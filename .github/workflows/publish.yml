@@ -41,4 +41,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${GITHUB_REF#refs/tags/}"
-          gh release upload "$tag" schema.json meta.json --clobber
+          gh release upload "$tag" schema/schema.json schema/meta.json --clobber

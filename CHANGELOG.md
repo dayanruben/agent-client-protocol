@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.9 (2025-10-13)
+
+- Fix schema publishing
+
 ## 0.4.8 (2025-10-13)
 
 - Fix publishing
