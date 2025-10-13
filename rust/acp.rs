@@ -27,9 +27,9 @@
 //! which define the core methods and capabilities of each side of the connection.
 //!
 //! To see working examples of these traits in action, check out the
-//! [agent](https://github.com/agentclientprotocol/agent-client-protocol/blob/main/rust/examples/agent.rs)
+//! [agent](https://github.com/agentclientprotocol/rust-sdk/blob/main/examples/agent.rs)
 //! and
-//! [client](https://github.com/agentclientprotocol/agent-client-protocol/blob/main/rust/examples/client.rs)
+//! [client](https://github.com/agentclientprotocol/rust-sdk/blob/main/examples/client.rs)
 //! example binaries included with this crate.
 //!
 //! ### Implementation Pattern
@@ -56,7 +56,6 @@ mod content;
 mod error;
 mod ext;
 mod plan;
-mod sdk;
 mod tool_call;
 mod version;
 
@@ -66,7 +65,6 @@ pub use content::*;
 pub use error::*;
 pub use ext::*;
 pub use plan::*;
-pub use sdk::*;
 pub use serde_json::value::RawValue;
 pub use tool_call::*;
 pub use version::*;
