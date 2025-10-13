@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.8 (2025-10-13)
+
+- Fix publishing
+
 ## 0.4.7 (2025-10-13)
 
 ### Protocol
