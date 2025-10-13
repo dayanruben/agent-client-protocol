@@ -20,6 +20,10 @@ unstable = []
 path = "rust/acp.rs"
 doctest = false
 
+[[bin]]
+name = "generate"
+path = "rust/bin/generate.rs"
+
 [dependencies]
 anyhow = "1"
 schemars = { version = "1" }

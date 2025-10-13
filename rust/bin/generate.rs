@@ -1,4 +1,4 @@
-use agent_client_protocol::{
+use agent_client_protocol_schema::{
     AGENT_METHOD_NAMES, AgentNotification, AgentRequest, AgentResponse, CLIENT_METHOD_NAMES,
     ClientNotification, ClientRequest, ClientResponse, VERSION,
 };
