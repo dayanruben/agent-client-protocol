@@ -27,11 +27,8 @@ use crate::{
 #[schemars(inline)]
 pub enum RequestId {
     #[display("null")]
-    #[schemars(title = "null")]
     Null,
-    #[schemars(title = "number")]
     Number(i64),
-    #[schemars(title = "string")]
     Str(String),
 }
 

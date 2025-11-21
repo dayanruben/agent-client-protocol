@@ -2,7 +2,11 @@ use agent_client_protocol_schema::{
     AGENT_METHOD_NAMES, AgentSide, CLIENT_METHOD_NAMES, ClientSide, JsonRpcMessage,
     OutgoingMessage, VERSION,
 };
-use schemars::{JsonSchema, generate::SchemaSettings};
+use schemars::{
+    JsonSchema,
+    generate::SchemaSettings,
+    transform::{RemoveRefSiblings, ReplaceBoolSchemas},
+};
 use std::{env, fs, path::Path};
 
 use markdown_generator::MarkdownGenerator;
@@ -26,8 +30,10 @@ enum AcpTypes {
 }
 
 fn main() {
-    let mut settings = SchemaSettings::default();
-    settings.untagged_enum_variant_titles = true;
+    let mut settings = SchemaSettings::draft2020_12();
+    settings = settings
+        .with_transform(RemoveRefSiblings::default())
+        .with_transform(ReplaceBoolSchemas::default());
 
     let generator = settings.into_generator();
     let mut schema = generator.into_root_schema_for::<AcpTypes>();
@@ -271,10 +277,8 @@ and control access to resources."
             write!(&mut self.output, "<ResponseField name=\"").unwrap();
 
             // Get variant name
-            let mut variant_name = String::new();
             if let Some(ref_val) = variant.get("$ref").and_then(|v| v.as_str()) {
                 let type_name = ref_val.strip_prefix("#/$defs/").unwrap_or(ref_val);
-                variant_name = type_name.to_string();
                 write!(&mut self.output, "{type_name}").unwrap();
             } else if let Some(const_val) = variant.get("const") {
                 if let Some(s) = const_val.as_str() {
@@ -309,29 +313,62 @@ and control access to resources."
                 writeln!(&mut self.output, "{{\"\"}}").unwrap();
             }
 
-            // Document properties if this variant has them
-            if let Some(props) = variant.get("properties").and_then(|v| v.as_object()) {
-                if !props.is_empty() {
-                    writeln!(&mut self.output).unwrap();
-                    writeln!(&mut self.output, "<Expandable title=\"Properties\">").unwrap();
-                    writeln!(&mut self.output).unwrap();
-                    self.document_properties_as_fields(props, variant, 0);
-                    writeln!(&mut self.output).unwrap();
-                    writeln!(&mut self.output, "</Expandable>").unwrap();
+            // Collect all properties and required fields
+            let mut merged_props = serde_json::Map::new();
+            let mut merged_required = Vec::new();
+
+            // Helper to merge from a definition
+            let mut merge_from = |def: &Value| {
+                if let Some(props) = def.get("properties").and_then(|v| v.as_object()) {
+                    for (k, v) in props {
+                        merged_props.insert(k.clone(), v.clone());
+                    }
                 }
-            } else if !variant_name.is_empty() {
-                // If this is a $ref, look up and document the referenced type's properties
-                if let Some(ref_def) = self.definitions.get(&variant_name).cloned()
-                    && let Some(props) = ref_def.get("properties").and_then(|v| v.as_object())
-                    && !props.is_empty()
-                {
-                    writeln!(&mut self.output).unwrap();
-                    writeln!(&mut self.output, "<Expandable title=\"Properties\">").unwrap();
-                    writeln!(&mut self.output).unwrap();
-                    self.document_properties_as_fields(props, &ref_def, 0);
-                    writeln!(&mut self.output).unwrap();
-                    writeln!(&mut self.output, "</Expandable>").unwrap();
+                if let Some(req) = def.get("required").and_then(|v| v.as_array()) {
+                    for r in req {
+                        if !merged_required.contains(r) {
+                            merged_required.push(r.clone());
+                        }
+                    }
                 }
+            };
+
+            // 1. Check for $ref (direct)
+            if let Some(ref_val) = variant.get("$ref").and_then(|v| v.as_str()) {
+                let type_name = ref_val.strip_prefix("#/$defs/").unwrap_or(ref_val);
+                if let Some(ref_def) = self.definitions.get(type_name) {
+                    merge_from(ref_def);
+                }
+            }
+
+            // 2. Check for allOf (often used for inheritance/composition)
+            if let Some(all_of) = variant.get("allOf").and_then(|v| v.as_array()) {
+                for item in all_of {
+                    if let Some(ref_val) = item.get("$ref").and_then(|v| v.as_str()) {
+                        let type_name = ref_val.strip_prefix("#/$defs/").unwrap_or(ref_val);
+                        if let Some(ref_def) = self.definitions.get(type_name) {
+                            merge_from(ref_def);
+                        }
+                    } else {
+                        merge_from(item);
+                    }
+                }
+            }
+
+            // 3. Local properties
+            merge_from(variant);
+
+            if !merged_props.is_empty() {
+                writeln!(&mut self.output).unwrap();
+                writeln!(&mut self.output, "<Expandable title=\"Properties\">").unwrap();
+                writeln!(&mut self.output).unwrap();
+
+                let mut synthetic_def = serde_json::Map::new();
+                synthetic_def.insert("required".to_string(), Value::Array(merged_required));
+
+                self.document_properties_as_fields(&merged_props, &Value::Object(synthetic_def), 0);
+                writeln!(&mut self.output).unwrap();
+                writeln!(&mut self.output, "</Expandable>").unwrap();
             }
 
             writeln!(&mut self.output, "</ResponseField>").unwrap();
@@ -582,6 +619,15 @@ and control access to resources."
                     Self::anchor_text(type_name),
                     type_name
                 );
+            }
+
+            // Check for single-item allOf/anyOf/oneOf wrappers (often used for $ref with sibling properties)
+            for key in ["allOf", "anyOf", "oneOf"] {
+                if let Some(arr) = schema.get(key).and_then(|v| v.as_array())
+                    && arr.len() == 1
+                {
+                    return Self::get_type_string(&arr[0]);
+                }
             }
 
             // Check for type
