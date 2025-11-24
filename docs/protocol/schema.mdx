@@ -115,7 +115,7 @@ See protocol docs: [Initialization](https://agentclientprotocol.com/protocol/ini
 <ResponseField name="agentCapabilities" type={<a href="#agentcapabilities">AgentCapabilities</a>} >
   Capabilities supported by the agent.
 
-    - Default: `{"loadSession":false,"mcpCapabilities":{"http":false,"sse":false},"promptCapabilities":{"audio":false,"embeddedContext":false,"image":false}}`
+    - Default: `{"loadSession":false,"mcpCapabilities":{"http":false,"sse":false},"promptCapabilities":{"audio":false,"embeddedContext":false,"image":false},"sessionCapabilities":{}}`
 
 </ResponseField>
 <ResponseField name="agentInfo" type={<><span><a href="#implementation">Implementation</a></span><span> | null</span></>} >
@@ -999,6 +999,11 @@ See protocol docs: [Agent Capabilities](https://agentclientprotocol.com/protocol
   Prompt capabilities supported by the agent.
 
     - Default: `{"audio":false,"embeddedContext":false,"image":false}`
+
+</ResponseField>
+<ResponseField name="sessionCapabilities" type={<a href="#sessioncapabilities">SessionCapabilities</a>} >
+
+    - Default: `{}`
 
 </ResponseField>
 
@@ -2224,6 +2229,26 @@ The user selected one of the provided options.
   required
 >
   The ID of the option the user selected.
+</ResponseField>
+
+## <span class="font-mono">SessionCapabilities</span>
+
+Session capabilities supported by the agent.
+
+As a baseline, all Agents **MUST** support `session/new`, `session/prompt`, `session/cancel`, and `session/update`.
+
+Optionally, they **MAY** support other session methods and notifications by specifying additional capabilities.
+
+Note: `session/load` is still handled by the top-level `load_session` capability. This will be unified in future versions of the protocol.
+
+See protocol docs: [Session Capabilities](https://agentclientprotocol.com/protocol/initialization#session-capabilities)
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object"}>
+  Extension point for implementations
 </ResponseField>
 
 ## <span class="font-mono">SessionId</span>

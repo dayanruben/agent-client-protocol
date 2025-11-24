@@ -528,6 +528,167 @@ impl LoadSessionResponse {
     }
 }
 
+// List sessions
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Request parameters for listing existing sessions.
+///
+/// Only available if the Agent supports the `listSessions` capability.
+#[cfg(feature = "unstable_session_list")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(extend("x-side" = "agent", "x-method" = SESSION_LIST_METHOD_NAME))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ListSessionsRequest {
+    /// Filter sessions by working directory. Must be an absolute path.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<PathBuf>,
+    /// Opaque cursor token from a previous response's nextCursor field for cursor-based pagination
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cursor: Option<String>,
+    /// Extension point for implementations
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<serde_json::Value>,
+}
+
+#[cfg(feature = "unstable_session_list")]
+impl ListSessionsRequest {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Filter sessions by working directory. Must be an absolute path.
+    #[must_use]
+    pub fn cwd(mut self, cwd: impl Into<PathBuf>) -> Self {
+        self.cwd = Some(cwd.into());
+        self
+    }
+
+    /// Opaque cursor token from a previous response's nextCursor field for cursor-based pagination
+    #[must_use]
+    pub fn cursor(mut self, cursor: impl Into<String>) -> Self {
+        self.cursor = Some(cursor.into());
+        self
+    }
+
+    /// Extension point for implementations
+    #[must_use]
+    pub fn meta(mut self, meta: serde_json::Value) -> Self {
+        self.meta = Some(meta);
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Response from listing sessions.
+#[cfg(feature = "unstable_session_list")]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(extend("x-side" = "agent", "x-method" = SESSION_LIST_METHOD_NAME))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ListSessionsResponse {
+    /// Array of session information objects
+    pub sessions: Vec<SessionInfo>,
+    /// Opaque cursor token. If present, pass this in the next request's cursor parameter
+    /// to fetch the next page. If absent, there are no more results.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_cursor: Option<String>,
+    /// Extension point for implementations
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<serde_json::Value>,
+}
+
+#[cfg(feature = "unstable_session_list")]
+impl ListSessionsResponse {
+    #[must_use]
+    pub fn new(sessions: Vec<SessionInfo>) -> Self {
+        Self {
+            sessions,
+            next_cursor: None,
+            meta: None,
+        }
+    }
+
+    #[must_use]
+    pub fn next_cursor(mut self, next_cursor: impl Into<String>) -> Self {
+        self.next_cursor = Some(next_cursor.into());
+        self
+    }
+
+    /// Extension point for implementations
+    #[must_use]
+    pub fn meta(mut self, meta: serde_json::Value) -> Self {
+        self.meta = Some(meta);
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Information about a session returned by session/list
+#[cfg(feature = "unstable_session_list")]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct SessionInfo {
+    /// Unique identifier for the session
+    pub session_id: SessionId,
+    /// The working directory for this session. Must be an absolute path.
+    pub cwd: PathBuf,
+    /// Human-readable title for the session
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// ISO 8601 timestamp of last activity
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updated_at: Option<String>,
+    /// Extension point for implementations
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<serde_json::Value>,
+}
+
+#[cfg(feature = "unstable_session_list")]
+impl SessionInfo {
+    pub fn new(session_id: SessionId, cwd: impl Into<PathBuf>) -> Self {
+        Self {
+            session_id,
+            cwd: cwd.into(),
+            title: None,
+            updated_at: None,
+            meta: None,
+        }
+    }
+
+    /// Human-readable title for the session
+    #[must_use]
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    /// ISO 8601 timestamp of last activity
+    #[must_use]
+    pub fn updated_at(mut self, updated_at: impl Into<String>) -> Self {
+        self.updated_at = Some(updated_at.into());
+        self
+    }
+
+    /// Extension point for implementations
+    #[must_use]
+    pub fn meta(mut self, meta: serde_json::Value) -> Self {
+        self.meta = Some(meta);
+        self
+    }
+}
+
 // Session modes
 
 /// The set of modes and the one currently active.
@@ -1201,6 +1362,8 @@ pub struct AgentCapabilities {
     /// MCP capabilities supported by the agent.
     #[serde(default)]
     pub mcp_capabilities: McpCapabilities,
+    #[serde(default)]
+    pub session_capabilities: SessionCapabilities,
     /// Extension point for implementations
     #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
     pub meta: Option<serde_json::Value>,
@@ -1233,6 +1396,81 @@ impl AgentCapabilities {
         self
     }
 
+    /// Extension point for implementations
+    #[must_use]
+    pub fn meta(mut self, meta: serde_json::Value) -> Self {
+        self.meta = Some(meta);
+        self
+    }
+}
+
+/// Session capabilities supported by the agent.
+///
+/// As a baseline, all Agents **MUST** support `session/new`, `session/prompt`, `session/cancel`, and `session/update`.
+///
+/// Optionally, they **MAY** support other session methods and notifications by specifying additional capabilities.
+///
+/// Note: `session/load` is still handled by the top-level `load_session` capability. This will be unified in future versions of the protocol.
+///
+/// See protocol docs: [Session Capabilities](https://agentclientprotocol.com/protocol/initialization#session-capabilities)
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SessionCapabilities {
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// Whether the agent supports `session/list`.
+    #[cfg(feature = "unstable_session_list")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub list: Option<SessionListCapabilities>,
+    /// Extension point for implementations
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<serde_json::Value>,
+}
+
+impl SessionCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    #[cfg(feature = "unstable_session_list")]
+    /// Whether the agent supports `session/list`.
+    #[must_use]
+    pub fn list(mut self, list: SessionListCapabilities) -> Self {
+        self.list = Some(list);
+        self
+    }
+
+    /// Extension point for implementations
+    #[must_use]
+    pub fn meta(mut self, meta: serde_json::Value) -> Self {
+        self.meta = Some(meta);
+        self
+    }
+}
+
+/// Capabilities for the `session/list` method.
+///
+/// By supplying `{}` it means that the agent supports listing of sessions.
+///
+/// Further capabilities can be added in the future for other means of filtering or searching the list.
+#[cfg(feature = "unstable_session_list")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SessionListCapabilities {
+    /// Extension point for implementations
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<serde_json::Value>,
+}
+
+#[cfg(feature = "unstable_session_list")]
+impl SessionListCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
     /// Extension point for implementations
     #[must_use]
     pub fn meta(mut self, meta: serde_json::Value) -> Self {
@@ -1381,6 +1619,9 @@ pub struct AgentMethodNames {
     /// Method for selecting a model for a given session.
     #[cfg(feature = "unstable_session_model")]
     pub session_set_model: &'static str,
+    /// Method for listing existing sessions.
+    #[cfg(feature = "unstable_session_list")]
+    pub session_list: &'static str,
 }
 
 /// Constant containing all agent method names.
@@ -1394,6 +1635,8 @@ pub const AGENT_METHOD_NAMES: AgentMethodNames = AgentMethodNames {
     session_cancel: SESSION_CANCEL_METHOD_NAME,
     #[cfg(feature = "unstable_session_model")]
     session_set_model: SESSION_SET_MODEL_METHOD_NAME,
+    #[cfg(feature = "unstable_session_list")]
+    session_list: SESSION_LIST_METHOD_NAME,
 };
 
 /// Method name for the initialize request.
@@ -1413,6 +1656,9 @@ pub(crate) const SESSION_CANCEL_METHOD_NAME: &str = "session/cancel";
 /// Method name for selecting a model for a given session.
 #[cfg(feature = "unstable_session_model")]
 pub(crate) const SESSION_SET_MODEL_METHOD_NAME: &str = "session/set_model";
+/// Method name for listing existing sessions.
+#[cfg(feature = "unstable_session_list")]
+pub(crate) const SESSION_LIST_METHOD_NAME: &str = "session/list";
 
 /// All possible requests that a client can send to an agent.
 ///
@@ -1470,6 +1716,17 @@ pub enum ClientRequest {
     ///
     /// See protocol docs: [Loading Sessions](https://agentclientprotocol.com/protocol/session-setup#loading-sessions)
     LoadSessionRequest(LoadSessionRequest),
+    #[cfg(feature = "unstable_session_list")]
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// Lists existing sessions known to the agent.
+    ///
+    /// This method is only available if the agent advertises the `listSessions` capability.
+    ///
+    /// The agent should return metadata about sessions with optional filtering and pagination support.
+    ListSessionsRequest(ListSessionsRequest),
     /// Sets the current mode for a session.
     ///
     /// Allows switching between different agent modes (e.g., "ask", "architect", "code")
@@ -1527,6 +1784,8 @@ pub enum AgentResponse {
     AuthenticateResponse(#[serde(default)] AuthenticateResponse),
     NewSessionResponse(NewSessionResponse),
     LoadSessionResponse(#[serde(default)] LoadSessionResponse),
+    #[cfg(feature = "unstable_session_list")]
+    ListSessionsResponse(ListSessionsResponse),
     SetSessionModeResponse(#[serde(default)] SetSessionModeResponse),
     PromptResponse(PromptResponse),
     #[cfg(feature = "unstable_session_model")]
