@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.8.0](https://github.com/agentclientprotocol/agent-client-protocol/compare/v0.7.0...v0.8.0) - 2025-11-28
+
+Some follow-up changes from 0.7.0. Most of the changes were in the Rust schema to make things a bit easier to work with.
+
+However, there were some further cleanups to the JSON schema to remove some $ref indirection where possible to have the schema be a bit flatter.
+
+There are also some fixes that were causing issues with code generators related to Extension methods, these now have concrete types in the schema as well.
+
+**Rust**: There are some breaking changes to the `OutgoingMessage` types and other low-level RPC types to make them generate clearer JSON schema representations. Likely these are only used by SDKs, but they moved to tuple enum variants.
+
+Also, rather than having free-floating `V0` and `V1` constants, these are now associated constants on the `ProtocolVersion` type itself.
+
+### Fixed
+
+- Broken doctest and test in CI ([#267](https://github.com/agentclientprotocol/agent-client-protocol/pull/267))
+
+### Other
+
+- Remove some nesting of the JSON schema ([#278](https://github.com/agentclientprotocol/agent-client-protocol/pull/278))
+- Easier ids in constructors ([#275](https://github.com/agentclientprotocol/agent-client-protocol/pull/275))
+- Exhaustive RPC types ([#272](https://github.com/agentclientprotocol/agent-client-protocol/pull/272))
+- Easier `new` methods for ExtRequest + ExtNotification ([#271](https://github.com/agentclientprotocol/agent-client-protocol/pull/271))
+- Protocol Version constants ([#270](https://github.com/agentclientprotocol/agent-client-protocol/pull/270))
+- Cleanup Rust example from schema docs ([#269](https://github.com/agentclientprotocol/agent-client-protocol/pull/269))
+- Introduce helper methods to get the corresponding method name of a ([#268](https://github.com/agentclientprotocol/agent-client-protocol/pull/268))
+
 ## 0.7.0 (2025-11-25)
 
 This is a big release as we move towards a v1.0 release of the JSON Schema.
