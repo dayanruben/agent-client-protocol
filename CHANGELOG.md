@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.0](https://github.com/agentclientprotocol/agent-client-protocol/compare/v0.9.1...v0.10.0) - 2025-12-06
+
+This release mostly contains several nice quality-of-life improvements for the Rust version of the schema, as well as an unstable draft implementation of session/fork for people to start trying out.
+
+### Added
+
+- *(rust-only)* More convenient builder method params ([#313](https://github.com/agentclientprotocol/agent-client-protocol/pull/313))
+- *(unstable)* Draft implementation of session/fork ([#311](https://github.com/agentclientprotocol/agent-client-protocol/pull/311))
+- *(rust-only)*: Provide nicer interface to `ErrorCode` and add them to the docs ([#301](https://github.com/agentclientprotocol/agent-client-protocol/pull/301))
+
+### Fixed
+
+- *(rust)* Make new methods consistent for all id params ([#306](https://github.com/agentclientprotocol/agent-client-protocol/pull/306))
+
+### Other
+
+- Bump the minor group with 2 updates ([#310](https://github.com/agentclientprotocol/agent-client-protocol/pull/310))
+- *(rust)* Move to a more typical rust lib setup ([#299](https://github.com/agentclientprotocol/agent-client-protocol/pull/299))
+
 ## [0.9.1](https://github.com/agentclientprotocol/agent-client-protocol/compare/v0.9.0...v0.9.1) - 2025-12-01
 
 ### Fixed
