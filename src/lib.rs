@@ -56,6 +56,8 @@ mod content;
 mod error;
 mod ext;
 mod plan;
+#[cfg(feature = "unstable_cancel_request")]
+mod protocol_level;
 mod rpc;
 mod tool_call;
 mod version;
@@ -67,6 +69,8 @@ use derive_more::{Display, From};
 pub use error::*;
 pub use ext::*;
 pub use plan::*;
+#[cfg(feature = "unstable_cancel_request")]
+pub use protocol_level::*;
 pub use rpc::*;
 pub use serde_json::value::RawValue;
 pub use tool_call::*;
