@@ -621,6 +621,11 @@ impl LoadSessionResponse {
 pub struct ForkSessionRequest {
     /// The ID of the session to fork.
     pub session_id: SessionId,
+    /// The working directory for this session.
+    pub cwd: PathBuf,
+    /// List of MCP servers to connect to for this session.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mcp_servers: Vec<McpServer>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
@@ -632,11 +637,20 @@ pub struct ForkSessionRequest {
 
 #[cfg(feature = "unstable_session_fork")]
 impl ForkSessionRequest {
-    pub fn new(session_id: impl Into<SessionId>) -> Self {
+    pub fn new(session_id: impl Into<SessionId>, cwd: impl Into<PathBuf>) -> Self {
         Self {
             session_id: session_id.into(),
+            cwd: cwd.into(),
+            mcp_servers: vec![],
             meta: None,
         }
+    }
+
+    /// List of MCP servers to connect to for this session.
+    #[must_use]
+    pub fn mcp_servers(mut self, mcp_servers: Vec<McpServer>) -> Self {
+        self.mcp_servers = mcp_servers;
+        self
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
