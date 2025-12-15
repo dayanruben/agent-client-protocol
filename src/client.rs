@@ -13,6 +13,8 @@ use crate::{
     ContentBlock, ExtNotification, ExtRequest, ExtResponse, IntoOption, Meta, Plan, SessionId,
     SessionModeId, ToolCall, ToolCallUpdate,
 };
+#[cfg(feature = "unstable_session_info_update")]
+use crate::{IntoMaybeUndefined, MaybeUndefined};
 
 // Session updates
 
@@ -90,6 +92,9 @@ pub enum SessionUpdate {
     ///
     /// See protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)
     CurrentModeUpdate(CurrentModeUpdate),
+    #[cfg(feature = "unstable_session_info_update")]
+    /// Session metadata has been updated (title, timestamps, custom metadata)
+    SessionInfoUpdate(SessionInfoUpdate),
 }
 
 /// The current mode of the session has changed
@@ -117,6 +122,63 @@ impl CurrentModeUpdate {
             current_mode_id: current_mode_id.into(),
             meta: None,
         }
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// Update to session metadata. All fields are optional to support partial updates.
+///
+/// Agents send this notification to update session information like title or custom metadata.
+/// This allows clients to display dynamic session names and track session state changes.
+#[cfg(feature = "unstable_session_info_update")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct SessionInfoUpdate {
+    /// Human-readable title for the session. Set to null to clear.
+    #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
+    pub title: MaybeUndefined<String>,
+    /// ISO 8601 timestamp of last activity. Set to null to clear.
+    #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
+    pub updated_at: MaybeUndefined<String>,
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_session_info_update")]
+impl SessionInfoUpdate {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Human-readable title for the session. Set to null to clear.
+    #[must_use]
+    pub fn title(mut self, title: impl IntoMaybeUndefined<String>) -> Self {
+        self.title = title.into_maybe_undefined();
+        self
+    }
+
+    /// ISO 8601 timestamp of last activity. Set to null to clear.
+    #[must_use]
+    pub fn updated_at(mut self, updated_at: impl IntoMaybeUndefined<String>) -> Self {
+        self.updated_at = updated_at.into_maybe_undefined();
+        self
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -1585,5 +1647,67 @@ impl AgentNotification {
             Self::SessionNotification(_) => CLIENT_METHOD_NAMES.session_update,
             Self::ExtNotification(ext_notification) => &ext_notification.method,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(feature = "unstable_session_info_update")]
+    #[test]
+    fn test_serialization_behavior() {
+        use serde_json::json;
+
+        assert_eq!(
+            serde_json::from_value::<SessionInfoUpdate>(json!({})).unwrap(),
+            SessionInfoUpdate {
+                title: MaybeUndefined::Undefined,
+                updated_at: MaybeUndefined::Undefined,
+                meta: None
+            }
+        );
+        assert_eq!(
+            serde_json::from_value::<SessionInfoUpdate>(json!({"title": null, "updatedAt": null}))
+                .unwrap(),
+            SessionInfoUpdate {
+                title: MaybeUndefined::Null,
+                updated_at: MaybeUndefined::Null,
+                meta: None
+            }
+        );
+        assert_eq!(
+            serde_json::from_value::<SessionInfoUpdate>(
+                json!({"title": "title", "updatedAt": "timestamp"})
+            )
+            .unwrap(),
+            SessionInfoUpdate {
+                title: MaybeUndefined::Value("title".to_string()),
+                updated_at: MaybeUndefined::Value("timestamp".to_string()),
+                meta: None
+            }
+        );
+
+        assert_eq!(
+            serde_json::to_value(SessionInfoUpdate::new()).unwrap(),
+            json!({})
+        );
+        assert_eq!(
+            serde_json::to_value(SessionInfoUpdate::new().title("title")).unwrap(),
+            json!({"title": "title"})
+        );
+        assert_eq!(
+            serde_json::to_value(SessionInfoUpdate::new().title(None)).unwrap(),
+            json!({"title": null})
+        );
+        assert_eq!(
+            serde_json::to_value(
+                SessionInfoUpdate::new()
+                    .title("title")
+                    .title(MaybeUndefined::Undefined)
+            )
+            .unwrap(),
+            json!({})
+        );
     }
 }
