@@ -27,6 +27,7 @@ struct ClientOutgoingMessage(JsonRpcMessage<OutgoingMessage<ClientSide, AgentSid
 #[derive(JsonSchema)]
 #[serde(untagged)]
 #[schemars(title = "Agent Client Protocol")]
+#[allow(clippy::large_enum_variant)]
 enum AcpTypes {
     Agent(AgentOutgoingMessage),
     Client(ClientOutgoingMessage),
@@ -942,6 +943,7 @@ starting with '$/' it is free to ignore the notification."
                 "session/prompt" => self.agent.get("PromptRequest").unwrap(),
                 "session/cancel" => self.agent.get("CancelNotification").unwrap(),
                 "session/set_model" => self.agent.get("SetSessionModelRequest").unwrap(),
+                "session/stop" => self.agent.get("StopSessionRequest").unwrap(),
                 _ => panic!("Introduced a method? Add it here :)"),
             }
         }
