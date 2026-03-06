@@ -726,26 +726,41 @@ Sets the current value for a session configuration option.
 
 Request parameters for setting a session configuration option.
 
-**Type:** Object
+**Type:** Union
 
-**Properties:**
+<ResponseField name="boolean" type="object">
+A boolean value (`type: "boolean"`).
 
-<ResponseField name="_meta" type={"object | null"} >
-  The _meta property is reserved by ACP to allow clients and agents to attach additional
-metadata to their interactions. Implementations MUST NOT make assumptions about values at
-these keys.
+<Expandable title="Properties">
 
-See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-
+<ResponseField name="type" type={"string"} required>
+  The discriminator value. Must be `"boolean"`.
 </ResponseField>
-<ResponseField name="configId" type={<a href="#sessionconfigid">SessionConfigId</a>} required>
-  The ID of the configuration option to set.
+<ResponseField name="value" type={"boolean"} required>
+  The boolean value.
 </ResponseField>
-<ResponseField name="sessionId" type={<a href="#sessionid">SessionId</a>} required>
-  The ID of the session to set the configuration option for.
+
+</Expandable>
 </ResponseField>
-<ResponseField name="value" type={<a href="#sessionconfigvalueid">SessionConfigValueId</a>} required>
-  The ID of the configuration option value to set.
+
+<ResponseField name="Object" type="object">
+A `SessionConfigValueId` string value.
+
+This is the default when `type` is absent on the wire. Unknown `type`
+values with string payloads also gracefully deserialize into this
+variant.
+
+<Expandable title="Properties">
+
+<ResponseField
+  name="value"
+  type={<a href="#sessionconfigvalueid">SessionConfigValueId</a>}
+  required
+>
+  The value ID.
+</ResponseField>
+
+</Expandable>
 </ResponseField>
 
 #### <span class="font-mono">SetSessionConfigOptionResponse</span>
@@ -3381,6 +3396,22 @@ Whether the agent supports `session/stop`.
 
 </ResponseField>
 
+## <span class="font-mono">SessionConfigBoolean</span>
+
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+A boolean on/off toggle session configuration option payload.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="currentValue" type={"boolean"} required>
+  The current value of the boolean option.
+</ResponseField>
+
 ## <span class="font-mono">SessionConfigGroupId</span>
 
 Unique identifier for a session configuration option value group.
@@ -3397,11 +3428,12 @@ Unique identifier for a session configuration option.
 
 A session configuration option selector and its current state.
 
+**Type:** Union
+
+<ResponseField name="select" type="object">
 Single-value selector (dropdown).
 
-**Type:** Object
-
-**Properties:**
+<Expandable title="Properties">
 
 <ResponseField
   name="currentValue"
@@ -3416,6 +3448,31 @@ Single-value selector (dropdown).
   required
 >
   The set of selectable options.
+</ResponseField>
+<ResponseField name="type" type={"string"} required>
+  The discriminator value. Must be `"select"`.
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="boolean" type="object">
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+Boolean on/off toggle.
+
+<Expandable title="Properties">
+
+<ResponseField name="currentValue" type={"boolean"} required>
+  The current value of the boolean option.
+</ResponseField>
+<ResponseField name="type" type={"string"} required>
+  The discriminator value. Must be `"boolean"`.
+</ResponseField>
+
+</Expandable>
 </ResponseField>
 
 ## <span class="font-mono">SessionConfigOptionCategory</span>
