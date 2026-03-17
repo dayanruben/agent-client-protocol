@@ -962,6 +962,12 @@ starting with '$/' it is free to ignore the notification."
                 "terminal/release" => self.client.get("ReleaseTerminalRequest").unwrap(),
                 "terminal/wait_for_exit" => self.client.get("WaitForTerminalExitRequest").unwrap(),
                 "terminal/kill" => self.client.get("KillTerminalRequest").unwrap(),
+                #[cfg(feature = "unstable_elicitation")]
+                "session/elicitation" => self.client.get("ElicitationRequest").unwrap(),
+                #[cfg(feature = "unstable_elicitation")]
+                "session/elicitation/complete" => {
+                    self.client.get("ElicitationCompleteNotification").unwrap()
+                }
                 _ => panic!("Introduced a method? Add it here :)"),
             }
         }
