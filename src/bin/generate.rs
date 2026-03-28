@@ -1033,6 +1033,16 @@ starting with '$/' it is free to ignore the notification."
                 "session/set_model" => self.agent.get("SetSessionModelRequest").unwrap(),
                 "session/close" => self.agent.get("CloseSessionRequest").unwrap(),
                 "logout" => self.agent.get("LogoutRequest").unwrap(),
+                "nes/start" => self.agent.get("StartNesRequest").unwrap(),
+                "nes/suggest" => self.agent.get("SuggestNesRequest").unwrap(),
+                "nes/close" => self.agent.get("CloseNesRequest").unwrap(),
+                "nes/accept" => self.agent.get("AcceptNesNotification").unwrap(),
+                "nes/reject" => self.agent.get("RejectNesNotification").unwrap(),
+                "document/didOpen" => self.agent.get("DidOpenDocumentNotification").unwrap(),
+                "document/didChange" => self.agent.get("DidChangeDocumentNotification").unwrap(),
+                "document/didClose" => self.agent.get("DidCloseDocumentNotification").unwrap(),
+                "document/didSave" => self.agent.get("DidSaveDocumentNotification").unwrap(),
+                "document/didFocus" => self.agent.get("DidFocusDocumentNotification").unwrap(),
                 _ => panic!("Introduced a method? Add it here :)"),
             }
         }

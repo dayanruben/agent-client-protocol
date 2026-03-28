@@ -20,6 +20,9 @@ use crate::{
 };
 use crate::{IntoMaybeUndefined, MaybeUndefined};
 
+#[cfg(feature = "unstable_nes")]
+use crate::{ClientNesCapabilities, PositionEncodingKind};
+
 // Session updates
 
 /// Notification containing a session update from the agent.
@@ -1500,6 +1503,23 @@ pub struct ClientCapabilities {
     #[cfg(feature = "unstable_elicitation")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub elicitation: Option<ElicitationCapabilities>,
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// NES (Next Edit Suggestions) capabilities supported by the client.
+    #[cfg(feature = "unstable_nes")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nes: Option<ClientNesCapabilities>,
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// The position encodings supported by the client, in order of preference.
+    #[cfg(feature = "unstable_nes")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub position_encodings: Vec<PositionEncodingKind>,
+
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
@@ -1554,6 +1574,26 @@ impl ClientCapabilities {
     #[must_use]
     pub fn elicitation(mut self, elicitation: impl IntoOption<ElicitationCapabilities>) -> Self {
         self.elicitation = elicitation.into_option();
+        self
+    }
+
+    /// **UNSTABLE**
+    ///
+    /// NES (Next Edit Suggestions) capabilities supported by the client.
+    #[cfg(feature = "unstable_nes")]
+    #[must_use]
+    pub fn nes(mut self, nes: impl IntoOption<ClientNesCapabilities>) -> Self {
+        self.nes = nes.into_option();
+        self
+    }
+
+    /// **UNSTABLE**
+    ///
+    /// The position encodings supported by the client, in order of preference.
+    #[cfg(feature = "unstable_nes")]
+    #[must_use]
+    pub fn position_encodings(mut self, position_encodings: Vec<PositionEncodingKind>) -> Self {
+        self.position_encodings = position_encodings;
         self
     }
 
@@ -2019,5 +2059,19 @@ mod tests {
             .unwrap(),
             json!({})
         );
+    }
+
+    #[cfg(feature = "unstable_nes")]
+    #[test]
+    fn test_client_capabilities_position_encodings_serialization() {
+        use serde_json::json;
+
+        let capabilities = ClientCapabilities::new().position_encodings(vec![
+            PositionEncodingKind::Utf32,
+            PositionEncodingKind::Utf16,
+        ]);
+        let json = serde_json::to_value(&capabilities).unwrap();
+
+        assert_eq!(json["positionEncodings"], json!(["utf-32", "utf-16"]));
     }
 }
