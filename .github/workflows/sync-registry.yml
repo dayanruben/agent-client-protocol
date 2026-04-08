@@ -11,6 +11,7 @@ on:
 jobs:
   sync:
     name: Sync Registry Documentation
+    if: github.repository_owner == 'agentclientprotocol'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
