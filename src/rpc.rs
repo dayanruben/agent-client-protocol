@@ -216,8 +216,8 @@ impl Side for ClientSide {
                     .map_err(Into::into)
             }
             #[cfg(feature = "unstable_elicitation")]
-            m if m == CLIENT_METHOD_NAMES.session_elicitation => serde_json::from_str(params.get())
-                .map(AgentRequest::ElicitationRequest)
+            m if m == CLIENT_METHOD_NAMES.elicitation_create => serde_json::from_str(params.get())
+                .map(AgentRequest::CreateElicitationRequest)
                 .map_err(Into::into),
             _ => {
                 if let Some(custom_method) = method.strip_prefix('_') {
@@ -240,9 +240,9 @@ impl Side for ClientSide {
                 .map(AgentNotification::SessionNotification)
                 .map_err(Into::into),
             #[cfg(feature = "unstable_elicitation")]
-            m if m == CLIENT_METHOD_NAMES.session_elicitation_complete => {
+            m if m == CLIENT_METHOD_NAMES.elicitation_complete => {
                 serde_json::from_str(params.get())
-                    .map(AgentNotification::ElicitationCompleteNotification)
+                    .map(AgentNotification::CompleteElicitationNotification)
                     .map_err(Into::into)
             }
             _ => {
