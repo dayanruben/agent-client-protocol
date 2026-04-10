@@ -11,8 +11,8 @@ use serde::{Deserialize, Serialize};
 
 #[cfg(feature = "unstable_elicitation")]
 use crate::elicitation::{
-    ElicitationCapabilities, ElicitationCompleteNotification, ElicitationRequest,
-    ElicitationResponse,
+    CompleteElicitationNotification, CreateElicitationRequest, CreateElicitationResponse,
+    ElicitationCapabilities,
 };
 use crate::{
     ContentBlock, ExtNotification, ExtRequest, ExtResponse, IntoOption, Meta, Plan,
@@ -1746,12 +1746,12 @@ pub struct ClientMethodNames {
     pub terminal_wait_for_exit: &'static str,
     /// Method for killing a terminal.
     pub terminal_kill: &'static str,
-    /// Method for session elicitation.
+    /// Method for elicitation.
     #[cfg(feature = "unstable_elicitation")]
-    pub session_elicitation: &'static str,
+    pub elicitation_create: &'static str,
     /// Notification for elicitation completion.
     #[cfg(feature = "unstable_elicitation")]
-    pub session_elicitation_complete: &'static str,
+    pub elicitation_complete: &'static str,
 }
 
 /// Constant containing all client method names.
@@ -1766,9 +1766,9 @@ pub const CLIENT_METHOD_NAMES: ClientMethodNames = ClientMethodNames {
     terminal_wait_for_exit: TERMINAL_WAIT_FOR_EXIT_METHOD_NAME,
     terminal_kill: TERMINAL_KILL_METHOD_NAME,
     #[cfg(feature = "unstable_elicitation")]
-    session_elicitation: SESSION_ELICITATION_METHOD_NAME,
+    elicitation_create: ELICITATION_CREATE_METHOD_NAME,
     #[cfg(feature = "unstable_elicitation")]
-    session_elicitation_complete: SESSION_ELICITATION_COMPLETE,
+    elicitation_complete: ELICITATION_COMPLETE_NOTIFICATION,
 };
 
 /// Notification name for session updates.
@@ -1789,12 +1789,12 @@ pub(crate) const TERMINAL_RELEASE_METHOD_NAME: &str = "terminal/release";
 pub(crate) const TERMINAL_WAIT_FOR_EXIT_METHOD_NAME: &str = "terminal/wait_for_exit";
 /// Method for killing a terminal.
 pub(crate) const TERMINAL_KILL_METHOD_NAME: &str = "terminal/kill";
-/// Method name for session elicitation.
+/// Method name for elicitation.
 #[cfg(feature = "unstable_elicitation")]
-pub(crate) const SESSION_ELICITATION_METHOD_NAME: &str = "session/elicitation";
+pub(crate) const ELICITATION_CREATE_METHOD_NAME: &str = "elicitation/create";
 /// Notification name for elicitation completion.
 #[cfg(feature = "unstable_elicitation")]
-pub(crate) const SESSION_ELICITATION_COMPLETE: &str = "session/elicitation/complete";
+pub(crate) const ELICITATION_COMPLETE_NOTIFICATION: &str = "elicitation/complete";
 
 /// All possible requests that an agent can send to a client.
 ///
@@ -1890,7 +1890,7 @@ pub enum AgentRequest {
     ///
     /// Requests structured user input via a form or URL.
     #[cfg(feature = "unstable_elicitation")]
-    ElicitationRequest(ElicitationRequest),
+    CreateElicitationRequest(CreateElicitationRequest),
     /// Handles extension method requests from the agent.
     ///
     /// Allows the Agent to send an arbitrary request that is not part of the ACP spec.
@@ -1915,7 +1915,7 @@ impl AgentRequest {
             Self::WaitForTerminalExitRequest(_) => CLIENT_METHOD_NAMES.terminal_wait_for_exit,
             Self::KillTerminalRequest(_) => CLIENT_METHOD_NAMES.terminal_kill,
             #[cfg(feature = "unstable_elicitation")]
-            Self::ElicitationRequest(_) => CLIENT_METHOD_NAMES.session_elicitation,
+            Self::CreateElicitationRequest(_) => CLIENT_METHOD_NAMES.elicitation_create,
             Self::ExtMethodRequest(ext_request) => &ext_request.method,
         }
     }
@@ -1941,7 +1941,7 @@ pub enum ClientResponse {
     WaitForTerminalExitResponse(WaitForTerminalExitResponse),
     KillTerminalResponse(#[serde(default)] KillTerminalResponse),
     #[cfg(feature = "unstable_elicitation")]
-    ElicitationResponse(ElicitationResponse),
+    CreateElicitationResponse(CreateElicitationResponse),
     ExtMethodResponse(ExtResponse),
 }
 
@@ -1975,7 +1975,7 @@ pub enum AgentNotification {
     ///
     /// Notification that a URL-based elicitation has completed.
     #[cfg(feature = "unstable_elicitation")]
-    ElicitationCompleteNotification(ElicitationCompleteNotification),
+    CompleteElicitationNotification(CompleteElicitationNotification),
     /// Handles extension notifications from the agent.
     ///
     /// Allows the Agent to send an arbitrary notification that is not part of the ACP spec.
@@ -1993,9 +1993,7 @@ impl AgentNotification {
         match self {
             Self::SessionNotification(_) => CLIENT_METHOD_NAMES.session_update,
             #[cfg(feature = "unstable_elicitation")]
-            Self::ElicitationCompleteNotification(_) => {
-                CLIENT_METHOD_NAMES.session_elicitation_complete
-            }
+            Self::CompleteElicitationNotification(_) => CLIENT_METHOD_NAMES.elicitation_complete,
             Self::ExtNotification(ext_notification) => &ext_notification.method,
         }
     }
