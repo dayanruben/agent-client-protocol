@@ -5,13 +5,15 @@
 
 use std::{path::PathBuf, sync::Arc};
 
-#[cfg(feature = "unstable_auth_methods")]
+#[cfg(any(feature = "unstable_auth_methods", feature = "unstable_llm_providers"))]
 use std::collections::HashMap;
 
 use derive_more::{Display, From};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "unstable_llm_providers")]
+use crate::RequiredNullable;
 use crate::{
     ClientCapabilities, ContentBlock, ExtNotification, ExtRequest, ExtResponse, IntoOption, Meta,
     ProtocolVersion, SessionId,
@@ -3380,6 +3382,396 @@ impl SetSessionModelResponse {
     }
 }
 
+// Providers
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Well-known API protocol identifiers for LLM providers.
+///
+/// Agents and clients MUST handle unknown protocol identifiers gracefully.
+///
+/// Protocol names beginning with `_` are free for custom use, like other ACP extension methods.
+/// Protocol names that do not begin with `_` are reserved for the ACP spec.
+#[cfg(feature = "unstable_llm_providers")]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+#[expect(clippy::doc_markdown)]
+pub enum LlmProtocol {
+    /// Anthropic API protocol.
+    Anthropic,
+    /// OpenAI API protocol.
+    #[serde(rename = "openai")]
+    OpenAi,
+    /// Azure OpenAI API protocol.
+    Azure,
+    /// Google Vertex AI API protocol.
+    Vertex,
+    /// AWS Bedrock API protocol.
+    Bedrock,
+    /// Unknown or custom protocol.
+    #[serde(untagged)]
+    Other(String),
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Current effective non-secret routing configuration for a provider.
+#[cfg(feature = "unstable_llm_providers")]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ProviderCurrentConfig {
+    /// Protocol currently used by this provider.
+    pub api_type: LlmProtocol,
+    /// Base URL currently used by this provider.
+    pub base_url: String,
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+impl ProviderCurrentConfig {
+    #[must_use]
+    pub fn new(api_type: LlmProtocol, base_url: impl Into<String>) -> Self {
+        Self {
+            api_type,
+            base_url: base_url.into(),
+        }
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Information about a configurable LLM provider.
+#[cfg(feature = "unstable_llm_providers")]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ProviderInfo {
+    /// Provider identifier, for example "main" or "openai".
+    pub id: String,
+    /// Supported protocol types for this provider.
+    pub supported: Vec<LlmProtocol>,
+    /// Whether this provider is mandatory and cannot be disabled via `providers/disable`.
+    /// If true, clients must not call `providers/disable` for this id.
+    pub required: bool,
+    /// Current effective non-secret routing config.
+    /// Null means provider is disabled.
+    pub current: RequiredNullable<ProviderCurrentConfig>,
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+impl ProviderInfo {
+    #[must_use]
+    pub fn new(
+        id: impl Into<String>,
+        supported: Vec<LlmProtocol>,
+        required: bool,
+        current: impl Into<RequiredNullable<ProviderCurrentConfig>>,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            supported,
+            required,
+            current: current.into(),
+            meta: None,
+        }
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Request parameters for `providers/list`.
+#[cfg(feature = "unstable_llm_providers")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(extend("x-side" = "agent", "x-method" = PROVIDERS_LIST_METHOD_NAME))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ListProvidersRequest {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+impl ListProvidersRequest {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Response to `providers/list`.
+#[cfg(feature = "unstable_llm_providers")]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(extend("x-side" = "agent", "x-method" = PROVIDERS_LIST_METHOD_NAME))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ListProvidersResponse {
+    /// Configurable providers with current routing info suitable for UI display.
+    pub providers: Vec<ProviderInfo>,
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+impl ListProvidersResponse {
+    #[must_use]
+    pub fn new(providers: Vec<ProviderInfo>) -> Self {
+        Self {
+            providers,
+            meta: None,
+        }
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Request parameters for `providers/set`.
+///
+/// Replaces the full configuration for one provider id.
+#[cfg(feature = "unstable_llm_providers")]
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(extend("x-side" = "agent", "x-method" = PROVIDERS_SET_METHOD_NAME))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct SetProvidersRequest {
+    /// Provider id to configure.
+    pub id: String,
+    /// Protocol type for this provider.
+    pub api_type: LlmProtocol,
+    /// Base URL for requests sent through this provider.
+    pub base_url: String,
+    /// Full headers map for this provider.
+    /// May include authorization, routing, or other integration-specific headers.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub headers: HashMap<String, String>,
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+impl SetProvidersRequest {
+    #[must_use]
+    pub fn new(id: impl Into<String>, api_type: LlmProtocol, base_url: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            api_type,
+            base_url: base_url.into(),
+            headers: HashMap::new(),
+            meta: None,
+        }
+    }
+
+    /// Full headers map for this provider.
+    /// May include authorization, routing, or other integration-specific headers.
+    #[must_use]
+    pub fn headers(mut self, headers: HashMap<String, String>) -> Self {
+        self.headers = headers;
+        self
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Response to `providers/set`.
+#[cfg(feature = "unstable_llm_providers")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(extend("x-side" = "agent", "x-method" = PROVIDERS_SET_METHOD_NAME))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct SetProvidersResponse {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+impl SetProvidersResponse {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Request parameters for `providers/disable`.
+#[cfg(feature = "unstable_llm_providers")]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(extend("x-side" = "agent", "x-method" = PROVIDERS_DISABLE_METHOD_NAME))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct DisableProvidersRequest {
+    /// Provider id to disable.
+    pub id: String,
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+impl DisableProvidersRequest {
+    #[must_use]
+    pub fn new(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            meta: None,
+        }
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Response to `providers/disable`.
+#[cfg(feature = "unstable_llm_providers")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[schemars(extend("x-side" = "agent", "x-method" = PROVIDERS_DISABLE_METHOD_NAME))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct DisableProvidersResponse {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+impl DisableProvidersResponse {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
 // Capabilities
 
 /// Capabilities supported by the agent.
@@ -3411,6 +3803,16 @@ pub struct AgentCapabilities {
     #[cfg(feature = "unstable_logout")]
     #[serde(default)]
     pub auth: AgentAuthCapabilities,
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// Provider configuration capabilities supported by the agent.
+    ///
+    /// By supplying `{}` it means that the agent supports provider configuration methods.
+    #[cfg(feature = "unstable_llm_providers")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub providers: Option<ProvidersCapabilities>,
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
@@ -3484,6 +3886,20 @@ impl AgentCapabilities {
 
     /// **UNSTABLE**
     ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// Provider configuration capabilities supported by the agent.
+    #[cfg(feature = "unstable_llm_providers")]
+    #[must_use]
+    pub fn providers(mut self, providers: impl IntoOption<ProvidersCapabilities>) -> Self {
+        self.providers = providers.into_option();
+        self
+    }
+
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
     /// NES (Next Edit Suggestions) capabilities supported by the agent.
     #[cfg(feature = "unstable_nes")]
     #[must_use]
@@ -3503,6 +3919,45 @@ impl AgentCapabilities {
     ) -> Self {
         self.position_encoding = position_encoding.into_option();
         self
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Provider configuration capabilities supported by the agent.
+///
+/// By supplying `{}` it means that the agent supports provider configuration methods.
+#[cfg(feature = "unstable_llm_providers")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ProvidersCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(skip_serializing_if = "Option::is_none", rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+impl ProvidersCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -3971,6 +4426,15 @@ pub struct AgentMethodNames {
     pub initialize: &'static str,
     /// Method for authenticating with the agent.
     pub authenticate: &'static str,
+    /// Method for listing configurable providers.
+    #[cfg(feature = "unstable_llm_providers")]
+    pub providers_list: &'static str,
+    /// Method for setting provider configuration.
+    #[cfg(feature = "unstable_llm_providers")]
+    pub providers_set: &'static str,
+    /// Method for disabling a provider.
+    #[cfg(feature = "unstable_llm_providers")]
+    pub providers_disable: &'static str,
     /// Method for creating a new session.
     pub session_new: &'static str,
     /// Method for loading an existing session.
@@ -4036,6 +4500,12 @@ pub struct AgentMethodNames {
 pub const AGENT_METHOD_NAMES: AgentMethodNames = AgentMethodNames {
     initialize: INITIALIZE_METHOD_NAME,
     authenticate: AUTHENTICATE_METHOD_NAME,
+    #[cfg(feature = "unstable_llm_providers")]
+    providers_list: PROVIDERS_LIST_METHOD_NAME,
+    #[cfg(feature = "unstable_llm_providers")]
+    providers_set: PROVIDERS_SET_METHOD_NAME,
+    #[cfg(feature = "unstable_llm_providers")]
+    providers_disable: PROVIDERS_DISABLE_METHOD_NAME,
     session_new: SESSION_NEW_METHOD_NAME,
     session_load: SESSION_LOAD_METHOD_NAME,
     session_set_mode: SESSION_SET_MODE_METHOD_NAME,
@@ -4079,6 +4549,15 @@ pub const AGENT_METHOD_NAMES: AgentMethodNames = AgentMethodNames {
 pub(crate) const INITIALIZE_METHOD_NAME: &str = "initialize";
 /// Method name for the authenticate request.
 pub(crate) const AUTHENTICATE_METHOD_NAME: &str = "authenticate";
+/// Method name for listing configurable providers.
+#[cfg(feature = "unstable_llm_providers")]
+pub(crate) const PROVIDERS_LIST_METHOD_NAME: &str = "providers/list";
+/// Method name for setting provider configuration.
+#[cfg(feature = "unstable_llm_providers")]
+pub(crate) const PROVIDERS_SET_METHOD_NAME: &str = "providers/set";
+/// Method name for disabling a provider.
+#[cfg(feature = "unstable_llm_providers")]
+pub(crate) const PROVIDERS_DISABLE_METHOD_NAME: &str = "providers/disable";
 /// Method name for creating a new session.
 pub(crate) const SESSION_NEW_METHOD_NAME: &str = "session/new";
 /// Method name for loading an existing session.
@@ -4142,6 +4621,27 @@ pub enum ClientRequest {
     ///
     /// See protocol docs: [Initialization](https://agentclientprotocol.com/protocol/initialization)
     AuthenticateRequest(AuthenticateRequest),
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// Lists providers that can be configured by the client.
+    #[cfg(feature = "unstable_llm_providers")]
+    ListProvidersRequest(ListProvidersRequest),
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// Replaces the configuration for a provider.
+    #[cfg(feature = "unstable_llm_providers")]
+    SetProvidersRequest(SetProvidersRequest),
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// Disables a provider.
+    #[cfg(feature = "unstable_llm_providers")]
+    DisableProvidersRequest(DisableProvidersRequest),
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
@@ -4294,6 +4794,12 @@ impl ClientRequest {
         match self {
             Self::InitializeRequest(_) => AGENT_METHOD_NAMES.initialize,
             Self::AuthenticateRequest(_) => AGENT_METHOD_NAMES.authenticate,
+            #[cfg(feature = "unstable_llm_providers")]
+            Self::ListProvidersRequest(_) => AGENT_METHOD_NAMES.providers_list,
+            #[cfg(feature = "unstable_llm_providers")]
+            Self::SetProvidersRequest(_) => AGENT_METHOD_NAMES.providers_set,
+            #[cfg(feature = "unstable_llm_providers")]
+            Self::DisableProvidersRequest(_) => AGENT_METHOD_NAMES.providers_disable,
             #[cfg(feature = "unstable_logout")]
             Self::LogoutRequest(_) => AGENT_METHOD_NAMES.logout,
             Self::NewSessionRequest(_) => AGENT_METHOD_NAMES.session_new,
@@ -4335,6 +4841,12 @@ impl ClientRequest {
 pub enum AgentResponse {
     InitializeResponse(InitializeResponse),
     AuthenticateResponse(#[serde(default)] AuthenticateResponse),
+    #[cfg(feature = "unstable_llm_providers")]
+    ListProvidersResponse(ListProvidersResponse),
+    #[cfg(feature = "unstable_llm_providers")]
+    SetProvidersResponse(#[serde(default)] SetProvidersResponse),
+    #[cfg(feature = "unstable_llm_providers")]
+    DisableProvidersResponse(#[serde(default)] DisableProvidersResponse),
     #[cfg(feature = "unstable_logout")]
     LogoutResponse(#[serde(default)] LogoutResponse),
     NewSessionResponse(NewSessionResponse),
@@ -5281,5 +5793,262 @@ mod test_serialization {
             }
             _ => panic!("Expected Select kind"),
         }
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_llm_protocol_known_variants() {
+        assert_eq!(
+            serde_json::to_value(&LlmProtocol::Anthropic).unwrap(),
+            json!("anthropic")
+        );
+        assert_eq!(
+            serde_json::to_value(&LlmProtocol::OpenAi).unwrap(),
+            json!("openai")
+        );
+        assert_eq!(
+            serde_json::to_value(&LlmProtocol::Azure).unwrap(),
+            json!("azure")
+        );
+        assert_eq!(
+            serde_json::to_value(&LlmProtocol::Vertex).unwrap(),
+            json!("vertex")
+        );
+        assert_eq!(
+            serde_json::to_value(&LlmProtocol::Bedrock).unwrap(),
+            json!("bedrock")
+        );
+
+        assert_eq!(
+            serde_json::from_str::<LlmProtocol>("\"anthropic\"").unwrap(),
+            LlmProtocol::Anthropic
+        );
+        assert_eq!(
+            serde_json::from_str::<LlmProtocol>("\"openai\"").unwrap(),
+            LlmProtocol::OpenAi
+        );
+        assert_eq!(
+            serde_json::from_str::<LlmProtocol>("\"azure\"").unwrap(),
+            LlmProtocol::Azure
+        );
+        assert_eq!(
+            serde_json::from_str::<LlmProtocol>("\"vertex\"").unwrap(),
+            LlmProtocol::Vertex
+        );
+        assert_eq!(
+            serde_json::from_str::<LlmProtocol>("\"bedrock\"").unwrap(),
+            LlmProtocol::Bedrock
+        );
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_llm_protocol_unknown_variant() {
+        let unknown: LlmProtocol = serde_json::from_str("\"cohere\"").unwrap();
+        assert_eq!(unknown, LlmProtocol::Other("cohere".to_string()));
+
+        let json = serde_json::to_value(&unknown).unwrap();
+        assert_eq!(json, json!("cohere"));
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_provider_current_config_serialization() {
+        let config =
+            ProviderCurrentConfig::new(LlmProtocol::Anthropic, "https://api.anthropic.com");
+
+        let json = serde_json::to_value(&config).unwrap();
+        assert_eq!(
+            json,
+            json!({
+                "apiType": "anthropic",
+                "baseUrl": "https://api.anthropic.com"
+            })
+        );
+
+        let deserialized: ProviderCurrentConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(deserialized.api_type, LlmProtocol::Anthropic);
+        assert_eq!(deserialized.base_url, "https://api.anthropic.com");
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_provider_info_with_current_config() {
+        let info = ProviderInfo::new(
+            "main",
+            vec![LlmProtocol::Anthropic, LlmProtocol::OpenAi],
+            true,
+            Some(ProviderCurrentConfig::new(
+                LlmProtocol::Anthropic,
+                "https://api.anthropic.com",
+            )),
+        );
+
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(
+            json,
+            json!({
+                "id": "main",
+                "supported": ["anthropic", "openai"],
+                "required": true,
+                "current": {
+                    "apiType": "anthropic",
+                    "baseUrl": "https://api.anthropic.com"
+                }
+            })
+        );
+
+        let deserialized: ProviderInfo = serde_json::from_value(json).unwrap();
+        assert_eq!(deserialized.id, "main");
+        assert_eq!(deserialized.supported.len(), 2);
+        assert!(deserialized.required);
+        assert!(deserialized.current.is_value());
+        assert_eq!(
+            deserialized.current.value().unwrap().api_type,
+            LlmProtocol::Anthropic
+        );
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_provider_info_disabled() {
+        let info = ProviderInfo::new(
+            "secondary",
+            vec![LlmProtocol::OpenAi],
+            false,
+            RequiredNullable::<ProviderCurrentConfig>::null(),
+        );
+
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(
+            json,
+            json!({
+                "id": "secondary",
+                "supported": ["openai"],
+                "required": false,
+                "current": null
+            })
+        );
+
+        let deserialized: ProviderInfo = serde_json::from_value(json).unwrap();
+        assert_eq!(deserialized.id, "secondary");
+        assert!(!deserialized.required);
+        assert!(deserialized.current.is_null());
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_provider_info_missing_current_fails() {
+        // current is required-but-nullable — omitting it entirely must fail
+        let json = json!({
+            "id": "main",
+            "supported": ["anthropic"],
+            "required": true
+        });
+        assert!(serde_json::from_value::<ProviderInfo>(json).is_err());
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_list_providers_response_serialization() {
+        let response = ListProvidersResponse::new(vec![ProviderInfo::new(
+            "main",
+            vec![LlmProtocol::Anthropic],
+            true,
+            Some(ProviderCurrentConfig::new(
+                LlmProtocol::Anthropic,
+                "https://api.anthropic.com",
+            )),
+        )]);
+
+        let json = serde_json::to_value(&response).unwrap();
+        assert_eq!(json["providers"].as_array().unwrap().len(), 1);
+        assert_eq!(json["providers"][0]["id"], "main");
+
+        let deserialized: ListProvidersResponse = serde_json::from_value(json).unwrap();
+        assert_eq!(deserialized.providers.len(), 1);
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_set_providers_request_serialization() {
+        use std::collections::HashMap;
+
+        let mut headers = HashMap::new();
+        headers.insert("Authorization".to_string(), "Bearer sk-test".to_string());
+
+        let request =
+            SetProvidersRequest::new("main", LlmProtocol::OpenAi, "https://api.openai.com/v1")
+                .headers(headers);
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(
+            json,
+            json!({
+                "id": "main",
+                "apiType": "openai",
+                "baseUrl": "https://api.openai.com/v1",
+                "headers": {
+                    "Authorization": "Bearer sk-test"
+                }
+            })
+        );
+
+        let deserialized: SetProvidersRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(deserialized.id, "main");
+        assert_eq!(deserialized.api_type, LlmProtocol::OpenAi);
+        assert_eq!(deserialized.base_url, "https://api.openai.com/v1");
+        assert_eq!(deserialized.headers.len(), 1);
+        assert_eq!(
+            deserialized.headers.get("Authorization").unwrap(),
+            "Bearer sk-test"
+        );
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_set_providers_request_omits_empty_headers() {
+        let request =
+            SetProvidersRequest::new("main", LlmProtocol::Anthropic, "https://api.anthropic.com");
+
+        let json = serde_json::to_value(&request).unwrap();
+        // headers should be omitted when empty
+        assert!(!json.as_object().unwrap().contains_key("headers"));
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_disable_providers_request_serialization() {
+        let request = DisableProvidersRequest::new("secondary");
+
+        let json = serde_json::to_value(&request).unwrap();
+        assert_eq!(json, json!({ "id": "secondary" }));
+
+        let deserialized: DisableProvidersRequest = serde_json::from_value(json).unwrap();
+        assert_eq!(deserialized.id, "secondary");
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_providers_capabilities_serialization() {
+        let caps = ProvidersCapabilities::new();
+
+        let json = serde_json::to_value(&caps).unwrap();
+        assert_eq!(json, json!({}));
+
+        let deserialized: ProvidersCapabilities = serde_json::from_value(json).unwrap();
+        assert!(deserialized.meta.is_none());
+    }
+
+    #[cfg(feature = "unstable_llm_providers")]
+    #[test]
+    fn test_agent_capabilities_with_providers() {
+        let caps = AgentCapabilities::new().providers(ProvidersCapabilities::new());
+
+        let json = serde_json::to_value(&caps).unwrap();
+        assert_eq!(json["providers"], json!({}));
+
+        let deserialized: AgentCapabilities = serde_json::from_value(json).unwrap();
+        assert!(deserialized.providers.is_some());
     }
 }
