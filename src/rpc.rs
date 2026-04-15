@@ -220,11 +220,11 @@ impl Side for ClientSide {
                 .map(AgentRequest::CreateElicitationRequest)
                 .map_err(Into::into),
             _ => {
-                if let Some(custom_method) = method.strip_prefix('_') {
-                    Ok(AgentRequest::ExtMethodRequest(ExtRequest {
-                        method: custom_method.into(),
-                        params: params.to_owned().into(),
-                    }))
+                if is_valid_ext_method(method) {
+                    Ok(AgentRequest::ExtMethodRequest(ExtRequest::new(
+                        method,
+                        params.to_owned().into(),
+                    )))
                 } else {
                     Err(Error::method_not_found())
                 }
@@ -246,11 +246,11 @@ impl Side for ClientSide {
                     .map_err(Into::into)
             }
             _ => {
-                if let Some(custom_method) = method.strip_prefix('_') {
-                    Ok(AgentNotification::ExtNotification(ExtNotification {
-                        method: custom_method.into(),
-                        params: params.to_owned().into(),
-                    }))
+                if is_valid_ext_method(method) {
+                    Ok(AgentNotification::ExtNotification(ExtNotification::new(
+                        method,
+                        params.to_owned().into(),
+                    )))
                 } else {
                     Err(Error::method_not_found())
                 }
@@ -349,11 +349,11 @@ impl Side for AgentSide {
                 .map(ClientRequest::CloseNesRequest)
                 .map_err(Into::into),
             _ => {
-                if let Some(custom_method) = method.strip_prefix('_') {
-                    Ok(ClientRequest::ExtMethodRequest(ExtRequest {
-                        method: custom_method.into(),
-                        params: params.to_owned().into(),
-                    }))
+                if is_valid_ext_method(method) {
+                    Ok(ClientRequest::ExtMethodRequest(ExtRequest::new(
+                        method,
+                        params.to_owned().into(),
+                    )))
                 } else {
                     Err(Error::method_not_found())
                 }
@@ -397,11 +397,11 @@ impl Side for AgentSide {
                 .map(ClientNotification::RejectNesNotification)
                 .map_err(Into::into),
             _ => {
-                if let Some(custom_method) = method.strip_prefix('_') {
-                    Ok(ClientNotification::ExtNotification(ExtNotification {
-                        method: custom_method.into(),
-                        params: params.to_owned().into(),
-                    }))
+                if is_valid_ext_method(method) {
+                    Ok(ClientNotification::ExtNotification(ExtNotification::new(
+                        method,
+                        params.to_owned().into(),
+                    )))
                 } else {
                     Err(Error::method_not_found())
                 }
@@ -410,10 +410,15 @@ impl Side for AgentSide {
     }
 }
 
+fn is_valid_ext_method(method: &str) -> bool {
+    method.starts_with('_') && method.len() > 1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use crate::ErrorCode;
     use serde_json::{Number, Value};
 
     #[test]
@@ -461,6 +466,53 @@ mod tests {
 
         let id = RequestId::Str("id".to_owned());
         assert_eq!(id.to_string(), "id");
+    }
+
+    #[test]
+    fn decode_ext_request_preserves_prefix_on_client_side() {
+        let raw = serde_json::value::RawValue::from_string(r#"{"x":1}"#.to_string()).unwrap();
+        let request = ClientSide::decode_request("_vendor/custom_request", Some(&raw)).unwrap();
+        assert_eq!(request.method(), "_vendor/custom_request");
+    }
+
+    #[test]
+    fn decode_ext_request_preserves_prefix_on_agent_side() {
+        let raw = serde_json::value::RawValue::from_string(r#"{"x":1}"#.to_string()).unwrap();
+        let request = AgentSide::decode_request("_vendor/custom_request", Some(&raw)).unwrap();
+        assert_eq!(request.method(), "_vendor/custom_request");
+    }
+
+    #[test]
+    fn decode_ext_notification_preserves_prefix_on_client_side() {
+        let raw = serde_json::value::RawValue::from_string(r#"{"x":1}"#.to_string()).unwrap();
+        let notification =
+            ClientSide::decode_notification("_vendor/custom_notification", Some(&raw)).unwrap();
+        assert_eq!(notification.method(), "_vendor/custom_notification");
+    }
+
+    #[test]
+    fn decode_ext_notification_preserves_prefix_on_agent_side() {
+        let raw = serde_json::value::RawValue::from_string(r#"{"x":1}"#.to_string()).unwrap();
+        let notification =
+            AgentSide::decode_notification("_vendor/custom_notification", Some(&raw)).unwrap();
+        assert_eq!(notification.method(), "_vendor/custom_notification");
+    }
+
+    #[test]
+    fn decode_rejects_empty_ext_method_name() {
+        let raw = serde_json::value::RawValue::from_string(r#"{}"#.to_string()).unwrap();
+
+        let err = ClientSide::decode_request("_", Some(&raw)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::MethodNotFound);
+
+        let err = ClientSide::decode_notification("_", Some(&raw)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::MethodNotFound);
+
+        let err = AgentSide::decode_request("_", Some(&raw)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::MethodNotFound);
+
+        let err = AgentSide::decode_notification("_", Some(&raw)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::MethodNotFound);
     }
 }
 
