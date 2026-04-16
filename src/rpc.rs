@@ -220,11 +220,11 @@ impl Side for ClientSide {
                 .map(AgentRequest::CreateElicitationRequest)
                 .map_err(Into::into),
             _ => {
-                if let Some(custom_method) = method.strip_prefix('_') {
-                    Ok(AgentRequest::ExtMethodRequest(ExtRequest {
-                        method: custom_method.into(),
-                        params: params.to_owned().into(),
-                    }))
+                if is_valid_ext_method(method) {
+                    Ok(AgentRequest::ExtMethodRequest(ExtRequest::new(
+                        method,
+                        params.to_owned().into(),
+                    )))
                 } else {
                     Err(Error::method_not_found())
                 }
@@ -246,11 +246,11 @@ impl Side for ClientSide {
                     .map_err(Into::into)
             }
             _ => {
-                if let Some(custom_method) = method.strip_prefix('_') {
-                    Ok(AgentNotification::ExtNotification(ExtNotification {
-                        method: custom_method.into(),
-                        params: params.to_owned().into(),
-                    }))
+                if is_valid_ext_method(method) {
+                    Ok(AgentNotification::ExtNotification(ExtNotification::new(
+                        method,
+                        params.to_owned().into(),
+                    )))
                 } else {
                     Err(Error::method_not_found())
                 }
@@ -283,6 +283,18 @@ impl Side for AgentSide {
                 .map_err(Into::into),
             m if m == AGENT_METHOD_NAMES.authenticate => serde_json::from_str(params.get())
                 .map(ClientRequest::AuthenticateRequest)
+                .map_err(Into::into),
+            #[cfg(feature = "unstable_llm_providers")]
+            m if m == AGENT_METHOD_NAMES.providers_list => serde_json::from_str(params.get())
+                .map(ClientRequest::ListProvidersRequest)
+                .map_err(Into::into),
+            #[cfg(feature = "unstable_llm_providers")]
+            m if m == AGENT_METHOD_NAMES.providers_set => serde_json::from_str(params.get())
+                .map(ClientRequest::SetProvidersRequest)
+                .map_err(Into::into),
+            #[cfg(feature = "unstable_llm_providers")]
+            m if m == AGENT_METHOD_NAMES.providers_disable => serde_json::from_str(params.get())
+                .map(ClientRequest::DisableProvidersRequest)
                 .map_err(Into::into),
             #[cfg(feature = "unstable_logout")]
             m if m == AGENT_METHOD_NAMES.logout => serde_json::from_str(params.get())
@@ -337,11 +349,11 @@ impl Side for AgentSide {
                 .map(ClientRequest::CloseNesRequest)
                 .map_err(Into::into),
             _ => {
-                if let Some(custom_method) = method.strip_prefix('_') {
-                    Ok(ClientRequest::ExtMethodRequest(ExtRequest {
-                        method: custom_method.into(),
-                        params: params.to_owned().into(),
-                    }))
+                if is_valid_ext_method(method) {
+                    Ok(ClientRequest::ExtMethodRequest(ExtRequest::new(
+                        method,
+                        params.to_owned().into(),
+                    )))
                 } else {
                     Err(Error::method_not_found())
                 }
@@ -385,11 +397,11 @@ impl Side for AgentSide {
                 .map(ClientNotification::RejectNesNotification)
                 .map_err(Into::into),
             _ => {
-                if let Some(custom_method) = method.strip_prefix('_') {
-                    Ok(ClientNotification::ExtNotification(ExtNotification {
-                        method: custom_method.into(),
-                        params: params.to_owned().into(),
-                    }))
+                if is_valid_ext_method(method) {
+                    Ok(ClientNotification::ExtNotification(ExtNotification::new(
+                        method,
+                        params.to_owned().into(),
+                    )))
                 } else {
                     Err(Error::method_not_found())
                 }
@@ -398,10 +410,15 @@ impl Side for AgentSide {
     }
 }
 
+fn is_valid_ext_method(method: &str) -> bool {
+    method.starts_with('_') && method.len() > 1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use crate::ErrorCode;
     use serde_json::{Number, Value};
 
     #[test]
@@ -449,6 +466,53 @@ mod tests {
 
         let id = RequestId::Str("id".to_owned());
         assert_eq!(id.to_string(), "id");
+    }
+
+    #[test]
+    fn decode_ext_request_preserves_prefix_on_client_side() {
+        let raw = serde_json::value::RawValue::from_string(r#"{"x":1}"#.to_string()).unwrap();
+        let request = ClientSide::decode_request("_vendor/custom_request", Some(&raw)).unwrap();
+        assert_eq!(request.method(), "_vendor/custom_request");
+    }
+
+    #[test]
+    fn decode_ext_request_preserves_prefix_on_agent_side() {
+        let raw = serde_json::value::RawValue::from_string(r#"{"x":1}"#.to_string()).unwrap();
+        let request = AgentSide::decode_request("_vendor/custom_request", Some(&raw)).unwrap();
+        assert_eq!(request.method(), "_vendor/custom_request");
+    }
+
+    #[test]
+    fn decode_ext_notification_preserves_prefix_on_client_side() {
+        let raw = serde_json::value::RawValue::from_string(r#"{"x":1}"#.to_string()).unwrap();
+        let notification =
+            ClientSide::decode_notification("_vendor/custom_notification", Some(&raw)).unwrap();
+        assert_eq!(notification.method(), "_vendor/custom_notification");
+    }
+
+    #[test]
+    fn decode_ext_notification_preserves_prefix_on_agent_side() {
+        let raw = serde_json::value::RawValue::from_string(r#"{"x":1}"#.to_string()).unwrap();
+        let notification =
+            AgentSide::decode_notification("_vendor/custom_notification", Some(&raw)).unwrap();
+        assert_eq!(notification.method(), "_vendor/custom_notification");
+    }
+
+    #[test]
+    fn decode_rejects_empty_ext_method_name() {
+        let raw = serde_json::value::RawValue::from_string(r#"{}"#.to_string()).unwrap();
+
+        let err = ClientSide::decode_request("_", Some(&raw)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::MethodNotFound);
+
+        let err = ClientSide::decode_notification("_", Some(&raw)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::MethodNotFound);
+
+        let err = AgentSide::decode_request("_", Some(&raw)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::MethodNotFound);
+
+        let err = AgentSide::decode_notification("_", Some(&raw)).unwrap_err();
+        assert_eq!(err.code, ErrorCode::MethodNotFound);
     }
 }
 
@@ -614,6 +678,61 @@ mod nes_rpc_tests {
             notification,
             ClientNotification::RejectNesNotification(_)
         ));
+    }
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+#[cfg(test)]
+mod providers_rpc_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn test_decode_providers_list_request() {
+        let params = serde_json::to_string(&json!({})).unwrap();
+        let raw = serde_json::value::RawValue::from_string(params).unwrap();
+        let request = AgentSide::decode_request("providers/list", Some(&raw)).unwrap();
+        assert!(matches!(request, ClientRequest::ListProvidersRequest(_)));
+    }
+
+    #[test]
+    fn test_decode_providers_set_request() {
+        let params = serde_json::to_string(&json!({
+            "id": "main",
+            "apiType": "anthropic",
+            "baseUrl": "https://api.anthropic.com"
+        }))
+        .unwrap();
+        let raw = serde_json::value::RawValue::from_string(params).unwrap();
+        let request = AgentSide::decode_request("providers/set", Some(&raw)).unwrap();
+        assert!(matches!(request, ClientRequest::SetProvidersRequest(_)));
+    }
+
+    #[test]
+    fn test_decode_providers_set_request_with_headers() {
+        let params = serde_json::to_string(&json!({
+            "id": "main",
+            "apiType": "openai",
+            "baseUrl": "https://api.openai.com/v1",
+            "headers": {
+                "Authorization": "Bearer sk-test"
+            }
+        }))
+        .unwrap();
+        let raw = serde_json::value::RawValue::from_string(params).unwrap();
+        let request = AgentSide::decode_request("providers/set", Some(&raw)).unwrap();
+        assert!(matches!(request, ClientRequest::SetProvidersRequest(_)));
+    }
+
+    #[test]
+    fn test_decode_providers_disable_request() {
+        let params = serde_json::to_string(&json!({
+            "id": "secondary"
+        }))
+        .unwrap();
+        let raw = serde_json::value::RawValue::from_string(params).unwrap();
+        let request = AgentSide::decode_request("providers/disable", Some(&raw)).unwrap();
+        assert!(matches!(request, ClientRequest::DisableProvidersRequest(_)));
     }
 }
 

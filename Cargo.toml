@@ -1,7 +1,7 @@
 [package]
 name = "agent-client-protocol-schema"
 authors = ["Zed <hi@zed.dev>"]
-version = "0.11.6"
+version = "0.11.7"
 edition = "2024"
 license = "Apache-2.0"
 description = "A protocol for standardizing communication between code editors and AI coding agents"
@@ -18,6 +18,7 @@ unstable = [
     "unstable_auth_methods",
     "unstable_cancel_request",
     "unstable_elicitation",
+    "unstable_llm_providers",
     "unstable_logout",
     "unstable_nes",
     "unstable_session_additional_directories",
@@ -32,6 +33,7 @@ unstable = [
 unstable_auth_methods = []
 unstable_cancel_request = []
 unstable_elicitation = []
+unstable_llm_providers = []
 unstable_logout = []
 unstable_nes = []
 unstable_session_additional_directories = []

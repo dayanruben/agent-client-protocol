@@ -114,7 +114,6 @@
             "pages": [
               "rfds/session-fork",
               "rfds/request-cancellation",
-              "rfds/session-resume",
               "rfds/meta-propagation",
               "rfds/agent-telemetry-export",
               "rfds/proxy-chains",
@@ -128,7 +127,6 @@
               "rfds/diff-delete",
               "rfds/boolean-config-option",
               "rfds/elicitation",
-              "rfds/session-close",
               "rfds/next-edit-suggestions",
               "rfds/additional-directories",
               "rfds/custom-llm-endpoint"
@@ -136,7 +134,7 @@
           },
           {
             "group": "Preview",
-            "pages": []
+            "pages": ["rfds/session-close", "rfds/session-resume"]
           },
           {
             "group": "Completed",
