@@ -129,7 +129,8 @@
               "rfds/elicitation",
               "rfds/next-edit-suggestions",
               "rfds/additional-directories",
-              "rfds/custom-llm-endpoint"
+              "rfds/custom-llm-endpoint",
+              "rfds/streamable-http-websocket-transport"
             ]
           },
           {
@@ -169,6 +170,7 @@
           {
             "group": "Announcements",
             "pages": [
+              "announcements/transports-working-group",
               "announcements/acp-agent-registry-stabilized",
               "announcements/session-info-update-stabilized",
               "announcements/session-list-stabilized",
