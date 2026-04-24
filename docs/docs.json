@@ -135,7 +135,7 @@
           },
           {
             "group": "Preview",
-            "pages": ["rfds/session-close", "rfds/session-resume"]
+            "pages": []
           },
           {
             "group": "Completed",
@@ -144,7 +144,9 @@
               "rfds/session-config-options",
               "rfds/session-list",
               "rfds/session-info-update",
-              "rfds/acp-agent-registry"
+              "rfds/acp-agent-registry",
+              "rfds/session-resume",
+              "rfds/session-close"
             ]
           }
         ]
@@ -170,6 +172,8 @@
           {
             "group": "Announcements",
             "pages": [
+              "announcements/session-close-stabilized",
+              "announcements/session-resume-stabilized",
               "announcements/transports-working-group",
               "announcements/acp-agent-registry-stabilized",
               "announcements/session-info-update-stabilized",
