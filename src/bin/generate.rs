@@ -1,9 +1,22 @@
+use agent_client_protocol_schema::ProtocolVersion;
+#[cfg(feature = "unstable_protocol_v2")]
+use agent_client_protocol_schema::v2::{
+    AGENT_METHOD_NAMES, AgentNotification, AgentRequest, AgentResponse, CLIENT_METHOD_NAMES,
+    ClientNotification, ClientRequest, ClientResponse, JsonRpcMessage, Notification, Request,
+    Response,
+};
+#[cfg(all(feature = "unstable_cancel_request", feature = "unstable_protocol_v2"))]
+use agent_client_protocol_schema::v2::{PROTOCOL_LEVEL_METHOD_NAMES, ProtocolLevelNotification};
+#[cfg(not(feature = "unstable_protocol_v2"))]
 use agent_client_protocol_schema::{
     AGENT_METHOD_NAMES, AgentNotification, AgentRequest, AgentResponse, CLIENT_METHOD_NAMES,
-    ClientNotification, ClientRequest, ClientResponse, JsonRpcMessage, Notification,
-    ProtocolVersion, Request, Response,
+    ClientNotification, ClientRequest, ClientResponse, JsonRpcMessage, Notification, Request,
+    Response,
 };
-#[cfg(feature = "unstable_cancel_request")]
+#[cfg(all(
+    feature = "unstable_cancel_request",
+    not(feature = "unstable_protocol_v2")
+))]
 use agent_client_protocol_schema::{PROTOCOL_LEVEL_METHOD_NAMES, ProtocolLevelNotification};
 use schemars::{
     JsonSchema,
@@ -71,51 +84,81 @@ fn main() {
     fs::create_dir_all(schema_dir.clone()).unwrap();
     fs::create_dir_all(docs_protocol_dir.clone()).unwrap();
 
-    let schema_file = if cfg!(feature = "unstable") {
-        "schema.unstable.json"
-    } else {
-        "schema.json"
+    // Each cfg combination owns exactly one filename, with disjoint write
+    // sets so the three generation runs that produce the published schemas
+    // can run in any order without clobbering each other:
+    //
+    // - `schema.json`              — stable v1 (no features)
+    // - `schema.unstable.json`     — v1 + unstable feature flags
+    // - `schema.v2.unstable.json`  — v2 (with optional unstable flags)
+    //
+    // There is no v2 stable schema yet; it will be added when v2 stabilizes.
+    let schema_file: &str = match (
+        cfg!(feature = "unstable_protocol_v2"),
+        cfg!(feature = "unstable"),
+    ) {
+        (true, _) => "schema.v2.unstable.json",
+        (false, true) => "schema.unstable.json",
+        (false, false) => "schema.json",
     };
-    fs::write(
-        schema_dir.join(schema_file),
-        serde_json::to_string_pretty(&schema_value).unwrap(),
-    )
-    .unwrap_or_else(|e| panic!("Failed to write {schema_file}: {e}"));
+    let schema_json = serde_json::to_string_pretty(&schema_value).unwrap();
+    fs::write(schema_dir.join(schema_file), &schema_json)
+        .unwrap_or_else(|e| panic!("Failed to write {schema_file}: {e}"));
+
+    // The version embedded in `meta*.json` reflects the protocol version the
+    // *schema itself describes*, not `ProtocolVersion::LATEST` (which always
+    // tracks the latest **stable** version). Generating with the
+    // `unstable_protocol_v2` feature emits v2-shaped types, so the metadata
+    // file must advertise version 2 to stay consistent with its contents.
+    #[cfg(feature = "unstable_protocol_v2")]
+    let schema_protocol_version = ProtocolVersion::V2;
+    #[cfg(not(feature = "unstable_protocol_v2"))]
+    let schema_protocol_version = ProtocolVersion::V1;
 
     // Create a combined metadata object
     #[cfg(not(feature = "unstable_cancel_request"))]
     let metadata = serde_json::json!({
-        "version": ProtocolVersion::LATEST,
+        "version": schema_protocol_version,
         "agentMethods": AGENT_METHOD_NAMES,
         "clientMethods": CLIENT_METHOD_NAMES,
     });
     #[cfg(feature = "unstable_cancel_request")]
     let metadata = serde_json::json!({
-        "version": ProtocolVersion::LATEST,
+        "version": schema_protocol_version,
         "agentMethods": AGENT_METHOD_NAMES,
         "clientMethods": CLIENT_METHOD_NAMES,
         "protocolMethods": PROTOCOL_LEVEL_METHOD_NAMES,
     });
 
-    let meta_file = if cfg!(feature = "unstable") {
-        "meta.unstable.json"
-    } else {
-        "meta.json"
+    let meta_file: &str = match (
+        cfg!(feature = "unstable_protocol_v2"),
+        cfg!(feature = "unstable"),
+    ) {
+        (true, _) => "meta.v2.unstable.json",
+        (false, true) => "meta.unstable.json",
+        (false, false) => "meta.json",
     };
-    fs::write(
-        schema_dir.join(meta_file),
-        serde_json::to_string_pretty(&metadata).unwrap(),
-    )
-    .unwrap_or_else(|e| panic!("Failed to write {meta_file}: {e}"));
+    let metadata_json = serde_json::to_string_pretty(&metadata).unwrap();
+    fs::write(schema_dir.join(meta_file), &metadata_json)
+        .unwrap_or_else(|e| panic!("Failed to write {meta_file}: {e}"));
 
-    // Generate markdown documentation
+    // Generate markdown documentation. Each cfg combination owns its own
+    // doc file just like the JSON schema files above, so the three
+    // `npm run generate` runs don't clobber each other:
+    //
+    // - `schema.mdx`              — stable v1 (no features)
+    // - `draft/schema.mdx`        — v1 + unstable feature flags
+    // - `draft/schema-v2.mdx`     — v2 (with optional unstable flags)
     let mut markdown_gen = MarkdownGenerator::new();
     let markdown_doc = markdown_gen.generate(&schema_value);
 
-    let doc_file = if cfg!(feature = "unstable") {
-        "draft/schema.mdx"
-    } else {
-        "schema.mdx"
+    let doc_file: &str = match (
+        cfg!(feature = "unstable_protocol_v2"),
+        cfg!(feature = "unstable"),
+    ) {
+        (true, _) => "draft/schema-v2.mdx",
+        (false, true) => "draft/schema.mdx",
+        (false, false) => "schema.mdx",
     };
 
     fs::write(docs_protocol_dir.join(doc_file), markdown_doc)

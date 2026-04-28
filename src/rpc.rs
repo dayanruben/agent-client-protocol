@@ -5,17 +5,15 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 
-use crate::{Error, Result};
-
 /// JSON RPC Request Id
 ///
-/// An identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is not included it is assumed to be a notification. The value SHOULD normally not be Null [1] and Numbers SHOULD NOT contain fractional parts [2]
+/// An identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is not included it is assumed to be a notification. The value SHOULD normally not be Null \[1\] and Numbers SHOULD NOT contain fractional parts \[2\]
 ///
 /// The Server MUST reply with the same value in the Response object if included. This member is used to correlate the context between the two objects.
 ///
-/// [1] The use of Null as a value for the id member in a Request object is discouraged, because this specification uses a value of Null for Responses with an unknown id. Also, because JSON-RPC 1.0 uses an id value of Null for Notifications this could cause confusion in handling.
+/// \[1\] The use of Null as a value for the id member in a Request object is discouraged, because this specification uses a value of Null for Responses with an unknown id. Also, because JSON-RPC 1.0 uses an id value of Null for Notifications this could cause confusion in handling.
 ///
-/// [2] Fractional parts may be problematic, since many decimal fractions cannot be represented exactly as binary fractions.
+/// \[2\] Fractional parts may be problematic, since many decimal fractions cannot be represented exactly as binary fractions.
 #[derive(
     Debug,
     PartialEq,
@@ -63,14 +61,14 @@ pub struct Request<Params> {
 )]
 #[serde(untagged)]
 #[schemars(rename = "{Result}", extend("x-docs-ignore" = true))]
-pub enum Response<Result> {
+pub enum Response<Result, Error> {
     Result { id: RequestId, result: Result },
     Error { id: RequestId, error: Error },
 }
 
-impl<R> Response<R> {
+impl<R, E> Response<R, E> {
     #[must_use]
-    pub fn new(id: impl Into<RequestId>, result: Result<R>) -> Self {
+    pub fn new(id: impl Into<RequestId>, result: std::result::Result<R, E>) -> Self {
         match result {
             Ok(result) => Self::Result {
                 id: id.into(),
@@ -123,6 +121,12 @@ impl<M> JsonRpcMessage<M> {
             jsonrpc: JsonRpcVersion::V2,
             message,
         }
+    }
+
+    /// Unwraps the contained message.
+    #[must_use]
+    pub fn into_inner(self) -> M {
+        self.message
     }
 }
 
