@@ -11,18 +11,18 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DefaultOnError, VecSkipError, serde_as, skip_serializing_none};
 
 #[cfg(feature = "unstable_elicitation")]
-use crate::{
+use super::{
     CompleteElicitationNotification, CreateElicitationRequest, CreateElicitationResponse,
     ElicitationCapabilities,
 };
-use crate::{
-    ContentBlock, EnvVariable, ExtNotification, ExtRequest, ExtResponse, IntoMaybeUndefined,
-    IntoOption, MaybeUndefined, Meta, Plan, SessionConfigOption, SessionId, SessionModeId,
-    SkipListener, ToolCall, ToolCallUpdate,
+use super::{
+    ContentBlock, EnvVariable, ExtNotification, ExtRequest, ExtResponse, Meta, Plan,
+    SessionConfigOption, SessionId, SessionModeId, ToolCall, ToolCallUpdate,
 };
+use crate::{IntoMaybeUndefined, IntoOption, MaybeUndefined, SkipListener};
 
 #[cfg(feature = "unstable_nes")]
-use crate::{ClientNesCapabilities, PositionEncodingKind};
+use super::{ClientNesCapabilities, PositionEncodingKind};
 
 // Session updates
 

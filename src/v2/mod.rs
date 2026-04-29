@@ -1,8 +1,19 @@
-//! Agent Client Protocol version 1 types.
+//! Agent Client Protocol version 2 draft types.
+//!
+//! **EXPERIMENTAL.** This module is gated behind the `unstable_protocol_v2`
+//! feature, is not part of the [`unstable`] umbrella, and is **not**
+//! advertised by [`crate::ProtocolVersion::LATEST`]. The wire format is
+//! currently identical to v1 (the default crate-root types) and the types
+//! here exist only as a place to evolve v2 without disturbing the stable v1
+//! API. Both the type definitions and the [`conversion`] helpers may change
+//! at any time.
+//!
+//! [`unstable`]: https://docs.rs/crate/agent-client-protocol-schema/latest/features
 
 mod agent;
 mod client;
 mod content;
+pub mod conversion;
 #[cfg(feature = "unstable_elicitation")]
 mod elicitation;
 mod error;

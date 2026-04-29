@@ -28,6 +28,11 @@ unstable = [
     "unstable_message_id",
     "unstable_boolean_config",
 ]
+# Protocol v2 is intentionally NOT part of the `unstable` umbrella.
+# It introduces a parallel `v2` module and (eventually) a different wire
+# version, so it must be opted into explicitly to avoid silently
+# changing `ProtocolVersion::LATEST` for `unstable` users.
+unstable_protocol_v2 = []
 unstable_auth_methods = []
 unstable_cancel_request = []
 unstable_elicitation = []
