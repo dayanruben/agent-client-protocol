@@ -206,6 +206,12 @@ mod markdown_generator {
             .unwrap();
             writeln!(&mut self.output, "---").unwrap();
             writeln!(&mut self.output).unwrap();
+            writeln!(
+                &mut self.output,
+                "<Note>The schema file can be downloaded directly from the [latest GitHub release](https://github.com/agentclientprotocol/agent-client-protocol/releases/latest/download/schema.json).</Note>"
+            )
+            .unwrap();
+            writeln!(&mut self.output).unwrap();
 
             let mut agent_types: BTreeMap<String, Vec<(String, Value)>> = BTreeMap::new();
             let mut client_types: BTreeMap<String, Vec<(String, Value)>> = BTreeMap::new();
@@ -1164,8 +1170,8 @@ starting with '$/' it is free to ignore the notification."
                 "initialize" => self.agent.get("InitializeRequest").unwrap(),
                 "authenticate" => self.agent.get("AuthenticateRequest").unwrap(),
                 "providers/list" => self.agent.get("ListProvidersRequest").unwrap(),
-                "providers/set" => self.agent.get("SetProvidersRequest").unwrap(),
-                "providers/disable" => self.agent.get("DisableProvidersRequest").unwrap(),
+                "providers/set" => self.agent.get("SetProviderRequest").unwrap(),
+                "providers/disable" => self.agent.get("DisableProviderRequest").unwrap(),
                 "session/new" => self.agent.get("NewSessionRequest").unwrap(),
                 "session/load" => self.agent.get("LoadSessionRequest").unwrap(),
                 "session/list" => self.agent.get("ListSessionsRequest").unwrap(),
