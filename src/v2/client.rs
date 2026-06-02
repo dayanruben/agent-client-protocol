@@ -17,7 +17,7 @@ use super::{
 };
 use super::{
     ContentBlock, EnvVariable, ExtNotification, ExtRequest, ExtResponse, Meta, Plan,
-    SessionConfigOption, SessionId, SessionModeId, ToolCall, ToolCallUpdate,
+    SessionConfigOption, SessionId, ToolCall, ToolCallUpdate,
 };
 #[cfg(feature = "unstable_plan_operations")]
 use super::{PlanCapabilities, PlanRemoved, PlanUpdate};
@@ -120,10 +120,6 @@ pub enum SessionUpdate {
     PlanRemoved(PlanRemoved),
     /// Available commands are ready or have changed
     AvailableCommandsUpdate(AvailableCommandsUpdate),
-    /// The current mode of the session has changed
-    ///
-    /// See protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)
-    CurrentModeUpdate(CurrentModeUpdate),
     /// Session configuration options have been updated.
     ConfigOptionUpdate(ConfigOptionUpdate),
     /// Session metadata has been updated (title, timestamps, custom metadata)
@@ -220,7 +216,6 @@ fn is_known_session_update(session_update: &str) -> bool {
         | "tool_call_update"
         | "plan"
         | "available_commands_update"
-        | "current_mode_update"
         | "config_option_update"
         | "session_info_update" => true,
         #[cfg(feature = "unstable_plan_operations")]
@@ -243,7 +238,6 @@ fn other_session_update_schema(schema: &mut Schema) {
             "tool_call_update",
             "plan",
             "available_commands_update",
-            "current_mode_update",
             "config_option_update",
             "session_info_update",
             #[cfg(feature = "unstable_plan_operations")]
@@ -256,46 +250,6 @@ fn other_session_update_schema(schema: &mut Schema) {
     );
 }
 
-/// The current mode of the session has changed
-///
-/// See protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct CurrentModeUpdate {
-    /// The ID of the current mode
-    pub current_mode_id: SessionModeId,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
-    ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-    #[serde(rename = "_meta")]
-    pub meta: Option<Meta>,
-}
-
-impl CurrentModeUpdate {
-    #[must_use]
-    pub fn new(current_mode_id: impl Into<SessionModeId>) -> Self {
-        Self {
-            current_mode_id: current_mode_id.into(),
-            meta: None,
-        }
-    }
-
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
-    ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-    #[must_use]
-    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
-        self.meta = meta.into_option();
-        self
-    }
-}
-
 /// Session configuration options have been updated.
 #[serde_as]
 #[skip_serializing_none]
@@ -305,6 +259,7 @@ impl CurrentModeUpdate {
 pub struct ConfigOptionUpdate {
     /// The full set of configuration options and their current values.
     #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
+    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     pub config_options: Vec<SessionConfigOption>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
@@ -410,6 +365,7 @@ pub struct UsageUpdate {
     pub size: u64,
     /// Cumulative session cost (optional).
     #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub cost: Option<Cost>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -555,6 +511,7 @@ impl ContentChunk {
 pub struct AvailableCommandsUpdate {
     /// Commands the agent can execute
     #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
+    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     pub available_commands: Vec<AvailableCommand>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
@@ -599,6 +556,7 @@ pub struct AvailableCommand {
     pub description: String,
     /// Input for the command if required
     #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub input: Option<AvailableCommandInput>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -1769,6 +1727,7 @@ pub struct ClientCapabilities {
     /// Supplying `{}` means the client can receive both update types.
     #[cfg(feature = "unstable_plan_operations")]
     #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub plan_capabilities: Option<PlanCapabilities>,
     /// **UNSTABLE**
@@ -1789,6 +1748,7 @@ pub struct ClientCapabilities {
     /// Determines which elicitation modes the agent may use.
     #[cfg(feature = "unstable_elicitation")]
     #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub elicitation: Option<ElicitationCapabilities>,
     /// **UNSTABLE**
@@ -1798,6 +1758,7 @@ pub struct ClientCapabilities {
     /// NES (Next Edit Suggestions) capabilities supported by the client.
     #[cfg(feature = "unstable_nes")]
     #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub nes: Option<ClientNesCapabilities>,
     /// **UNSTABLE**
@@ -1807,6 +1768,7 @@ pub struct ClientCapabilities {
     /// The position encodings supported by the client, in order of preference.
     #[cfg(feature = "unstable_nes")]
     #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
+    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub position_encodings: Vec<PositionEncodingKind>,
 
