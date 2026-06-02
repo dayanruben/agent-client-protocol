@@ -4675,13 +4675,13 @@ impl IntoV1 for super::PromptResponse {
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
             stop_reason,
-            #[cfg(feature = "unstable_session_usage")]
+            #[cfg(feature = "unstable_end_turn_token_usage")]
             usage,
             meta,
         } = self;
         Ok(crate::v1::PromptResponse {
             stop_reason: stop_reason.into_v1()?,
-            #[cfg(feature = "unstable_session_usage")]
+            #[cfg(feature = "unstable_end_turn_token_usage")]
             usage: usage.into_v1()?,
             meta: meta.into_v1()?,
         })
@@ -4694,13 +4694,13 @@ impl IntoV2 for crate::v1::PromptResponse {
     fn into_v2(self) -> Result<Self::Output> {
         let Self {
             stop_reason,
-            #[cfg(feature = "unstable_session_usage")]
+            #[cfg(feature = "unstable_end_turn_token_usage")]
             usage,
             meta,
         } = self;
         Ok(super::PromptResponse {
             stop_reason: stop_reason.into_v2()?,
-            #[cfg(feature = "unstable_session_usage")]
+            #[cfg(feature = "unstable_end_turn_token_usage")]
             usage: usage.into_v2()?,
             meta: meta.into_v2()?,
         })
@@ -4736,7 +4736,7 @@ impl IntoV2 for crate::v1::StopReason {
     }
 }
 
-#[cfg(feature = "unstable_session_usage")]
+#[cfg(feature = "unstable_end_turn_token_usage")]
 impl IntoV1 for super::Usage {
     type Output = crate::v1::Usage;
 
@@ -4760,7 +4760,7 @@ impl IntoV1 for super::Usage {
     }
 }
 
-#[cfg(feature = "unstable_session_usage")]
+#[cfg(feature = "unstable_end_turn_token_usage")]
 impl IntoV2 for crate::v1::Usage {
     type Output = super::Usage;
 
