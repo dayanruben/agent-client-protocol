@@ -112,29 +112,33 @@ The Agent reports the model's output to the Client via `session/update` notifica
   "params": {
     "sessionId": "sess_abc123def456",
     "update": {
-      "sessionUpdate": "plan",
-      "entries": [
-        {
-          "content": "Check for syntax errors",
-          "priority": "high",
-          "status": "pending"
-        },
-        {
-          "content": "Identify potential type issues",
-          "priority": "medium",
-          "status": "pending"
-        },
-        {
-          "content": "Review error handling patterns",
-          "priority": "medium",
-          "status": "pending"
-        },
-        {
-          "content": "Suggest improvements",
-          "priority": "low",
-          "status": "pending"
-        }
-      ]
+      "sessionUpdate": "plan_update",
+      "plan": {
+        "type": "items",
+        "id": "plan-1",
+        "entries": [
+          {
+            "content": "Check for syntax errors",
+            "priority": "high",
+            "status": "pending"
+          },
+          {
+            "content": "Identify potential type issues",
+            "priority": "medium",
+            "status": "pending"
+          },
+          {
+            "content": "Review error handling patterns",
+            "priority": "medium",
+            "status": "pending"
+          },
+          {
+            "content": "Suggest improvements",
+            "priority": "low",
+            "status": "pending"
+          }
+        ]
+      }
     }
   }
 }
@@ -154,6 +158,7 @@ The Agent then reports text responses from the model:
     "sessionId": "sess_abc123def456",
     "update": {
       "sessionUpdate": "agent_message_chunk",
+      "messageId": "msg_agent_c42b9",
       "content": {
         "type": "text",
         "text": "I'll analyze your code for potential issues. Let me examine it..."
@@ -162,6 +167,8 @@ The Agent then reports text responses from the model:
   }
 }
 ```
+
+The Agent **MAY** include an opaque `messageId` on message chunks. Chunks with the same `messageId` belong to the same message; a changed `messageId` indicates a new message.
 
 If the model requested tool calls, these are also reported immediately:
 

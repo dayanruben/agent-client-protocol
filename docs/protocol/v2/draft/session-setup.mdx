@@ -60,7 +60,7 @@ Clients create a new session by calling the `session/new` method with:
     "cwd": "/home/user/project",
     "mcpServers": [
       {
-        "name": "filesystem",
+        "name": "workspace-tools",
         "command": "/path/to/mcp-server",
         "args": ["--stdio"],
         "env": []
@@ -123,9 +123,9 @@ To load an existing session, Clients **MUST** call the `session/load` method wit
     "cwd": "/home/user/project",
     "mcpServers": [
       {
-        "name": "filesystem",
+        "name": "workspace-tools",
         "command": "/path/to/mcp-server",
-        "args": ["--mode", "filesystem"],
+        "args": ["--mode", "workspace"],
         "env": []
       }
     ]
@@ -145,6 +145,7 @@ For example, a user message from the conversation history:
     "sessionId": "sess_789xyz",
     "update": {
       "sessionUpdate": "user_message_chunk",
+      "messageId": "msg_user_8f7a1",
       "content": {
         "type": "text",
         "text": "What's the capital of France?"
@@ -164,6 +165,7 @@ Followed by the agent's response:
     "sessionId": "sess_789xyz",
     "update": {
       "sessionUpdate": "agent_message_chunk",
+      "messageId": "msg_agent_c42b9",
       "content": {
         "type": "text",
         "text": "The capital of France is Paris."
@@ -172,6 +174,8 @@ Followed by the agent's response:
   }
 }
 ```
+
+If the Agent provides message IDs during replay, each `messageId` is an opaque, unique identifier for the replayed message.
 
 When **all** the conversation entries have been streamed to the Client, the
 Agent **MUST** respond to the original `session/load` request.
@@ -238,9 +242,9 @@ To resume an existing session without replaying prior messages, Clients
     "cwd": "/home/user/project",
     "mcpServers": [
       {
-        "name": "filesystem",
+        "name": "workspace-tools",
         "command": "/path/to/mcp-server",
-        "args": ["--mode", "filesystem"],
+        "args": ["--mode", "workspace"],
         "env": []
       }
     ]
@@ -335,7 +339,7 @@ active.
 
 Agents that advertise `sessionCapabilities.additionalDirectories` allow Clients
 to include `additionalDirectories` on supported session lifecycle requests to
-expand the session's effective filesystem root set. Supported stable lifecycle
+expand the session's effective workspace root set. Supported stable lifecycle
 requests include `session/new`, `session/load`, and `session/resume`.
 
 ```json
@@ -430,7 +434,7 @@ Example stdio transport configuration:
 
 ```json
 {
-  "name": "filesystem",
+  "name": "workspace-tools",
   "command": "/path/to/mcp-server",
   "args": ["--stdio"],
   "env": [
