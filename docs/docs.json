@@ -179,11 +179,9 @@
             "pages": [
               "rfds/session-fork",
               "rfds/request-cancellation",
-              "rfds/meta-propagation",
               "rfds/agent-telemetry-export",
               "rfds/proxy-chains",
               "rfds/mcp-over-acp",
-              "rfds/session-usage",
               "rfds/end-turn-token-usage",
               "rfds/auth-methods",
               "rfds/diff-delete",
@@ -202,7 +200,6 @@
                   "rfds/v2/enum-variant-extension",
                   "rfds/v2/client-filesystem-terminal-capabilities",
                   "rfds/v2/plan-variants",
-                  "rfds/message-id",
                   "rfds/streamable-http-websocket-transport"
                 ]
               }
@@ -210,7 +207,12 @@
           },
           {
             "group": "Preview",
-            "pages": ["rfds/rust-sdk-v1", "rfds/session-delete"]
+            "pages": [
+              "rfds/rust-sdk-v1",
+              "rfds/session-delete",
+              "rfds/session-usage",
+              "rfds/message-id"
+            ]
           },
           {
             "group": "Completed",
@@ -219,6 +221,7 @@
               "rfds/session-config-options",
               "rfds/session-list",
               "rfds/session-info-update",
+              "rfds/meta-propagation",
               "rfds/acp-agent-registry",
               "rfds/session-resume",
               "rfds/session-close",
