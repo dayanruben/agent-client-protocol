@@ -4434,8 +4434,6 @@ impl IntoV1 for super::AgentCapabilities {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            prompt,
-            mcp,
             session,
             auth,
             #[cfg(feature = "unstable_llm_providers")]
@@ -4446,12 +4444,23 @@ impl IntoV1 for super::AgentCapabilities {
             position_encoding,
             meta,
         } = self;
-        let load_session = session.load.is_some();
+        let Some(session) = session else {
+            return Err(ProtocolConversionError::new(
+                "v2 AgentCapabilities without `session` cannot be represented in v1",
+            ));
+        };
+        let V1SessionCapabilityParts {
+            session_capabilities,
+            prompt_capabilities,
+            load_session,
+            mcp_capabilities,
+        } = session.into_v1()?;
+
         Ok(crate::v1::AgentCapabilities {
             load_session: load_session.into_v1()?,
-            prompt_capabilities: prompt.into_v1()?,
-            mcp_capabilities: mcp.into_v1()?,
-            session_capabilities: session.into_v1()?,
+            prompt_capabilities,
+            mcp_capabilities,
+            session_capabilities,
             auth: auth.into_v1()?,
             #[cfg(feature = "unstable_llm_providers")]
             providers: providers.into_v1()?,
@@ -4482,14 +4491,15 @@ impl IntoV2 for crate::v1::AgentCapabilities {
             position_encoding,
             meta,
         } = self;
-        let mut session = session_capabilities.into_v2()?;
-        if load_session {
-            session.load = Some(super::SessionLoadCapabilities::new());
-        }
+        let session = super::SessionCapabilities::from_v1(
+            session_capabilities,
+            prompt_capabilities,
+            load_session,
+            mcp_capabilities,
+        )?;
+
         Ok(super::AgentCapabilities {
-            prompt: prompt_capabilities.into_v2()?,
-            mcp: mcp_capabilities.into_v2()?,
-            session,
+            session: Some(session),
             auth: auth.into_v2()?,
             #[cfg(feature = "unstable_llm_providers")]
             providers: providers.into_v2()?,
@@ -4526,39 +4536,33 @@ impl IntoV2 for crate::v1::ProvidersCapabilities {
     }
 }
 
-impl IntoV1 for super::SessionCapabilities {
-    type Output = crate::v1::SessionCapabilities;
-
-    fn into_v1(self) -> Result<Self::Output> {
-        let Self {
-            load: _,
-            list,
-            delete,
-            additional_directories,
-            #[cfg(feature = "unstable_session_fork")]
-            fork,
-            resume,
-            close,
-            meta,
-        } = self;
-        Ok(crate::v1::SessionCapabilities {
-            list: list.into_v1()?,
-            delete: delete.into_v1()?,
-            additional_directories: additional_directories.into_v1()?,
-            #[cfg(feature = "unstable_session_fork")]
-            fork: fork.into_v1()?,
-            resume: resume.into_v1()?,
-            close: close.into_v1()?,
-            meta: meta.into_v1()?,
-        })
-    }
+/// The v1 capability fields represented by v2 `SessionCapabilities`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct V1SessionCapabilityParts {
+    /// Session-specific v1 capabilities.
+    pub session_capabilities: crate::v1::SessionCapabilities,
+    /// Prompt capabilities for v1 `session/prompt` requests.
+    pub prompt_capabilities: crate::v1::PromptCapabilities,
+    /// Whether v1 `session/load` is supported.
+    pub load_session: bool,
+    /// MCP capabilities for v1 session lifecycle requests.
+    pub mcp_capabilities: crate::v1::McpCapabilities,
 }
 
-impl IntoV2 for crate::v1::SessionCapabilities {
-    type Output = super::SessionCapabilities;
-
-    fn into_v2(self) -> Result<Self::Output> {
+impl super::SessionCapabilities {
+    /// Converts these v2 draft session capabilities into the v1 capability
+    /// fields they represent.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProtocolConversionError`] when any contained capability field
+    /// cannot be represented in v1.
+    pub fn into_v1(self) -> Result<V1SessionCapabilityParts> {
         let Self {
+            prompt,
+            mcp,
+            load,
             list,
             delete,
             additional_directories,
@@ -4568,8 +4572,52 @@ impl IntoV2 for crate::v1::SessionCapabilities {
             close,
             meta,
         } = self;
+
+        Ok(V1SessionCapabilityParts {
+            session_capabilities: crate::v1::SessionCapabilities {
+                list: list.into_v1()?,
+                delete: delete.into_v1()?,
+                additional_directories: additional_directories.into_v1()?,
+                #[cfg(feature = "unstable_session_fork")]
+                fork: fork.into_v1()?,
+                resume: resume.into_v1()?,
+                close: close.into_v1()?,
+                meta: meta.into_v1()?,
+            },
+            prompt_capabilities: prompt.unwrap_or_default().into_v1()?,
+            load_session: load.is_some(),
+            mcp_capabilities: mcp.unwrap_or_default().into_v1()?,
+        })
+    }
+
+    /// Builds v2 draft session capabilities from the v1 agent capability fields
+    /// that now live under `session` in v2.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ProtocolConversionError`] when any of the supplied v1
+    /// capability fields cannot be represented in v2.
+    pub fn from_v1(
+        session_capabilities: crate::v1::SessionCapabilities,
+        prompt_capabilities: crate::v1::PromptCapabilities,
+        load_session: bool,
+        mcp_capabilities: crate::v1::McpCapabilities,
+    ) -> Result<Self> {
+        let crate::v1::SessionCapabilities {
+            list,
+            delete,
+            additional_directories,
+            #[cfg(feature = "unstable_session_fork")]
+            fork,
+            resume,
+            close,
+            meta,
+        } = session_capabilities;
+
         Ok(super::SessionCapabilities {
-            load: None,
+            prompt: Some(prompt_capabilities.into_v2()?),
+            mcp: Some(mcp_capabilities.into_v2()?),
+            load: load_session.then(super::SessionLoadCapabilities::new),
             list: list.into_v2()?,
             delete: delete.into_v2()?,
             additional_directories: additional_directories.into_v2()?,
@@ -8603,7 +8651,11 @@ mod tests {
 
         let v2_capabilities: v2::AgentCapabilities =
             v1_to_v2(v1_capabilities).expect("v1 -> v2 conversion");
-        assert!(v2_capabilities.session.load.is_some());
+        let session = v2_capabilities
+            .session
+            .as_ref()
+            .expect("v1 capabilities imply v2 session support");
+        assert!(session.load.is_some());
         let v2_json = serde_json::to_value(&v2_capabilities).expect("v2 serialize");
         assert_eq!(v2_json.get("loadSession"), None);
         assert_eq!(
@@ -8614,6 +8666,31 @@ mod tests {
         let v1_after: v1::AgentCapabilities =
             v2_to_v1(v2_capabilities).expect("v2 -> v1 conversion");
         assert!(v1_after.load_session);
+    }
+
+    #[test]
+    fn v2_agent_capabilities_without_session_do_not_convert_to_v1() {
+        let error = v2::AgentCapabilities::new().into_v1().unwrap_err();
+        assert_eq!(
+            error.message(),
+            "v2 AgentCapabilities without `session` cannot be represented in v1"
+        );
+    }
+
+    #[test]
+    fn v2_session_capabilities_convert_to_v1_agent_capability_parts() {
+        let parts = v2::SessionCapabilities::new()
+            .load(v2::SessionLoadCapabilities::new())
+            .prompt(v2::PromptCapabilities::new().image(v2::PromptImageCapabilities::new()))
+            .mcp(v2::McpCapabilities::new().http(v2::McpHttpCapabilities::new()))
+            .list(v2::SessionListCapabilities::new())
+            .into_v1()
+            .expect("v2 session capabilities -> v1 parts");
+
+        assert!(parts.session_capabilities.list.is_some());
+        assert!(parts.prompt_capabilities.image);
+        assert!(parts.load_session);
+        assert!(parts.mcp_capabilities.http);
     }
 
     #[test]
