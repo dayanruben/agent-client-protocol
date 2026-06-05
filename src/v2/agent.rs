@@ -2642,16 +2642,13 @@ impl SetSessionConfigOptionResponse {
 /// See protocol docs: [MCP Servers](https://agentclientprotocol.com/protocol/session-setup#mcp-servers)
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[schemars(extend("discriminator" = {"propertyName": "type"}))]
 #[non_exhaustive]
 pub enum McpServer {
     /// HTTP transport configuration
     ///
     /// Only available when the Agent capabilities include `mcp.http`.
     Http(McpServerHttp),
-    /// SSE transport configuration
-    ///
-    /// Only available when the Agent capabilities include `mcp.sse`.
-    Sse(McpServerSse),
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
@@ -2664,9 +2661,94 @@ pub enum McpServer {
     Acp(McpServerAcp),
     /// Stdio transport configuration
     ///
-    /// All Agents MUST support this transport.
-    #[serde(untagged)]
+    /// Only available when the Agent capabilities include `mcp.stdio`.
     Stdio(McpServerStdio),
+    /// Custom or future MCP server transport configuration.
+    ///
+    /// Values beginning with `_` are reserved for implementation-specific
+    /// extensions. Unknown values that do not begin with `_` are reserved for
+    /// future ACP variants.
+    ///
+    /// Receivers that do not understand this transport should preserve the raw
+    /// payload when storing, replaying, proxying, or forwarding session setup
+    /// data, and otherwise ignore it or reject the server configuration.
+    #[serde(untagged)]
+    Other(OtherMcpServer),
+}
+
+/// Custom or future MCP server transport payload.
+#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq, Eq)]
+#[schemars(inline)]
+#[schemars(transform = other_mcp_server_schema)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct OtherMcpServer {
+    /// Custom or future MCP server transport type.
+    ///
+    /// Values beginning with `_` are reserved for implementation-specific
+    /// extensions. Unknown values that do not begin with `_` are reserved for
+    /// future ACP variants.
+    #[serde(rename = "type")]
+    pub type_: String,
+    /// Additional fields from the unknown MCP server transport payload.
+    #[serde(flatten)]
+    pub fields: BTreeMap<String, serde_json::Value>,
+}
+
+impl OtherMcpServer {
+    #[must_use]
+    pub fn new(type_: impl Into<String>, mut fields: BTreeMap<String, serde_json::Value>) -> Self {
+        fields.remove("type");
+        Self {
+            type_: type_.into(),
+            fields,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for OtherMcpServer {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let type_ = fields
+            .remove("type")
+            .ok_or_else(|| serde::de::Error::missing_field("type"))?;
+        let serde_json::Value::String(type_) = type_ else {
+            return Err(serde::de::Error::custom("`type` must be a string"));
+        };
+
+        if is_known_mcp_server_type(&type_) {
+            return Err(serde::de::Error::custom(format!(
+                "known MCP server transport `{type_}` did not match its schema"
+            )));
+        }
+
+        Ok(Self { type_, fields })
+    }
+}
+
+fn is_known_mcp_server_type(type_: &str) -> bool {
+    match type_ {
+        "http" | "stdio" => true,
+        #[cfg(feature = "unstable_mcp_over_acp")]
+        "acp" => true,
+        _ => false,
+    }
+}
+
+fn other_mcp_server_schema(schema: &mut Schema) {
+    super::schema_util::reject_known_string_discriminators(
+        schema,
+        "type",
+        &[
+            "http",
+            "stdio",
+            #[cfg(feature = "unstable_mcp_over_acp")]
+            "acp",
+        ],
+    );
 }
 
 /// HTTP transport configuration for MCP.
@@ -2691,57 +2773,6 @@ pub struct McpServerHttp {
 }
 
 impl McpServerHttp {
-    #[must_use]
-    pub fn new(name: impl Into<String>, url: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            url: url.into(),
-            headers: Vec::new(),
-            meta: None,
-        }
-    }
-
-    /// HTTP headers to set when making requests to the MCP server.
-    #[must_use]
-    pub fn headers(mut self, headers: Vec<HttpHeader>) -> Self {
-        self.headers = headers;
-        self
-    }
-
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
-    ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-    #[must_use]
-    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
-        self.meta = meta.into_option();
-        self
-    }
-}
-
-/// SSE transport configuration for MCP.
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct McpServerSse {
-    /// Human-readable name identifying this MCP server.
-    pub name: String,
-    /// URL to the MCP server.
-    pub url: String,
-    /// HTTP headers to set when making requests to the MCP server.
-    pub headers: Vec<HttpHeader>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
-    ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-    #[serde(rename = "_meta")]
-    pub meta: Option<Meta>,
-}
-
-impl McpServerSse {
     #[must_use]
     pub fn new(name: impl Into<String>, url: impl Into<String>) -> Self {
         Self {
@@ -4441,6 +4472,14 @@ impl PromptEmbeddedContextCapabilities {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct McpCapabilities {
+    /// Agent supports [`McpServer::Stdio`].
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports stdio MCP server transports.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
+    #[serde(default)]
+    pub stdio: Option<McpStdioCapabilities>,
     /// Agent supports [`McpServer::Http`].
     ///
     /// Optional. Omitted or `null` both mean the agent does not advertise support.
@@ -4449,14 +4488,6 @@ pub struct McpCapabilities {
     #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub http: Option<McpHttpCapabilities>,
-    /// Agent supports [`McpServer::Sse`].
-    ///
-    /// Optional. Omitted or `null` both mean the agent does not advertise support.
-    /// Supplying `{}` means the agent supports SSE MCP server transports.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
-    #[serde(default)]
-    pub sse: Option<McpSseCapabilities>,
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
@@ -4485,6 +4516,16 @@ impl McpCapabilities {
         Self::default()
     }
 
+    /// Agent supports [`McpServer::Stdio`].
+    ///
+    /// Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports stdio MCP server transports.
+    #[must_use]
+    pub fn stdio(mut self, stdio: impl IntoOption<McpStdioCapabilities>) -> Self {
+        self.stdio = stdio.into_option();
+        self
+    }
+
     /// Agent supports [`McpServer::Http`].
     ///
     /// Omitted or `null` both mean the agent does not advertise support.
@@ -4492,16 +4533,6 @@ impl McpCapabilities {
     #[must_use]
     pub fn http(mut self, http: impl IntoOption<McpHttpCapabilities>) -> Self {
         self.http = http.into_option();
-        self
-    }
-
-    /// Agent supports [`McpServer::Sse`].
-    ///
-    /// Omitted or `null` both mean the agent does not advertise support.
-    /// Supplying `{}` means the agent supports SSE MCP server transports.
-    #[must_use]
-    pub fn sse(mut self, sse: impl IntoOption<McpSseCapabilities>) -> Self {
-        self.sse = sse.into_option();
         self
     }
 
@@ -4518,6 +4549,40 @@ impl McpCapabilities {
     pub fn acp(mut self, acp: impl IntoOption<McpAcpCapabilities>) -> Self {
         self.acp = acp.into_option();
         self
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// Capabilities for stdio MCP server transports.
+///
+/// Supplying `{}` means the agent supports stdio MCP server transports.
+#[skip_serializing_none]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct McpStdioCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+impl McpStdioCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -4549,40 +4614,6 @@ pub struct McpHttpCapabilities {
 }
 
 impl McpHttpCapabilities {
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
-    ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-    #[must_use]
-    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
-        self.meta = meta.into_option();
-        self
-    }
-}
-
-/// Capabilities for SSE MCP server transports.
-///
-/// Supplying `{}` means the agent supports SSE MCP server transports.
-#[skip_serializing_none]
-#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct McpSseCapabilities {
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
-    ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-    #[serde(rename = "_meta")]
-    pub meta: Option<Meta>,
-}
-
-impl McpSseCapabilities {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
@@ -5224,6 +5255,7 @@ mod test_serialization {
         assert_eq!(
             json,
             json!({
+                "type": "stdio",
                 "name": "test-server",
                 "command": "/usr/bin/server",
                 "args": ["--port", "3000"],
@@ -5254,6 +5286,51 @@ mod test_serialization {
             }
             _ => panic!("Expected Stdio variant"),
         }
+    }
+
+    #[test]
+    fn test_mcp_server_unknown_transport_serialization() {
+        let json = json!({
+            "type": "websocket",
+            "name": "future-server",
+            "url": "wss://example.com/mcp",
+            "protocolVersion": "2026-01-01"
+        });
+
+        let deserialized: McpServer = serde_json::from_value(json.clone()).unwrap();
+        let McpServer::Other(OtherMcpServer { type_, fields }) = &deserialized else {
+            panic!("Expected Other variant");
+        };
+
+        assert_eq!(type_, "websocket");
+        assert_eq!(fields["name"], "future-server");
+        assert_eq!(fields["url"], "wss://example.com/mcp");
+        assert_eq!(fields["protocolVersion"], "2026-01-01");
+        assert_eq!(serde_json::to_value(&deserialized).unwrap(), json);
+    }
+
+    #[test]
+    fn test_mcp_server_stdio_requires_type() {
+        let result = serde_json::from_value::<McpServer>(json!({
+            "name": "test-server",
+            "command": "/usr/bin/server",
+            "args": [],
+            "env": []
+        }));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mcp_server_unknown_does_not_hide_malformed_known_transport() {
+        let result = serde_json::from_value::<McpServer>(json!({
+            "type": "stdio",
+            "name": "test-server",
+            "args": [],
+            "env": []
+        }));
+
+        assert!(result.is_err());
     }
 
     #[test]
@@ -5323,47 +5400,6 @@ mod test_serialization {
             .method(),
             "mcp/message"
         );
-    }
-
-    #[test]
-    fn test_mcp_server_sse_serialization() {
-        let server = McpServer::Sse(
-            McpServerSse::new("sse-server", "https://sse.example.com/events")
-                .headers(vec![HttpHeader::new("X-API-Key", "apikey456")]),
-        );
-
-        let json = serde_json::to_value(&server).unwrap();
-        assert_eq!(
-            json,
-            json!({
-                "type": "sse",
-                "name": "sse-server",
-                "url": "https://sse.example.com/events",
-                "headers": [
-                    {
-                        "name": "X-API-Key",
-                        "value": "apikey456"
-                    }
-                ]
-            })
-        );
-
-        let deserialized: McpServer = serde_json::from_value(json).unwrap();
-        match deserialized {
-            McpServer::Sse(McpServerSse {
-                name,
-                url,
-                headers,
-                meta: _,
-            }) => {
-                assert_eq!(name, "sse-server");
-                assert_eq!(url, "https://sse.example.com/events");
-                assert_eq!(headers.len(), 1);
-                assert_eq!(headers[0].name, "X-API-Key");
-                assert_eq!(headers[0].value, "apikey456");
-            }
-            _ => panic!("Expected Sse variant"),
-        }
     }
 
     #[test]
@@ -6428,24 +6464,24 @@ mod test_serialization {
     #[test]
     fn test_mcp_capabilities_serialize_supported_transports_as_objects() {
         let caps = McpCapabilities::new()
-            .http(McpHttpCapabilities::new())
-            .sse(McpSseCapabilities::new());
+            .stdio(McpStdioCapabilities::new())
+            .http(McpHttpCapabilities::new());
 
         assert_eq!(
             serde_json::to_value(&caps).unwrap(),
             json!({
-                "http": {},
-                "sse": {}
+                "stdio": {},
+                "http": {}
             })
         );
 
         let deserialized: McpCapabilities = serde_json::from_value(json!({
-            "http": null,
-            "sse": false
+            "stdio": null,
+            "http": false
         }))
         .unwrap();
+        assert!(deserialized.stdio.is_none());
         assert!(deserialized.http.is_none());
-        assert!(deserialized.sse.is_none());
     }
 
     #[cfg(feature = "unstable_mcp_over_acp")]
