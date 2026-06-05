@@ -1719,7 +1719,7 @@ impl IntoV1 for super::AuthCapabilities {
     fn into_v1(self) -> Result<Self::Output> {
         let Self { terminal, meta } = self;
         Ok(crate::v1::AuthCapabilities {
-            terminal: terminal.into_v1()?,
+            terminal: terminal.is_some(),
             meta: meta.into_v1()?,
         })
     }
@@ -1732,7 +1732,7 @@ impl IntoV2 for crate::v1::AuthCapabilities {
     fn into_v2(self) -> Result<Self::Output> {
         let Self { terminal, meta } = self;
         Ok(super::AuthCapabilities {
-            terminal: terminal.into_v2()?,
+            terminal: terminal.then(super::TerminalAuthCapabilities::new),
             meta: meta.into_v2()?,
         })
     }
@@ -2428,13 +2428,13 @@ impl IntoV1 for super::InitializeRequest {
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
             protocol_version,
-            client_capabilities,
+            capabilities,
             client_info,
             meta,
         } = self;
         Ok(crate::v1::InitializeRequest {
             protocol_version: protocol_version.into_v1()?,
-            client_capabilities: client_capabilities.into_v1()?,
+            client_capabilities: capabilities.into_v1()?,
             client_info: client_info.into_v1()?,
             meta: meta.into_v1()?,
         })
@@ -2453,7 +2453,7 @@ impl IntoV2 for crate::v1::InitializeRequest {
         } = self;
         Ok(super::InitializeRequest {
             protocol_version: protocol_version.into_v2()?,
-            client_capabilities: client_capabilities.into_v2()?,
+            capabilities: client_capabilities.into_v2()?,
             client_info: client_info.into_v2()?,
             meta: meta.into_v2()?,
         })
@@ -2466,7 +2466,7 @@ impl IntoV1 for super::InitializeResponse {
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
             protocol_version,
-            agent_capabilities,
+            capabilities: agent_capabilities,
             auth_methods,
             agent_info,
             meta,
@@ -2494,7 +2494,7 @@ impl IntoV2 for crate::v1::InitializeResponse {
         } = self;
         Ok(super::InitializeResponse {
             protocol_version: protocol_version.into_v2()?,
-            agent_capabilities: agent_capabilities.into_v2()?,
+            capabilities: agent_capabilities.into_v2()?,
             auth_methods: auth_methods.into_v2()?,
             agent_info: agent_info.into_v2()?,
             meta: meta.into_v2()?,
@@ -4498,10 +4498,9 @@ impl IntoV1 for super::AgentCapabilities {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            load_session,
-            prompt_capabilities,
-            mcp_capabilities,
-            session_capabilities,
+            prompt,
+            mcp,
+            session,
             auth,
             #[cfg(feature = "unstable_llm_providers")]
             providers,
@@ -4511,11 +4510,12 @@ impl IntoV1 for super::AgentCapabilities {
             position_encoding,
             meta,
         } = self;
+        let load_session = session.load.is_some();
         Ok(crate::v1::AgentCapabilities {
             load_session: load_session.into_v1()?,
-            prompt_capabilities: prompt_capabilities.into_v1()?,
-            mcp_capabilities: mcp_capabilities.into_v1()?,
-            session_capabilities: session_capabilities.into_v1()?,
+            prompt_capabilities: prompt.into_v1()?,
+            mcp_capabilities: mcp.into_v1()?,
+            session_capabilities: session.into_v1()?,
             auth: auth.into_v1()?,
             #[cfg(feature = "unstable_llm_providers")]
             providers: providers.into_v1()?,
@@ -4546,11 +4546,14 @@ impl IntoV2 for crate::v1::AgentCapabilities {
             position_encoding,
             meta,
         } = self;
+        let mut session = session_capabilities.into_v2()?;
+        if load_session {
+            session.load = Some(super::SessionLoadCapabilities::new());
+        }
         Ok(super::AgentCapabilities {
-            load_session: load_session.into_v2()?,
-            prompt_capabilities: prompt_capabilities.into_v2()?,
-            mcp_capabilities: mcp_capabilities.into_v2()?,
-            session_capabilities: session_capabilities.into_v2()?,
+            prompt: prompt_capabilities.into_v2()?,
+            mcp: mcp_capabilities.into_v2()?,
+            session,
             auth: auth.into_v2()?,
             #[cfg(feature = "unstable_llm_providers")]
             providers: providers.into_v2()?,
@@ -4592,6 +4595,7 @@ impl IntoV1 for super::SessionCapabilities {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
+            load: _,
             list,
             #[cfg(feature = "unstable_session_delete")]
             delete,
@@ -4632,6 +4636,7 @@ impl IntoV2 for crate::v1::SessionCapabilities {
             meta,
         } = self;
         Ok(super::SessionCapabilities {
+            load: None,
             list: list.into_v2()?,
             #[cfg(feature = "unstable_session_delete")]
             delete: delete.into_v2()?,
@@ -4791,9 +4796,9 @@ impl IntoV1 for super::PromptCapabilities {
             meta,
         } = self;
         Ok(crate::v1::PromptCapabilities {
-            image: image.into_v1()?,
-            audio: audio.into_v1()?,
-            embedded_context: embedded_context.into_v1()?,
+            image: image.is_some(),
+            audio: audio.is_some(),
+            embedded_context: embedded_context.is_some(),
             meta: meta.into_v1()?,
         })
     }
@@ -4810,9 +4815,9 @@ impl IntoV2 for crate::v1::PromptCapabilities {
             meta,
         } = self;
         Ok(super::PromptCapabilities {
-            image: image.into_v2()?,
-            audio: audio.into_v2()?,
-            embedded_context: embedded_context.into_v2()?,
+            image: image.then(super::PromptImageCapabilities::new),
+            audio: audio.then(super::PromptAudioCapabilities::new),
+            embedded_context: embedded_context.then(super::PromptEmbeddedContextCapabilities::new),
             meta: meta.into_v2()?,
         })
     }
@@ -4830,10 +4835,10 @@ impl IntoV1 for super::McpCapabilities {
             meta,
         } = self;
         Ok(crate::v1::McpCapabilities {
-            http: http.into_v1()?,
-            sse: sse.into_v1()?,
+            http: http.is_some(),
+            sse: sse.is_some(),
             #[cfg(feature = "unstable_mcp_over_acp")]
-            acp: acp.into_v1()?,
+            acp: acp.is_some(),
             meta: meta.into_v1()?,
         })
     }
@@ -4851,10 +4856,10 @@ impl IntoV2 for crate::v1::McpCapabilities {
             meta,
         } = self;
         Ok(super::McpCapabilities {
-            http: http.into_v2()?,
-            sse: sse.into_v2()?,
+            http: http.then(super::McpHttpCapabilities::new),
+            sse: sse.then(super::McpSseCapabilities::new),
             #[cfg(feature = "unstable_mcp_over_acp")]
-            acp: acp.into_v2()?,
+            acp: acp.then(super::McpAcpCapabilities::new),
             meta: meta.into_v2()?,
         })
     }
@@ -8648,7 +8653,7 @@ mod tests {
         let converted: v2::InitializeRequest =
             v1_to_v2(request).expect("v1 -> v2 conversion failed");
         let converted_capabilities =
-            serde_json::to_value(converted.client_capabilities).expect("v2 serialize");
+            serde_json::to_value(converted.capabilities).expect("v2 serialize");
         assert_eq!(converted_capabilities.get("fs"), None);
         assert_eq!(converted_capabilities.get("terminal"), None);
     }
@@ -8658,7 +8663,99 @@ mod tests {
         let response = v1::InitializeResponse::new(ProtocolVersion::V1)
             .agent_info(v1::Implementation::new("test-agent", "2.0.0").title("Test Agent"));
         assert_v1_round_trip::<v1::InitializeResponse, v2::InitializeResponse>(response.clone());
-        assert_json_eq_after_v1_to_v2::<v1::InitializeResponse, v2::InitializeResponse>(response);
+        let converted: v2::InitializeResponse =
+            v1_to_v2(response).expect("v1 -> v2 conversion failed");
+        let converted_json = serde_json::to_value(&converted).expect("v2 serialize");
+        assert_eq!(converted_json.get("agentCapabilities"), None);
+        assert!(converted_json.get("capabilities").is_some());
+        assert_eq!(converted_json.pointer("/capabilities/loadSession"), None);
+    }
+
+    #[test]
+    fn agent_load_session_capability_moves_between_v1_and_v2() {
+        let v1_capabilities = v1::AgentCapabilities::new().load_session(true);
+
+        let v2_capabilities: v2::AgentCapabilities =
+            v1_to_v2(v1_capabilities).expect("v1 -> v2 conversion");
+        assert!(v2_capabilities.session.load.is_some());
+        let v2_json = serde_json::to_value(&v2_capabilities).expect("v2 serialize");
+        assert_eq!(v2_json.get("loadSession"), None);
+        assert_eq!(
+            v2_json.pointer("/session/load"),
+            Some(&serde_json::json!({}))
+        );
+
+        let v1_after: v1::AgentCapabilities =
+            v2_to_v1(v2_capabilities).expect("v2 -> v1 conversion");
+        assert!(v1_after.load_session);
+    }
+
+    #[test]
+    fn v1_prompt_capability_bools_convert_to_v2_objects() {
+        let v1_capabilities = v1::PromptCapabilities::new()
+            .image(true)
+            .audio(true)
+            .embedded_context(true);
+
+        let v2_capabilities: v2::PromptCapabilities =
+            v1_to_v2(v1_capabilities).expect("v1 -> v2 conversion");
+        let v2_json = serde_json::to_value(&v2_capabilities).expect("v2 serialize");
+        assert_eq!(v2_json.pointer("/image"), Some(&serde_json::json!({})));
+        assert_eq!(v2_json.pointer("/audio"), Some(&serde_json::json!({})));
+        assert_eq!(
+            v2_json.pointer("/embeddedContext"),
+            Some(&serde_json::json!({}))
+        );
+
+        let v1_after: v1::PromptCapabilities =
+            v2_to_v1(v2_capabilities).expect("v2 -> v1 conversion");
+        assert!(v1_after.image);
+        assert!(v1_after.audio);
+        assert!(v1_after.embedded_context);
+    }
+
+    #[test]
+    fn v1_mcp_capability_bools_convert_to_v2_objects() {
+        let v1_capabilities = v1::McpCapabilities::new().http(true).sse(true);
+
+        let v2_capabilities: v2::McpCapabilities =
+            v1_to_v2(v1_capabilities).expect("v1 -> v2 conversion");
+        let v2_json = serde_json::to_value(&v2_capabilities).expect("v2 serialize");
+        assert_eq!(v2_json.pointer("/http"), Some(&serde_json::json!({})));
+        assert_eq!(v2_json.pointer("/sse"), Some(&serde_json::json!({})));
+
+        let v1_after: v1::McpCapabilities = v2_to_v1(v2_capabilities).expect("v2 -> v1 conversion");
+        assert!(v1_after.http);
+        assert!(v1_after.sse);
+    }
+
+    #[cfg(feature = "unstable_mcp_over_acp")]
+    #[test]
+    fn v1_mcp_acp_capability_bool_converts_to_v2_object() {
+        let v1_capabilities = v1::McpCapabilities::new().acp(true);
+
+        let v2_capabilities: v2::McpCapabilities =
+            v1_to_v2(v1_capabilities).expect("v1 -> v2 conversion");
+        let v2_json = serde_json::to_value(&v2_capabilities).expect("v2 serialize");
+        assert_eq!(v2_json.pointer("/acp"), Some(&serde_json::json!({})));
+
+        let v1_after: v1::McpCapabilities = v2_to_v1(v2_capabilities).expect("v2 -> v1 conversion");
+        assert!(v1_after.acp);
+    }
+
+    #[cfg(feature = "unstable_auth_methods")]
+    #[test]
+    fn v1_auth_terminal_capability_bool_converts_to_v2_object() {
+        let v1_capabilities = v1::AuthCapabilities::new().terminal(true);
+
+        let v2_capabilities: v2::AuthCapabilities =
+            v1_to_v2(v1_capabilities).expect("v1 -> v2 conversion");
+        let v2_json = serde_json::to_value(&v2_capabilities).expect("v2 serialize");
+        assert_eq!(v2_json.pointer("/terminal"), Some(&serde_json::json!({})));
+
+        let v1_after: v1::AuthCapabilities =
+            v2_to_v1(v2_capabilities).expect("v2 -> v1 conversion");
+        assert!(v1_after.terminal);
     }
 
     #[test]

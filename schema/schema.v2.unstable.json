@@ -66,22 +66,13 @@
           "default": {},
           "description": "Authentication-related capabilities supported by the agent."
         },
-        "loadSession": {
-          "default": false,
-          "description": "Whether the agent supports `session/load`.",
-          "type": "boolean"
-        },
-        "mcpCapabilities": {
+        "mcp": {
           "allOf": [
             {
               "$ref": "#/$defs/McpCapabilities"
             }
           ],
-          "default": {
-            "acp": false,
-            "http": false,
-            "sse": false
-          },
+          "default": {},
           "description": "MCP capabilities supported by the agent."
         },
         "nes": {
@@ -108,17 +99,13 @@
           "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nThe position encoding selected by the agent from the client's supported encodings.",
           "x-deserialize-default-on-error": true
         },
-        "promptCapabilities": {
+        "prompt": {
           "allOf": [
             {
               "$ref": "#/$defs/PromptCapabilities"
             }
           ],
-          "default": {
-            "audio": false,
-            "embeddedContext": false,
-            "image": false
-          },
+          "default": {},
           "description": "Prompt capabilities supported by the agent."
         },
         "providers": {
@@ -133,7 +120,7 @@
           "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nProvider configuration capabilities supported by the agent.\n\nBy supplying `{}` it means that the agent supports provider configuration methods.",
           "x-deserialize-default-on-error": true
         },
-        "sessionCapabilities": {
+        "session": {
           "allOf": [
             {
               "$ref": "#/$defs/SessionCapabilities"
@@ -538,9 +525,16 @@
           "type": ["object", "null"]
         },
         "terminal": {
-          "default": false,
-          "description": "Whether the client supports `terminal` authentication methods.\n\nWhen `true`, the agent may include `terminal` entries in its authentication methods.",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TerminalAuthCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the client supports `terminal` authentication methods.\n\nOptional. Omitted or `null` both mean the client does not advertise support.\nSupplying `{}` means the agent may include `terminal` entries in its authentication methods.",
+          "x-deserialize-default-on-error": true
         }
       },
       "type": "object"
@@ -1001,9 +995,7 @@
               "$ref": "#/$defs/AuthCapabilities"
             }
           ],
-          "default": {
-            "terminal": false
-          },
+          "default": {},
           "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nAuthentication capabilities supported by the client.\nDetermines which authentication method types the agent may include\nin its `InitializeResponse`."
         },
         "elicitation": {
@@ -1282,7 +1274,7 @@
                       "$ref": "#/$defs/LoadSessionRequest"
                     }
                   ],
-                  "description": "Loads an existing session to resume a previous conversation.\n\nThis method is only available if the agent advertises the `loadSession` capability.\n\nThe agent should:\n- Restore the session context and conversation history\n- Connect to the specified MCP servers\n- Stream the entire conversation history back to the client via notifications\n\nSee protocol docs: [Loading Sessions](https://agentclientprotocol.com/protocol/session-setup#loading-sessions)",
+                  "description": "Loads an existing session to resume a previous conversation.\n\nThis method is only available if the agent advertises the `session.load` capability.\n\nThe agent should:\n- Restore the session context and conversation history\n- Connect to the specified MCP servers\n- Stream the entire conversation history back to the client via notifications\n\nSee protocol docs: [Loading Sessions](https://agentclientprotocol.com/protocol/session-setup#loading-sessions)",
                   "title": "LoadSessionRequest"
                 },
                 {
@@ -1291,7 +1283,7 @@
                       "$ref": "#/$defs/ListSessionsRequest"
                     }
                   ],
-                  "description": "Lists existing sessions known to the agent.\n\nThis method is only available if the agent advertises the `sessionCapabilities.list` capability.\n\nThe agent should return metadata about sessions with optional filtering and pagination support.",
+                  "description": "Lists existing sessions known to the agent.\n\nThis method is only available if the agent advertises the `session.list` capability.\n\nThe agent should return metadata about sessions with optional filtering and pagination support.",
                   "title": "ListSessionsRequest"
                 },
                 {
@@ -1300,7 +1292,7 @@
                       "$ref": "#/$defs/DeleteSessionRequest"
                     }
                   ],
-                  "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nDeletes an existing session from `session/list`.\n\nThis method is only available if the agent advertises the `sessionCapabilities.delete` capability.",
+                  "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nDeletes an existing session from `session/list`.\n\nThis method is only available if the agent advertises the `session.delete` capability.",
                   "title": "DeleteSessionRequest"
                 },
                 {
@@ -1318,7 +1310,7 @@
                       "$ref": "#/$defs/ResumeSessionRequest"
                     }
                   ],
-                  "description": "Resumes an existing session without returning previous messages.\n\nThis method is only available if the agent advertises the `sessionCapabilities.resume` capability.\n\nThe agent should resume the session context, allowing the conversation to continue\nwithout replaying the message history (unlike `session/load`).",
+                  "description": "Resumes an existing session without returning previous messages.\n\nThis method is only available if the agent advertises the `session.resume` capability.\n\nThe agent should resume the session context, allowing the conversation to continue\nwithout replaying the message history (unlike `session/load`).",
                   "title": "ResumeSessionRequest"
                 },
                 {
@@ -1327,7 +1319,7 @@
                       "$ref": "#/$defs/CloseSessionRequest"
                     }
                   ],
-                  "description": "Closes an active session and frees up any resources associated with it.\n\nThis method is only available if the agent advertises the `sessionCapabilities.close` capability.\n\nThe agent must cancel any ongoing work (as if `session/cancel` was called)\nand then free up any resources associated with the session.",
+                  "description": "Closes an active session and frees up any resources associated with it.\n\nThis method is only available if the agent advertises the `session.close` capability.\n\nThe agent must cancel any ongoing work (as if `session/cancel` was called)\nand then free up any resources associated with the session.",
                   "title": "CloseSessionRequest"
                 },
                 {
@@ -1523,7 +1515,7 @@
       "x-side": "agent"
     },
     "CloseSessionRequest": {
-      "description": "Request parameters for closing an active session.\n\nIf supported, the agent **must** cancel any ongoing work related to the session\n(treat it as if `session/cancel` was called) and then free up any resources\nassociated with the session.\n\nOnly available if the Agent supports the `sessionCapabilities.close` capability.",
+      "description": "Request parameters for closing an active session.\n\nIf supported, the agent **must** cancel any ongoing work related to the session\n(treat it as if `session/cancel` was called) and then free up any resources\nassociated with the session.\n\nOnly available if the Agent supports the `session.close` capability.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -1975,7 +1967,7 @@
       "x-side": "client"
     },
     "DeleteSessionRequest": {
-      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nRequest parameters for deleting an existing session from `session/list`.\n\nOnly available if the Agent supports the `sessionCapabilities.delete` capability.",
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nRequest parameters for deleting an existing session from `session/list`.\n\nOnly available if the Agent supports the `session.delete` capability.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -2982,16 +2974,14 @@
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
           "type": ["object", "null"]
         },
-        "clientCapabilities": {
+        "capabilities": {
           "allOf": [
             {
               "$ref": "#/$defs/ClientCapabilities"
             }
           ],
           "default": {
-            "auth": {
-              "terminal": false
-            }
+            "auth": {}
           },
           "description": "Capabilities supported by the client."
         },
@@ -3029,29 +3019,6 @@
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
           "type": ["object", "null"]
         },
-        "agentCapabilities": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/AgentCapabilities"
-            }
-          ],
-          "default": {
-            "auth": {},
-            "loadSession": false,
-            "mcpCapabilities": {
-              "acp": false,
-              "http": false,
-              "sse": false
-            },
-            "promptCapabilities": {
-              "audio": false,
-              "embeddedContext": false,
-              "image": false
-            },
-            "sessionCapabilities": {}
-          },
-          "description": "Capabilities supported by the agent."
-        },
         "agentInfo": {
           "anyOf": [
             {
@@ -3073,6 +3040,20 @@
           "type": "array",
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
+        },
+        "capabilities": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/AgentCapabilities"
+            }
+          ],
+          "default": {
+            "auth": {},
+            "mcp": {},
+            "prompt": {},
+            "session": {}
+          },
+          "description": "Capabilities supported by the agent."
         },
         "protocolVersion": {
           "allOf": [
@@ -3154,7 +3135,7 @@
       "x-side": "agent"
     },
     "ListSessionsRequest": {
-      "description": "Request parameters for listing existing sessions.\n\nOnly available if the Agent supports the `sessionCapabilities.list` capability.",
+      "description": "Request parameters for listing existing sessions.\n\nOnly available if the Agent supports the `session.list` capability.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -3237,7 +3218,7 @@
       "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nWell-known API protocol identifiers for LLM providers.\n\nAgents and clients MUST handle unknown protocol identifiers gracefully.\n\nProtocol names beginning with `_` are free for custom use, like other ACP extension methods.\nProtocol names that do not begin with `_` are reserved for the ACP spec."
     },
     "LoadSessionRequest": {
-      "description": "Request parameters for loading an existing session.\n\nOnly available if the Agent supports the `loadSession` capability.\n\nSee protocol docs: [Loading Sessions](https://agentclientprotocol.com/protocol/session-setup#loading-sessions)",
+      "description": "Request parameters for loading an existing session.\n\nOnly available if the Agent supports the `session.load` capability.\n\nSee protocol docs: [Loading Sessions](https://agentclientprotocol.com/protocol/session-setup#loading-sessions)",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -3335,6 +3316,17 @@
       "x-method": "logout",
       "x-side": "agent"
     },
+    "McpAcpCapabilities": {
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nCapabilities for ACP MCP server transports.\n\nSupplying `{}` means the agent supports ACP MCP server transports.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object"
+    },
     "McpCapabilities": {
       "description": "MCP capabilities supported by the agent",
       "properties": {
@@ -3344,19 +3336,40 @@
           "type": ["object", "null"]
         },
         "acp": {
-          "default": false,
-          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nAgent supports [`McpServer::Acp`].",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McpAcpCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nAgent supports [`McpServer::Acp`].\n\nOptional. Omitted or `null` both mean the agent does not advertise support.\nSupplying `{}` means the agent supports ACP MCP server transports.",
+          "x-deserialize-default-on-error": true
         },
         "http": {
-          "default": false,
-          "description": "Agent supports [`McpServer::Http`].",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McpHttpCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Agent supports [`McpServer::Http`].\n\nOptional. Omitted or `null` both mean the agent does not advertise support.\nSupplying `{}` means the agent supports HTTP MCP server transports.",
+          "x-deserialize-default-on-error": true
         },
         "sse": {
-          "default": false,
-          "description": "Agent supports [`McpServer::Sse`].",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McpSseCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Agent supports [`McpServer::Sse`].\n\nOptional. Omitted or `null` both mean the agent does not advertise support.\nSupplying `{}` means the agent supports SSE MCP server transports.",
+          "x-deserialize-default-on-error": true
         }
       },
       "type": "object"
@@ -3364,6 +3377,17 @@
     "McpConnectionId": {
       "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nA unique identifier for an active MCP-over-ACP connection.",
       "type": "string"
+    },
+    "McpHttpCapabilities": {
+      "description": "Capabilities for HTTP MCP server transports.\n\nSupplying `{}` means the agent supports HTTP MCP server transports.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object"
     },
     "McpServer": {
       "anyOf": [
@@ -3373,7 +3397,7 @@
               "$ref": "#/$defs/McpServerHttp"
             }
           ],
-          "description": "HTTP transport configuration\n\nOnly available when the Agent capabilities indicate `mcp_capabilities.http` is `true`.",
+          "description": "HTTP transport configuration\n\nOnly available when the Agent capabilities include `mcp.http`.",
           "properties": {
             "type": {
               "const": "http",
@@ -3389,7 +3413,7 @@
               "$ref": "#/$defs/McpServerSse"
             }
           ],
-          "description": "SSE transport configuration\n\nOnly available when the Agent capabilities indicate `mcp_capabilities.sse` is `true`.",
+          "description": "SSE transport configuration\n\nOnly available when the Agent capabilities include `mcp.sse`.",
           "properties": {
             "type": {
               "const": "sse",
@@ -3405,7 +3429,7 @@
               "$ref": "#/$defs/McpServerAcp"
             }
           ],
-          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nACP transport configuration\n\nOnly available when the Agent capabilities indicate `mcp_capabilities.acp` is `true`.\nThe MCP server is provided by an ACP component and communicates over the ACP channel.",
+          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nACP transport configuration\n\nOnly available when the Agent capabilities include `mcp.acp`.\nThe MCP server is provided by an ACP component and communicates over the ACP channel.",
           "properties": {
             "type": {
               "const": "acp",
@@ -3541,6 +3565,17 @@
         }
       },
       "required": ["name", "command", "args", "env"],
+      "type": "object"
+    },
+    "McpSseCapabilities": {
+      "description": "Capabilities for SSE MCP server transports.\n\nSupplying `{}` means the agent supports SSE MCP server transports.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
       "type": "object"
     },
     "MessageId": {
@@ -5180,6 +5215,17 @@
         }
       ]
     },
+    "PromptAudioCapabilities": {
+      "description": "Capabilities for audio content in prompt requests.\n\nSupplying `{}` means the agent supports audio content in prompts.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object"
+    },
     "PromptCapabilities": {
       "description": "Prompt capabilities supported by the agent in `session/prompt` requests.\n\nBaseline agent functionality requires support for [`ContentBlock::Text`]\nand [`ContentBlock::ResourceLink`] in prompt requests.\n\nOther variants must be explicitly opted in to.\nCapabilities for different types of content in prompt requests.\n\nIndicates which content types beyond the baseline (text and resource links)\nthe agent can process.\n\nSee protocol docs: [Prompt Capabilities](https://agentclientprotocol.com/protocol/initialization#prompt-capabilities)",
       "properties": {
@@ -5189,19 +5235,62 @@
           "type": ["object", "null"]
         },
         "audio": {
-          "default": false,
-          "description": "Agent supports [`ContentBlock::Audio`].",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PromptAudioCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Agent supports [`ContentBlock::Audio`].\n\nOptional. Omitted or `null` both mean the agent does not advertise support.\nSupplying `{}` means the agent supports audio content in prompts.",
+          "x-deserialize-default-on-error": true
         },
         "embeddedContext": {
-          "default": false,
-          "description": "Agent supports embedded context in `session/prompt` requests.\n\nWhen enabled, the Client is allowed to include [`ContentBlock::Resource`]\nin prompt requests for pieces of context that are referenced in the message.",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PromptEmbeddedContextCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Agent supports embedded context in `session/prompt` requests.\n\nWhen enabled, the Client is allowed to include [`ContentBlock::Resource`]\nin prompt requests for pieces of context that are referenced in the message.\n\nOptional. Omitted or `null` both mean the agent does not advertise support.\nSupplying `{}` means the agent supports embedded context in prompts.",
+          "x-deserialize-default-on-error": true
         },
         "image": {
-          "default": false,
-          "description": "Agent supports [`ContentBlock::Image`].",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PromptImageCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Agent supports [`ContentBlock::Image`].\n\nOptional. Omitted or `null` both mean the agent does not advertise support.\nSupplying `{}` means the agent supports image content in prompts.",
+          "x-deserialize-default-on-error": true
+        }
+      },
+      "type": "object"
+    },
+    "PromptEmbeddedContextCapabilities": {
+      "description": "Capabilities for embedded context in prompt requests.\n\nSupplying `{}` means the agent supports embedded context in prompts.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "PromptImageCapabilities": {
+      "description": "Capabilities for image content in prompt requests.\n\nSupplying `{}` means the agent supports image content in prompts.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
         }
       },
       "type": "object"
@@ -5593,7 +5682,7 @@
       "type": "object"
     },
     "ResumeSessionRequest": {
-      "description": "Request parameters for resuming an existing session.\n\nResumes an existing session without returning previous messages (unlike `session/load`).\nThis is useful for agents that can resume sessions but don't implement full session loading.\n\nOnly available if the Agent supports the `sessionCapabilities.resume` capability.",
+      "description": "Request parameters for resuming an existing session.\n\nResumes an existing session without returning previous messages (unlike `session/load`).\nThis is useful for agents that can resume sessions but don't implement full session loading.\n\nOnly available if the Agent supports the `session.resume` capability.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -5700,7 +5789,7 @@
       "type": "object"
     },
     "SessionCapabilities": {
-      "description": "Session capabilities supported by the agent.\n\nAs a baseline, all Agents **MUST** support `session/new`, `session/prompt`, `session/cancel`, and `session/update`.\n\nOptionally, they **MAY** support other session methods and notifications by specifying additional capabilities.\n\nNote: `session/load` is still handled by the top-level `load_session` capability. This will be unified in future versions of the protocol.\n\nSee protocol docs: [Session Capabilities](https://agentclientprotocol.com/protocol/initialization#session-capabilities)",
+      "description": "Session capabilities supported by the agent.\n\nAs a baseline, all Agents **MUST** support `session/new`, `session/prompt`, `session/cancel`, and `session/update`.\n\nOptionally, they **MAY** support other session methods and notifications by specifying additional capabilities.\n\nSee protocol docs: [Session Capabilities](https://agentclientprotocol.com/protocol/initialization#session-capabilities)",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -5765,6 +5854,18 @@
             }
           ],
           "description": "Whether the agent supports `session/list`.",
+          "x-deserialize-default-on-error": true
+        },
+        "load": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionLoadCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Whether the agent supports `session/load`.\n\nOptional. Omitted or `null` both mean the agent does not advertise support.\nSupplying `{}` means the agent supports loading sessions.",
           "x-deserialize-default-on-error": true
         },
         "resume": {
@@ -6146,6 +6247,17 @@
     },
     "SessionListCapabilities": {
       "description": "Capabilities for the `session/list` method.\n\nBy supplying `{}` it means that the agent supports listing of sessions.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "SessionLoadCapabilities": {
+      "description": "Capabilities for the `session/load` method.\n\nSupplying `{}` means the agent supports loading sessions.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -6920,6 +7032,17 @@
       "type": "object",
       "x-method": "nes/suggest",
       "x-side": "agent"
+    },
+    "TerminalAuthCapabilities": {
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nCapabilities for terminal authentication methods.\n\nSupplying `{}` means the client supports terminal authentication methods.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object"
     },
     "TextContent": {
       "description": "Text provided to or from an LLM.",

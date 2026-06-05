@@ -37,7 +37,7 @@ They **SHOULD** also provide a name and version to the Agent.
   "method": "initialize",
   "params": {
     "protocolVersion": 2,
-    "clientCapabilities": {},
+    "capabilities": {},
     "clientInfo": {
       "name": "my-client",
       "title": "My Client",
@@ -55,16 +55,18 @@ The Agent **MUST** respond with the chosen [protocol version](#protocol-version)
   "id": 0,
   "result": {
     "protocolVersion": 2,
-    "agentCapabilities": {
-      "loadSession": true,
-      "promptCapabilities": {
-        "image": true,
-        "audio": true,
-        "embeddedContext": true
+    "capabilities": {
+      "session": {
+        "load": {}
       },
-      "mcpCapabilities": {
-        "http": true,
-        "sse": true
+      "prompt": {
+        "image": {},
+        "audio": {},
+        "embeddedContext": {}
+      },
+      "mcp": {
+        "http": {},
+        "sse": {}
       }
     },
     "agentInfo": {
@@ -109,7 +111,7 @@ Implementations can also [advertise custom capabilities](/protocol/v2/extensibil
 
 ### Client Capabilities
 
-Clients **MAY** include defined capability fields in `clientCapabilities`.
+Clients **MAY** include defined capability fields in `capabilities`.
 Omitted fields mean unsupported. Extension-specific capabilities belong in
 `_meta`.
 
@@ -117,12 +119,7 @@ Omitted fields mean unsupported. Extension-specific capabilities belong in
 
 The Agent **SHOULD** specify whether it supports the following capabilities:
 
-<ResponseField name="loadSession" type="boolean" post={["default: false"]}>
-  The [`session/load`](/protocol/v2/session-setup#loading-sessions) method is
-  available.
-</ResponseField>
-
-<ResponseField name="promptCapabilities" type="PromptCapabilities Object">
+<ResponseField name="prompt" type="PromptCapabilities Object">
   Object indicating the different types of [content](/protocol/v2/content) that
   may be included in `session/prompt` requests.
 </ResponseField>
@@ -137,26 +134,39 @@ As a baseline, all Agents **MUST** support `ContentBlock::Text` and `ContentBloc
 
 Optionally, they **MAY** support richer types of [content](/protocol/v2/content) by specifying the following capabilities:
 
-<ResponseField name="image" type="boolean" post={["default: false"]}>
-  The prompt may include `ContentBlock::Image`
+<ResponseField name="image" type="PromptImageCapabilities Object">
+  The prompt may include `ContentBlock::Image`. Omitted or `null` means the
+  Agent does not advertise support. Supplying `{}` means the Agent supports
+  image content in prompts.
 </ResponseField>
 
-<ResponseField name="audio" type="boolean" post={["default: false"]}>
-  The prompt may include `ContentBlock::Audio`
+<ResponseField name="audio" type="PromptAudioCapabilities Object">
+  The prompt may include `ContentBlock::Audio`. Omitted or `null` means the
+  Agent does not advertise support. Supplying `{}` means the Agent supports
+  audio content in prompts.
 </ResponseField>
 
-<ResponseField name="embeddedContext" type="boolean" post={["default: false"]}>
-  The prompt may include `ContentBlock::Resource`
+<ResponseField
+  name="embeddedContext"
+  type="PromptEmbeddedContextCapabilities Object"
+>
+  The prompt may include `ContentBlock::Resource`. Omitted or `null` means the
+  Agent does not advertise support. Supplying `{}` means the Agent supports
+  embedded context in prompts.
 </ResponseField>
 
 #### MCP capabilities
 
-<ResponseField name="http" type="boolean" post={["default: false"]}>
-  The Agent supports connecting to MCP servers over HTTP.
+<ResponseField name="http" type="McpHttpCapabilities Object">
+  The Agent supports connecting to MCP servers over HTTP. Omitted or `null`
+  means the Agent does not advertise support. Supplying `{}` means the Agent
+  supports HTTP MCP server transports.
 </ResponseField>
 
-<ResponseField name="sse" type="boolean" post={["default: false"]}>
-  The Agent supports connecting to MCP servers over SSE.
+<ResponseField name="sse" type="McpSseCapabilities Object">
+  The Agent supports connecting to MCP servers over SSE. Omitted or `null` means
+  the Agent does not advertise support. Supplying `{}` means the Agent supports
+  SSE MCP server transports.
 
 Note: This transport has been deprecated by the MCP spec.
 
@@ -178,6 +188,12 @@ As a baseline, all Agents **MUST** support `session/new`, `session/prompt`, `ses
 
 Optionally, they **MAY** support other session methods and notifications by specifying additional capabilities.
 
+<ResponseField name="load" type="SessionLoadCapabilities Object">
+  The [`session/load`](/protocol/v2/session-setup#loading-sessions) method is
+  available. Omitted or `null` means the Agent does not advertise support.
+  Supplying `{}` means the Agent supports loading sessions.
+</ResponseField>
+
 <ResponseField
   name="additionalDirectories"
   type="SessionAdditionalDirectoriesCapabilities Object"
@@ -186,11 +202,6 @@ Optionally, they **MAY** support other session methods and notifications by spec
   requests. Omitted or `null` means the Agent does not advertise support.
   Supplying `{}` means the Agent supports additional workspace roots.
 </ResponseField>
-
-<Note>
-  `session/load` is still handled by the top-level `load_session` capability.
-  This will be unified in future versions of the protocol.
-</Note>
 
 ## Implementation Information
 
