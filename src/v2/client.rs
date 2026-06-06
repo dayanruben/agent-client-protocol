@@ -117,12 +117,7 @@ pub enum SessionUpdate {
     ConfigOptionUpdate(ConfigOptionUpdate),
     /// Session metadata has been updated (title, timestamps, custom metadata)
     SessionInfoUpdate(SessionInfoUpdate),
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// Context window and cost update for the session.
-    #[cfg(feature = "unstable_session_usage")]
     UsageUpdate(UsageUpdate),
     /// Custom or future session update.
     ///
@@ -201,20 +196,19 @@ impl<'de> Deserialize<'de> for OtherSessionUpdate {
 }
 
 fn is_known_session_update(session_update: &str) -> bool {
-    match session_update {
+    matches!(
+        session_update,
         "user_message_chunk"
-        | "agent_message_chunk"
-        | "agent_thought_chunk"
-        | "tool_call"
-        | "tool_call_update"
-        | "plan_update"
-        | "available_commands_update"
-        | "config_option_update"
-        | "session_info_update" => true,
-        #[cfg(feature = "unstable_session_usage")]
-        "usage_update" => true,
-        _ => false,
-    }
+            | "agent_message_chunk"
+            | "agent_thought_chunk"
+            | "tool_call"
+            | "tool_call_update"
+            | "plan_update"
+            | "available_commands_update"
+            | "config_option_update"
+            | "session_info_update"
+            | "usage_update"
+    )
 }
 
 fn other_session_update_schema(schema: &mut Schema) {
@@ -233,7 +227,6 @@ fn other_session_update_schema(schema: &mut Schema) {
             "session_info_update",
             #[cfg(feature = "unstable_plan_operations")]
             "plan_removed",
-            #[cfg(feature = "unstable_session_usage")]
             "usage_update",
         ],
     );
@@ -336,12 +329,7 @@ impl SessionInfoUpdate {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Context window and cost update for a session.
-#[cfg(feature = "unstable_session_usage")]
 #[serde_as]
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -366,7 +354,6 @@ pub struct UsageUpdate {
     pub meta: Option<Meta>,
 }
 
-#[cfg(feature = "unstable_session_usage")]
 impl UsageUpdate {
     #[must_use]
     pub fn new(used: u64, size: u64) -> Self {
@@ -397,12 +384,7 @@ impl UsageUpdate {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Cost information for a session.
-#[cfg(feature = "unstable_session_usage")]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -413,7 +395,6 @@ pub struct Cost {
     pub currency: String,
 }
 
-#[cfg(feature = "unstable_session_usage")]
 impl Cost {
     #[must_use]
     pub fn new(amount: f64, currency: impl Into<String>) -> Self {
@@ -1104,6 +1085,7 @@ impl ClientCapabilities {
 /// method types the client can handle. This governs opt-in types that require
 /// additional client-side support.
 #[cfg(feature = "unstable_auth_methods")]
+#[serde_as]
 #[skip_serializing_none]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1111,9 +1093,12 @@ impl ClientCapabilities {
 pub struct AuthCapabilities {
     /// Whether the client supports `terminal` authentication methods.
     ///
-    /// When `true`, the agent may include `terminal` entries in its authentication methods.
+    /// Optional. Omitted or `null` both mean the client does not advertise support.
+    /// Supplying `{}` means the agent may include `terminal` entries in its authentication methods.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
-    pub terminal: bool,
+    pub terminal: Option<TerminalAuthCapabilities>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
@@ -1132,12 +1117,52 @@ impl AuthCapabilities {
 
     /// Whether the client supports `terminal` authentication methods.
     ///
-    /// When `true`, the agent may include `AuthMethod::Terminal`
-    /// entries in its authentication methods.
+    /// Omitted or `null` both mean the client does not advertise support.
+    /// Supplying `{}` means the agent may include `AuthMethod::Terminal` entries in its authentication methods.
     #[must_use]
-    pub fn terminal(mut self, terminal: bool) -> Self {
-        self.terminal = terminal;
+    pub fn terminal(mut self, terminal: impl IntoOption<TerminalAuthCapabilities>) -> Self {
+        self.terminal = terminal.into_option();
         self
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Capabilities for terminal authentication methods.
+///
+/// Supplying `{}` means the client supports terminal authentication methods.
+#[cfg(feature = "unstable_auth_methods")]
+#[skip_serializing_none]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct TerminalAuthCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_auth_methods")]
+impl TerminalAuthCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -1434,6 +1459,82 @@ mod tests {
     }
 
     #[test]
+    fn test_content_chunk_message_id_serialization() {
+        use serde_json::json;
+
+        assert_eq!(
+            serde_json::to_value(SessionUpdate::AgentMessageChunk(ContentChunk::new(
+                ContentBlock::Text(crate::v2::TextContent::new("Hello")),
+                "msg_agent_c42b9",
+            )))
+            .unwrap(),
+            json!({
+                "sessionUpdate": "agent_message_chunk",
+                "messageId": "msg_agent_c42b9",
+                "content": {
+                    "type": "text",
+                    "text": "Hello"
+                }
+            })
+        );
+
+        let err = serde_json::from_value::<ContentChunk>(json!({
+            "content": {
+                "type": "text",
+                "text": "Hello"
+            }
+        }))
+        .unwrap_err();
+
+        assert!(err.to_string().contains("messageId"), "{err}");
+    }
+
+    #[test]
+    fn test_usage_update_serialization() {
+        use serde_json::json;
+
+        assert_eq!(
+            serde_json::to_value(SessionUpdate::UsageUpdate(UsageUpdate::new(
+                53_000, 200_000
+            )))
+            .unwrap(),
+            json!({
+                "sessionUpdate": "usage_update",
+                "used": 53000,
+                "size": 200_000
+            })
+        );
+
+        assert_eq!(
+            serde_json::to_value(SessionUpdate::UsageUpdate(
+                UsageUpdate::new(53_000, 200_000).cost(Cost::new(0.045, "USD"))
+            ))
+            .unwrap(),
+            json!({
+                "sessionUpdate": "usage_update",
+                "used": 53000,
+                "size": 200_000,
+                "cost": {
+                    "amount": 0.045,
+                    "currency": "USD"
+                }
+            })
+        );
+
+        let SessionUpdate::UsageUpdate(update) = serde_json::from_value(json!({
+            "sessionUpdate": "usage_update",
+            "used": 53000,
+            "size": 200_000,
+            "cost": null
+        }))
+        .unwrap() else {
+            panic!("expected usage update");
+        };
+
+        assert_eq!(update.cost, None);
+    }
+
+    #[test]
     fn session_update_preserves_unknown_variant() {
         use serde_json::json;
 
@@ -1642,5 +1743,26 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(request_with_null_params.params, None);
+    }
+
+    #[cfg(feature = "unstable_auth_methods")]
+    #[test]
+    fn test_auth_capabilities_serialize_terminal_support_as_object() {
+        use serde_json::json;
+
+        let capabilities = AuthCapabilities::new().terminal(TerminalAuthCapabilities::new());
+
+        assert_eq!(
+            serde_json::to_value(&capabilities).unwrap(),
+            json!({
+                "terminal": {}
+            })
+        );
+
+        let deserialized: AuthCapabilities = serde_json::from_value(json!({
+            "terminal": false
+        }))
+        .unwrap();
+        assert!(deserialized.terminal.is_none());
     }
 }

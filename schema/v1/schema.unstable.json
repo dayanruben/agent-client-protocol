@@ -217,11 +217,74 @@
                 {
                   "allOf": [
                     {
+                      "$ref": "#/$defs/WriteTextFileRequest"
+                    }
+                  ],
+                  "description": "Writes content to a text file in the client's file system.\n\nOnly available if the client advertises the `fs.writeTextFile` capability.\nAllows the agent to create or modify files within the client's environment.\n\nSee protocol docs: [Client](https://agentclientprotocol.com/protocol/overview#client)",
+                  "title": "WriteTextFileRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/ReadTextFileRequest"
+                    }
+                  ],
+                  "description": "Reads content from a text file in the client's file system.\n\nOnly available if the client advertises the `fs.readTextFile` capability.\nAllows the agent to access file contents within the client's environment.\n\nSee protocol docs: [Client](https://agentclientprotocol.com/protocol/overview#client)",
+                  "title": "ReadTextFileRequest"
+                },
+                {
+                  "allOf": [
+                    {
                       "$ref": "#/$defs/RequestPermissionRequest"
                     }
                   ],
                   "description": "Requests permission from the user for a tool call operation.\n\nCalled by the agent when it needs user authorization before executing\na potentially sensitive operation. The client should present the options\nto the user and return their decision.\n\nIf the client cancels the prompt turn via `session/cancel`, it MUST\nrespond to this request with `RequestPermissionOutcome::Cancelled`.\n\nSee protocol docs: [Requesting Permission](https://agentclientprotocol.com/protocol/tool-calls#requesting-permission)",
                   "title": "RequestPermissionRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/CreateTerminalRequest"
+                    }
+                  ],
+                  "description": "Executes a command in a new terminal\n\nOnly available if the `terminal` Client capability is set to `true`.\n\nReturns a `TerminalId` that can be used with other terminal methods\nto get the current output, wait for exit, and kill the command.\n\nThe `TerminalId` can also be used to embed the terminal in a tool call\nby using the `ToolCallContent::Terminal` variant.\n\nThe Agent is responsible for releasing the terminal by using the `terminal/release`\nmethod.\n\nSee protocol docs: [Terminals](https://agentclientprotocol.com/protocol/terminals)",
+                  "title": "CreateTerminalRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/TerminalOutputRequest"
+                    }
+                  ],
+                  "description": "Gets the terminal output and exit status\n\nReturns the current content in the terminal without waiting for the command to exit.\nIf the command has already exited, the exit status is included.\n\nSee protocol docs: [Terminals](https://agentclientprotocol.com/protocol/terminals)",
+                  "title": "TerminalOutputRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/ReleaseTerminalRequest"
+                    }
+                  ],
+                  "description": "Releases a terminal\n\nThe command is killed if it hasn't exited yet. Use `terminal/wait_for_exit`\nto wait for the command to exit before releasing the terminal.\n\nAfter release, the `TerminalId` can no longer be used with other `terminal/*` methods,\nbut tool calls that already contain it, continue to display its output.\n\nThe `terminal/kill` method can be used to terminate the command without releasing\nthe terminal, allowing the Agent to call `terminal/output` and other methods.\n\nSee protocol docs: [Terminals](https://agentclientprotocol.com/protocol/terminals)",
+                  "title": "ReleaseTerminalRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/WaitForTerminalExitRequest"
+                    }
+                  ],
+                  "description": "Waits for the terminal command to exit and return its exit status\n\nSee protocol docs: [Terminals](https://agentclientprotocol.com/protocol/terminals)",
+                  "title": "WaitForTerminalExitRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/KillTerminalRequest"
+                    }
+                  ],
+                  "description": "Kills the terminal command without releasing the terminal\n\nWhile `terminal/release` will also kill the command, this method will keep\nthe `TerminalId` valid so it can be used with other methods.\n\nThis method can be helpful when implementing command timeouts which terminate\nthe command as soon as elapsed, and then get the final output so it can be sent\nto the model.\n\nNote: Call `terminal/release` when `TerminalId` is no longer needed.\n\nSee protocol docs: [Terminals](https://agentclientprotocol.com/protocol/terminals)",
+                  "title": "KillTerminalRequest"
                 },
                 {
                   "allOf": [
@@ -393,6 +456,14 @@
                     }
                   ],
                   "title": "CloseSessionResponse"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/SetSessionModeResponse"
+                    }
+                  ],
+                  "title": "SetSessionModeResponse"
                 },
                 {
                   "allOf": [
@@ -610,70 +681,6 @@
           "type": "object"
         },
         {
-          "additionalProperties": true,
-          "description": "Custom or future authentication method.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this method type should preserve the raw\npayload when storing, replaying, proxying, or forwarding initialization\ndata, and otherwise ignore the method or display it generically.",
-          "not": {
-            "anyOf": [
-              {
-                "properties": {
-                  "type": {
-                    "const": "agent",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "type": {
-                    "const": "env_var",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "type": {
-                    "const": "terminal",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              }
-            ]
-          },
-          "properties": {
-            "_meta": {
-              "additionalProperties": true,
-              "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
-              "type": ["object", "null"]
-            },
-            "description": {
-              "description": "Optional description providing more details about this authentication method.",
-              "type": ["string", "null"]
-            },
-            "id": {
-              "description": "Unique identifier for this authentication method.",
-              "type": "string"
-            },
-            "name": {
-              "description": "Human-readable name of the authentication method.",
-              "type": "string"
-            },
-            "type": {
-              "description": "Custom or future authentication method type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-              "type": "string"
-            }
-          },
-          "required": ["type", "id", "name"],
-          "title": "other",
-          "type": "object"
-        },
-        {
           "allOf": [
             {
               "$ref": "#/$defs/AuthMethodAgent"
@@ -687,17 +694,6 @@
     },
     "AuthMethodAgent": {
       "description": "Agent handles authentication itself.\n\nThis is the default authentication method type.",
-      "not": {
-        "properties": {
-          "type": {
-            "not": {
-              "const": "agent"
-            }
-          }
-        },
-        "required": ["type"],
-        "type": "object"
-      },
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -866,19 +862,6 @@
           ],
           "description": "All text that was typed after the command name is provided as input.",
           "title": "unstructured"
-        },
-        {
-          "additionalProperties": true,
-          "description": "Custom or future command input specification.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this input type should preserve the raw\npayload when storing, replaying, proxying, or forwarding command\nmetadata, and otherwise ignore the input specification or display the\ncommand without structured input.",
-          "properties": {
-            "type": {
-              "description": "Custom or future command input type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-              "type": "string"
-            }
-          },
-          "required": ["type"],
-          "title": "other",
-          "type": "object"
         }
       ],
       "description": "The input specification for a command."
@@ -1018,6 +1001,18 @@
           "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nElicitation capabilities supported by the client.\nDetermines which elicitation modes the agent may use.",
           "x-deserialize-default-on-error": true
         },
+        "fs": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/FileSystemCapabilities"
+            }
+          ],
+          "default": {
+            "readTextFile": false,
+            "writeTextFile": false
+          },
+          "description": "File system capabilities supported by the client.\nDetermines which file operations the agent can request."
+        },
         "nes": {
           "anyOf": [
             {
@@ -1030,6 +1025,18 @@
           "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nNES (Next Edit Suggestions) capabilities supported by the client.",
           "x-deserialize-default-on-error": true
         },
+        "plan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PlanCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nWhether the client supports `plan_update` and `plan_removed` session updates.\n\nOptional. Omitted means the client does not advertise support.\nSupplying `{}` means the client can receive both update types.",
+          "x-deserialize-default-on-error": true
+        },
         "positionEncodings": {
           "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nThe position encodings supported by the client, in order of preference.",
           "items": {
@@ -1038,6 +1045,11 @@
           "type": "array",
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
+        },
+        "terminal": {
+          "default": false,
+          "description": "Whether the Client support all `terminal/*` methods.",
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -1300,7 +1312,7 @@
                       "$ref": "#/$defs/DeleteSessionRequest"
                     }
                   ],
-                  "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nDeletes an existing session from `session/list`.\n\nThis method is only available if the agent advertises the `sessionCapabilities.delete` capability.",
+                  "description": "Deletes an existing session from `session/list`.\n\nThis method is only available if the agent advertises the `sessionCapabilities.delete` capability.",
                   "title": "DeleteSessionRequest"
                 },
                 {
@@ -1329,6 +1341,15 @@
                   ],
                   "description": "Closes an active session and frees up any resources associated with it.\n\nThis method is only available if the agent advertises the `sessionCapabilities.close` capability.\n\nThe agent must cancel any ongoing work (as if `session/cancel` was called)\nand then free up any resources associated with the session.",
                   "title": "CloseSessionRequest"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/SetSessionModeRequest"
+                    }
+                  ],
+                  "description": "Sets the current mode for a session.\n\nAllows switching between different agent modes (e.g., \"ask\", \"architect\", \"code\")\nthat affect system prompts, tool availability, and permission behaviors.\n\nThe mode must be one of the modes advertised in `availableModes` during session\ncreation or loading. Agents may also change modes autonomously and notify the\nclient via `current_mode_update` notifications.\n\nThis method can be called at any time during a session, whether the Agent is\nidle or actively generating a response.\n\nSee protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)",
+                  "title": "SetSessionModeRequest"
                 },
                 {
                   "allOf": [
@@ -1418,10 +1439,66 @@
                 {
                   "allOf": [
                     {
+                      "$ref": "#/$defs/WriteTextFileResponse"
+                    }
+                  ],
+                  "title": "WriteTextFileResponse"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/ReadTextFileResponse"
+                    }
+                  ],
+                  "title": "ReadTextFileResponse"
+                },
+                {
+                  "allOf": [
+                    {
                       "$ref": "#/$defs/RequestPermissionResponse"
                     }
                   ],
                   "title": "RequestPermissionResponse"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/CreateTerminalResponse"
+                    }
+                  ],
+                  "title": "CreateTerminalResponse"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/TerminalOutputResponse"
+                    }
+                  ],
+                  "title": "TerminalOutputResponse"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/ReleaseTerminalResponse"
+                    }
+                  ],
+                  "title": "ReleaseTerminalResponse"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/WaitForTerminalExitResponse"
+                    }
+                  ],
+                  "title": "WaitForTerminalExitResponse"
+                },
+                {
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/KillTerminalResponse"
+                    }
+                  ],
+                  "title": "KillTerminalResponse"
                 },
                 {
                   "allOf": [
@@ -1665,7 +1742,11 @@
       "type": "object"
     },
     "ContentBlock": {
-      "anyOf": [
+      "description": "Content blocks represent displayable information in the Agent Client Protocol.\n\nThey provide a structured way to handle various types of user-facing content—whether\nit's text from language models, images for analysis, or embedded resources for context.\n\nContent blocks appear in:\n- User prompts sent via `session/prompt`\n- Language model output streamed through `session/update` notifications\n- Progress updates and results from tool calls\n\nThis structure is compatible with the Model Context Protocol (MCP), enabling\nagents to seamlessly forward content from MCP tool outputs without transformation.\n\nSee protocol docs: [Content](https://agentclientprotocol.com/protocol/content)",
+      "discriminator": {
+        "propertyName": "type"
+      },
+      "oneOf": [
         {
           "allOf": [
             {
@@ -1745,79 +1826,8 @@
           },
           "required": ["type"],
           "type": "object"
-        },
-        {
-          "additionalProperties": true,
-          "description": "Custom or future content block.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content block type should preserve\nthe raw payload when storing, replaying, proxying, or forwarding content,\nand otherwise ignore it or display it generically.",
-          "not": {
-            "anyOf": [
-              {
-                "properties": {
-                  "type": {
-                    "const": "text",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "type": {
-                    "const": "image",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "type": {
-                    "const": "audio",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "type": {
-                    "const": "resource_link",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "type": {
-                    "const": "resource",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              }
-            ]
-          },
-          "properties": {
-            "type": {
-              "description": "Custom or future content block type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-              "type": "string"
-            }
-          },
-          "required": ["type"],
-          "title": "other",
-          "type": "object"
         }
-      ],
-      "description": "Content blocks represent displayable information in the Agent Client Protocol.\n\nThey provide a structured way to handle various types of user-facing content—whether\nit's text from language models, images for analysis, or embedded resources for context.\n\nContent blocks appear in:\n- User prompts sent via `session/prompt`\n- Language model output streamed through `session/update` notifications\n- Progress updates and results from tool calls\n\nThis structure is compatible with the Model Context Protocol (MCP), enabling\nagents to seamlessly forward content from MCP tool outputs without transformation.\n\nSee protocol docs: [Content](https://agentclientprotocol.com/protocol/content)",
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "ContentChunk": {
       "description": "A streamed item of content",
@@ -1836,19 +1846,22 @@
           "description": "A single item of content"
         },
         "messageId": {
-          "allOf": [
+          "anyOf": [
             {
               "$ref": "#/$defs/MessageId"
+            },
+            {
+              "type": "null"
             }
           ],
           "description": "A unique identifier for the message this chunk belongs to.\n\nAll chunks belonging to the same message share the same `messageId`.\nA change in `messageId` indicates a new message has started."
         }
       },
-      "required": ["content", "messageId"],
+      "required": ["content"],
       "type": "object"
     },
     "Cost": {
-      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nCost information for a session.",
+      "description": "Cost information for a session.",
       "properties": {
         "amount": {
           "description": "Total cumulative cost for session.",
@@ -1974,8 +1987,96 @@
       "x-method": "elicitation/create",
       "x-side": "client"
     },
+    "CreateTerminalRequest": {
+      "description": "Request to create a new terminal and execute a command.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "args": {
+          "description": "Array of command arguments.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "command": {
+          "description": "The command to execute.",
+          "type": "string"
+        },
+        "cwd": {
+          "description": "Working directory for the command (absolute path).",
+          "type": ["string", "null"]
+        },
+        "env": {
+          "description": "Environment variables for the command.",
+          "items": {
+            "$ref": "#/$defs/EnvVariable"
+          },
+          "type": "array"
+        },
+        "outputByteLimit": {
+          "description": "Maximum number of output bytes to retain.\n\nWhen the limit is exceeded, the Client truncates from the beginning of the output\nto stay within the limit.\n\nThe Client MUST ensure truncation happens at a character boundary to maintain valid\nstring output, even if this means the retained output is slightly less than the\nspecified limit.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "sessionId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            }
+          ],
+          "description": "The session ID for this request."
+        }
+      },
+      "required": ["sessionId", "command"],
+      "type": "object",
+      "x-method": "terminal/create",
+      "x-side": "client"
+    },
+    "CreateTerminalResponse": {
+      "description": "Response containing the ID of the created terminal.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "terminalId": {
+          "description": "The unique identifier for the created terminal.",
+          "type": "string"
+        }
+      },
+      "required": ["terminalId"],
+      "type": "object",
+      "x-method": "terminal/create",
+      "x-side": "client"
+    },
+    "CurrentModeUpdate": {
+      "description": "The current mode of the session has changed\n\nSee protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "currentModeId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionModeId"
+            }
+          ],
+          "description": "The ID of the current mode"
+        }
+      },
+      "required": ["currentModeId"],
+      "type": "object"
+    },
     "DeleteSessionRequest": {
-      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nRequest parameters for deleting an existing session from `session/list`.\n\nOnly available if the Agent supports the `sessionCapabilities.delete` capability.",
+      "description": "Request parameters for deleting an existing session from `session/list`.\n\nOnly available if the Agent supports the `sessionCapabilities.delete` capability.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -1997,7 +2098,7 @@
       "x-side": "agent"
     },
     "DeleteSessionResponse": {
-      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nResponse from deleting a session.",
+      "description": "Response from deleting a session.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -2827,6 +2928,27 @@
     "ExtResponse": {
       "description": "Allows for sending an arbitrary response to an [`ExtRequest`] that is not part of the ACP spec.\nExtension methods provide a way to add custom functionality while maintaining\nprotocol compatibility.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)"
     },
+    "FileSystemCapabilities": {
+      "description": "File system capabilities that a client may support.\n\nSee protocol docs: [FileSystem](https://agentclientprotocol.com/protocol/initialization#filesystem)",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "readTextFile": {
+          "default": false,
+          "description": "Whether the Client supports `fs/read_text_file` requests.",
+          "type": "boolean"
+        },
+        "writeTextFile": {
+          "default": false,
+          "description": "Whether the Client supports `fs/write_text_file` requests.",
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
     "ForkSessionRequest": {
       "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nRequest parameters for forking an existing session.\n\nCreates a new session based on the context of an existing one, allowing\noperations like generating summaries without affecting the original session's history.\n\nOnly available if the Agent supports the `session.fork` capability.",
       "properties": {
@@ -2883,6 +3005,18 @@
           "type": ["array", "null"],
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
+        },
+        "modes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionModeState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Initial mode state if supported by the Agent\n\nSee protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)",
+          "x-deserialize-default-on-error": true
         },
         "sessionId": {
           "allOf": [
@@ -2991,7 +3125,12 @@
           "default": {
             "auth": {
               "terminal": false
-            }
+            },
+            "fs": {
+              "readTextFile": false,
+              "writeTextFile": false
+            },
+            "terminal": false
           },
           "description": "Capabilities supported by the client."
         },
@@ -3117,6 +3256,45 @@
       },
       "type": "object"
     },
+    "KillTerminalRequest": {
+      "description": "Request to kill a terminal without releasing it.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "sessionId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            }
+          ],
+          "description": "The session ID for this request."
+        },
+        "terminalId": {
+          "description": "The ID of the terminal to kill.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "terminalId"],
+      "type": "object",
+      "x-method": "terminal/kill",
+      "x-side": "client"
+    },
+    "KillTerminalResponse": {
+      "description": "Response to `terminal/kill` method",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object",
+      "x-method": "terminal/kill",
+      "x-side": "client"
+    },
     "ListProvidersRequest": {
       "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nRequest parameters for `providers/list`.",
       "properties": {
@@ -3229,7 +3407,7 @@
           "type": "string"
         },
         {
-          "description": "Custom or future protocol.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
+          "description": "Unknown or custom protocol.",
           "title": "other",
           "type": "string"
         }
@@ -3292,6 +3470,18 @@
           "type": ["array", "null"],
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
+        },
+        "modes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionModeState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Initial mode state if supported by the Agent\n\nSee protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)",
+          "x-deserialize-default-on-error": true
         }
       },
       "type": "object",
@@ -3829,7 +4019,8 @@
       "type": "object"
     },
     "NesDiagnosticSeverity": {
-      "anyOf": [
+      "description": "Severity of a diagnostic.",
+      "oneOf": [
         {
           "const": "error",
           "description": "An error.",
@@ -3849,14 +4040,8 @@
           "const": "hint",
           "description": "A hint.",
           "type": "string"
-        },
-        {
-          "description": "Custom or future diagnostic severity.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-          "title": "Other",
-          "type": "string"
         }
-      ],
-      "description": "Severity of a diagnostic."
+      ]
     },
     "NesDiagnosticsCapabilities": {
       "description": "Capabilities for diagnostics context.",
@@ -4232,7 +4417,8 @@
       "type": "object"
     },
     "NesRejectReason": {
-      "anyOf": [
+      "description": "The reason a suggestion was rejected.",
+      "oneOf": [
         {
           "const": "rejected",
           "description": "The user explicitly dismissed the suggestion.",
@@ -4252,14 +4438,8 @@
           "const": "cancelled",
           "description": "The request was cancelled before the agent returned a response.",
           "type": "string"
-        },
-        {
-          "description": "Custom or future rejection reason.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-          "title": "Other",
-          "type": "string"
         }
-      ],
-      "description": "The reason a suggestion was rejected."
+      ]
     },
     "NesRelatedSnippet": {
       "description": "A related code snippet from a file.",
@@ -4451,7 +4631,11 @@
       "type": "object"
     },
     "NesSuggestion": {
-      "anyOf": [
+      "description": "A suggestion returned by the agent.",
+      "discriminator": {
+        "propertyName": "kind"
+      },
+      "oneOf": [
         {
           "allOf": [
             {
@@ -4515,69 +4699,8 @@
           },
           "required": ["kind"],
           "type": "object"
-        },
-        {
-          "additionalProperties": true,
-          "description": "Custom or future NES suggestion.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this suggestion kind should preserve\nthe raw payload when storing, replaying, proxying, or forwarding\nsuggestions, and otherwise ignore it or display it generically.",
-          "not": {
-            "anyOf": [
-              {
-                "properties": {
-                  "kind": {
-                    "const": "edit",
-                    "type": "string"
-                  }
-                },
-                "required": ["kind"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "kind": {
-                    "const": "jump",
-                    "type": "string"
-                  }
-                },
-                "required": ["kind"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "kind": {
-                    "const": "rename",
-                    "type": "string"
-                  }
-                },
-                "required": ["kind"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "kind": {
-                    "const": "searchAndReplace",
-                    "type": "string"
-                  }
-                },
-                "required": ["kind"],
-                "type": "object"
-              }
-            ]
-          },
-          "properties": {
-            "kind": {
-              "description": "Custom or future NES suggestion kind.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-              "type": "string"
-            }
-          },
-          "required": ["kind"],
-          "title": "other",
-          "type": "object"
         }
-      ],
-      "description": "A suggestion returned by the agent.",
-      "discriminator": {
-        "propertyName": "kind"
-      }
+      ]
     },
     "NesTextEdit": {
       "description": "A text edit within a suggestion.",
@@ -4599,7 +4722,8 @@
       "type": "object"
     },
     "NesTriggerKind": {
-      "anyOf": [
+      "description": "What triggered the suggestion request.",
+      "oneOf": [
         {
           "const": "automatic",
           "description": "Triggered by user typing or cursor movement.",
@@ -4614,14 +4738,8 @@
           "const": "manual",
           "description": "Triggered by an explicit user action (keyboard shortcut).",
           "type": "string"
-        },
-        {
-          "description": "Custom or future suggestion trigger kind.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-          "title": "Other",
-          "type": "string"
         }
-      ],
-      "description": "What triggered the suggestion request."
+      ]
     },
     "NesUserAction": {
       "description": "A user action (typing, cursor movement, etc.).",
@@ -4678,7 +4796,7 @@
           "type": ["object", "null"]
         },
         "additionalDirectories": {
-          "description": "Additional workspace roots for this session. Each path must be absolute.\n\nThese expand the session's workspace scope without changing `cwd`, which\nremains the base for relative paths. When omitted or empty, no\nadditional roots are activated for the new session.",
+          "description": "Additional workspace roots for this session. Each path must be absolute.\n\nThese expand the session's filesystem scope without changing `cwd`, which\nremains the base for relative paths. When omitted or empty, no\nadditional roots are activated for the new session.",
           "items": {
             "type": "string"
           },
@@ -4717,6 +4835,18 @@
           "type": ["array", "null"],
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
+        },
+        "modes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionModeState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Initial mode state if supported by the Agent\n\nSee protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)",
+          "x-deserialize-default-on-error": true
         },
         "sessionId": {
           "allOf": [
@@ -4798,7 +4928,8 @@
       "type": "string"
     },
     "PermissionOptionKind": {
-      "anyOf": [
+      "description": "The type of permission option being presented to the user.\n\nHelps clients choose appropriate icons and UI treatment.",
+      "oneOf": [
         {
           "const": "allow_once",
           "description": "Allow this operation only this time.",
@@ -4818,14 +4949,40 @@
           "const": "reject_always",
           "description": "Reject this operation and remember the choice.",
           "type": "string"
-        },
-        {
-          "description": "Custom or future permission option kind.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-          "title": "other",
-          "type": "string"
         }
-      ],
-      "description": "The type of permission option being presented to the user.\n\nHelps clients choose appropriate icons and UI treatment."
+      ]
+    },
+    "Plan": {
+      "description": "An execution plan for accomplishing complex tasks.\n\nPlans consist of multiple entries representing individual tasks or goals.\nAgents report plans to clients to provide visibility into their execution strategy.\nPlans can evolve during execution as the agent discovers new requirements or completes tasks.\n\nSee protocol docs: [Agent Plan](https://agentclientprotocol.com/protocol/agent-plan)",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "entries": {
+          "description": "The list of tasks to be accomplished.\n\nWhen updating a plan, the agent must send a complete list of all entries\nwith their current status. The client replaces the entire plan with each update.",
+          "items": {
+            "$ref": "#/$defs/PlanEntry"
+          },
+          "type": "array",
+          "x-deserialize-default-on-error": true,
+          "x-deserialize-skip-invalid-items": true
+        }
+      },
+      "required": ["entries"],
+      "type": "object"
+    },
+    "PlanCapabilities": {
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nCapabilities for receiving `plan_update` and `plan_removed` session updates.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object"
     },
     "PlanEntry": {
       "description": "A single entry in the execution plan.\n\nRepresents a task or goal that the assistant intends to accomplish\nas part of fulfilling the user's request.\nSee protocol docs: [Plan Entries](https://agentclientprotocol.com/protocol/agent-plan#plan-entries)",
@@ -4860,7 +5017,8 @@
       "type": "object"
     },
     "PlanEntryPriority": {
-      "anyOf": [
+      "description": "Priority levels for plan entries.\n\nUsed to indicate the relative importance or urgency of different\ntasks in the execution plan.\nSee protocol docs: [Plan Entries](https://agentclientprotocol.com/protocol/agent-plan#plan-entries)",
+      "oneOf": [
         {
           "const": "high",
           "description": "High priority task - critical to the overall goal.",
@@ -4875,17 +5033,12 @@
           "const": "low",
           "description": "Low priority task - nice to have but not essential.",
           "type": "string"
-        },
-        {
-          "description": "Custom or future plan entry priority.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-          "title": "other",
-          "type": "string"
         }
-      ],
-      "description": "Priority levels for plan entries.\n\nUsed to indicate the relative importance or urgency of different\ntasks in the execution plan.\nSee protocol docs: [Plan Entries](https://agentclientprotocol.com/protocol/agent-plan#plan-entries)"
+      ]
     },
     "PlanEntryStatus": {
-      "anyOf": [
+      "description": "Status of a plan entry in the execution flow.\n\nTracks the lifecycle of each task from planning through completion.\nSee protocol docs: [Plan Entries](https://agentclientprotocol.com/protocol/agent-plan#plan-entries)",
+      "oneOf": [
         {
           "const": "pending",
           "description": "The task has not started yet.",
@@ -4900,14 +5053,8 @@
           "const": "completed",
           "description": "The task has been successfully completed.",
           "type": "string"
-        },
-        {
-          "description": "Custom or future plan entry status.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-          "title": "other",
-          "type": "string"
         }
-      ],
-      "description": "Status of a plan entry in the execution flow.\n\nTracks the lifecycle of each task from planning through completion.\nSee protocol docs: [Plan Entries](https://agentclientprotocol.com/protocol/agent-plan#plan-entries)"
+      ]
     },
     "PlanFile": {
       "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nA plan represented by a file URI.",
@@ -4934,11 +5081,11 @@
       "type": "object"
     },
     "PlanId": {
-      "description": "Unique identifier for a plan within a session.",
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nUnique identifier for a plan within a session.",
       "type": "string"
     },
     "PlanItems": {
-      "description": "A plan represented as structured entries.",
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nA plan represented as structured entries.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -5011,7 +5158,7 @@
       "type": "object"
     },
     "PlanUpdate": {
-      "description": "A content update for a plan identified by ID.",
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nA content update for a plan identified by ID.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -5031,7 +5178,11 @@
       "type": "object"
     },
     "PlanUpdateContent": {
-      "anyOf": [
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nUpdated content for a plan.",
+      "discriminator": {
+        "propertyName": "type"
+      },
+      "oneOf": [
         {
           "allOf": [
             {
@@ -5054,7 +5205,7 @@
               "$ref": "#/$defs/PlanFile"
             }
           ],
-          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nA URI pointing to a file containing the plan.",
+          "description": "A URI pointing to a file containing the plan.",
           "properties": {
             "type": {
               "const": "file",
@@ -5070,7 +5221,7 @@
               "$ref": "#/$defs/PlanMarkdown"
             }
           ],
-          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nRaw markdown content for the plan.",
+          "description": "Raw markdown content for the plan.",
           "properties": {
             "type": {
               "const": "markdown",
@@ -5079,67 +5230,8 @@
           },
           "required": ["type"],
           "type": "object"
-        },
-        {
-          "additionalProperties": true,
-          "description": "Custom or future plan update content.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content type should preserve the\nraw payload when storing, replaying, proxying, or forwarding plans, and\notherwise ignore it or display it generically.",
-          "not": {
-            "anyOf": [
-              {
-                "properties": {
-                  "type": {
-                    "const": "items",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "type": {
-                    "const": "file",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "type": {
-                    "const": "markdown",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              }
-            ]
-          },
-          "properties": {
-            "id": {
-              "allOf": [
-                {
-                  "$ref": "#/$defs/PlanId"
-                }
-              ],
-              "description": "The plan ID to update."
-            },
-            "type": {
-              "description": "Custom or future plan update content type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-              "type": "string"
-            }
-          },
-          "required": ["type", "id"],
-          "title": "other",
-          "type": "object"
         }
-      ],
-      "description": "Updated content for a plan.",
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "Position": {
       "description": "A zero-based position in a text document.\n\nThe meaning of `character` depends on the negotiated position encoding.",
@@ -5269,37 +5361,6 @@
       "x-method": "session/prompt",
       "x-side": "agent"
     },
-    "ProtocolLevelNotification": {
-      "properties": {
-        "method": {
-          "type": "string"
-        },
-        "params": {
-          "anyOf": [
-            {
-              "anyOf": [
-                {
-                  "allOf": [
-                    {
-                      "$ref": "#/$defs/CancelRequestNotification"
-                    }
-                  ],
-                  "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or\nchanged at any point.\n\nCancels an ongoing request.\n\nThis is a notification sent by the side that sent a request to cancel that request.\n\nUpon receiving this notification, the receiver:\n\n1. MUST cancel the corresponding request activity and all nested activities\n2. MAY send any pending notifications.\n3. MUST send one of these responses for the original request:\n  - Valid response with appropriate data (partial results or cancellation marker)\n  - Error response with code `-32800` (Cancelled)\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/cancellation)",
-                  "title": "CancelRequestNotification"
-                }
-              ],
-              "description": "General protocol-level notifications that all sides are expected to\nimplement.\n\nNotifications whose methods start with '$/' are messages which\nare protocol implementation dependent and might not be implementable in all\nclients or agents. For example if the implementation uses a single threaded\nsynchronous programming language then there is little it can do to react to\na `$/cancel_request` notification. If an agent or client receives\nnotifications starting with '$/' it is free to ignore the notification.\n\nNotifications do not expect a response."
-            },
-            {
-              "type": "null"
-            }
-          ]
-        }
-      },
-      "required": ["method"],
-      "type": "object",
-      "x-docs-ignore": true
-    },
     "ProtocolVersion": {
       "description": "Protocol version identifier.\n\nThis version is only bumped for breaking changes.\nNon-breaking changes should be introduced via capabilities.",
       "format": "uint16",
@@ -5400,6 +5461,61 @@
       "required": ["start", "end"],
       "type": "object"
     },
+    "ReadTextFileRequest": {
+      "description": "Request to read content from a text file.\n\nOnly available if the client supports the `fs.readTextFile` capability.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "limit": {
+          "description": "Maximum number of lines to read.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "line": {
+          "description": "Line number to start reading from (1-based).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "path": {
+          "description": "Absolute path to the file to read.",
+          "type": "string"
+        },
+        "sessionId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            }
+          ],
+          "description": "The session ID for this request."
+        }
+      },
+      "required": ["sessionId", "path"],
+      "type": "object",
+      "x-method": "fs/read_text_file",
+      "x-side": "client"
+    },
+    "ReadTextFileResponse": {
+      "description": "Response containing the contents of a text file.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "content": {
+          "type": "string"
+        }
+      },
+      "required": ["content"],
+      "type": "object",
+      "x-method": "fs/read_text_file",
+      "x-side": "client"
+    },
     "RejectNesNotification": {
       "description": "Notification sent when a suggestion is rejected.",
       "properties": {
@@ -5437,6 +5553,45 @@
       "type": "object",
       "x-method": "nes/reject",
       "x-side": "agent"
+    },
+    "ReleaseTerminalRequest": {
+      "description": "Request to release a terminal and free its resources.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "sessionId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            }
+          ],
+          "description": "The session ID for this request."
+        },
+        "terminalId": {
+          "description": "The ID of the terminal to release.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "terminalId"],
+      "type": "object",
+      "x-method": "terminal/release",
+      "x-side": "client"
+    },
+    "ReleaseTerminalResponse": {
+      "description": "Response to terminal/release method",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object",
+      "x-method": "terminal/release",
+      "x-side": "client"
     },
     "RequestId": {
       "anyOf": [
@@ -5648,6 +5803,18 @@
           "type": ["array", "null"],
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
+        },
+        "modes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionModeState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Initial mode state if supported by the Agent\n\nSee protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)",
+          "x-deserialize-default-on-error": true
         }
       },
       "type": "object",
@@ -5655,18 +5822,9 @@
       "x-side": "agent"
     },
     "Role": {
-      "anyOf": [
-        {
-          "enum": ["assistant", "user"],
-          "type": "string"
-        },
-        {
-          "description": "Custom or future role.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-          "title": "other",
-          "type": "string"
-        }
-      ],
-      "description": "The sender or recipient of messages and data in a conversation."
+      "description": "The sender or recipient of messages and data in a conversation.",
+      "enum": ["assistant", "user"],
+      "type": "string"
     },
     "SelectedPermissionOutcome": {
       "description": "The user selected one of the provided options.",
@@ -5740,7 +5898,7 @@
               "type": "null"
             }
           ],
-          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nWhether the agent supports `session/delete`.\n\nOptional. Omitted or `null` both mean the agent does not advertise support.\nSupplying `{}` means the agent supports deleting sessions from `session/list`.",
+          "description": "Whether the agent supports `session/delete`.\n\nOptional. Omitted or `null` both mean the agent does not advertise support.\nSupplying `{}` means the agent supports deleting sessions from `session/list`.",
           "x-deserialize-default-on-error": true
         },
         "fork": {
@@ -5813,7 +5971,11 @@
       "type": "string"
     },
     "SessionConfigOption": {
-      "anyOf": [
+      "description": "A session configuration option selector and its current state.",
+      "discriminator": {
+        "propertyName": "type"
+      },
+      "oneOf": [
         {
           "allOf": [
             {
@@ -5845,49 +6007,8 @@
           },
           "required": ["type"],
           "type": "object"
-        },
-        {
-          "additionalProperties": true,
-          "description": "Custom or future session configuration option payload.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this option type should preserve the raw\npayload when storing, replaying, proxying, or forwarding configuration\ndata, and otherwise ignore the option or display it generically.",
-          "not": {
-            "anyOf": [
-              {
-                "properties": {
-                  "type": {
-                    "const": "select",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "type": {
-                    "const": "boolean",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              }
-            ]
-          },
-          "properties": {
-            "type": {
-              "description": "Custom or future session configuration option type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-              "type": "string"
-            }
-          },
-          "required": ["type"],
-          "title": "other",
-          "type": "object"
         }
       ],
-      "description": "A session configuration option selector and its current state.",
-      "discriminator": {
-        "propertyName": "type"
-      },
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -5944,7 +6065,7 @@
           "type": "string"
         },
         {
-          "description": "Custom or future category.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
+          "description": "Unknown / uncategorized selector.",
           "title": "other",
           "type": "string"
         }
@@ -6059,7 +6180,7 @@
       "type": "string"
     },
     "SessionDeleteCapabilities": {
-      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nCapabilities for the `session/delete` method.\n\nSupplying `{}` means the agent supports deleting sessions from `session/list`.",
+      "description": "Capabilities for the `session/delete` method.\n\nSupplying `{}` means the agent supports deleting sessions from `session/list`.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -6155,6 +6276,60 @@
       },
       "type": "object"
     },
+    "SessionMode": {
+      "description": "A mode the agent can operate in.\n\nSee protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "description": {
+          "type": ["string", "null"]
+        },
+        "id": {
+          "$ref": "#/$defs/SessionModeId"
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name"],
+      "type": "object"
+    },
+    "SessionModeId": {
+      "description": "Unique identifier for a Session Mode.",
+      "type": "string"
+    },
+    "SessionModeState": {
+      "description": "The set of modes and the one currently active.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "availableModes": {
+          "description": "The set of modes that the Agent can operate in",
+          "items": {
+            "$ref": "#/$defs/SessionMode"
+          },
+          "type": "array",
+          "x-deserialize-default-on-error": true,
+          "x-deserialize-skip-invalid-items": true
+        },
+        "currentModeId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionModeId"
+            }
+          ],
+          "description": "The current mode the Agent is in."
+        }
+      },
+      "required": ["currentModeId", "availableModes"],
+      "type": "object"
+    },
     "SessionNotification": {
       "description": "Notification containing a session update from the agent.\n\nUsed to stream real-time progress and results during prompt processing.\n\nSee protocol docs: [Agent Reports Output](https://agentclientprotocol.com/protocol/prompt-turn#3-agent-reports-output)",
       "properties": {
@@ -6197,7 +6372,11 @@
       "type": "object"
     },
     "SessionUpdate": {
-      "anyOf": [
+      "description": "Different types of updates that can be sent during session processing.\n\nThese updates provide real-time feedback about the agent's progress.\n\nSee protocol docs: [Agent Reports Output](https://agentclientprotocol.com/protocol/prompt-turn#3-agent-reports-output)",
+      "discriminator": {
+        "propertyName": "sessionUpdate"
+      },
+      "oneOf": [
         {
           "allOf": [
             {
@@ -6281,10 +6460,26 @@
         {
           "allOf": [
             {
+              "$ref": "#/$defs/Plan"
+            }
+          ],
+          "description": "The agent's execution plan for complex tasks.\nSee protocol docs: [Agent Plan](https://agentclientprotocol.com/protocol/agent-plan)",
+          "properties": {
+            "sessionUpdate": {
+              "const": "plan",
+              "type": "string"
+            }
+          },
+          "required": ["sessionUpdate"],
+          "type": "object"
+        },
+        {
+          "allOf": [
+            {
               "$ref": "#/$defs/PlanUpdate"
             }
           ],
-          "description": "A content update for a plan identified by ID.\nSee protocol docs: [Agent Plan](https://agentclientprotocol.com/protocol/agent-plan)",
+          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nA content update for a plan identified by ID.",
           "properties": {
             "sessionUpdate": {
               "const": "plan_update",
@@ -6329,6 +6524,22 @@
         {
           "allOf": [
             {
+              "$ref": "#/$defs/CurrentModeUpdate"
+            }
+          ],
+          "description": "The current mode of the session has changed\n\nSee protocol docs: [Session Modes](https://agentclientprotocol.com/protocol/session-modes)",
+          "properties": {
+            "sessionUpdate": {
+              "const": "current_mode_update",
+              "type": "string"
+            }
+          },
+          "required": ["sessionUpdate"],
+          "type": "object"
+        },
+        {
+          "allOf": [
+            {
               "$ref": "#/$defs/ConfigOptionUpdate"
             }
           ],
@@ -6364,7 +6575,7 @@
               "$ref": "#/$defs/UsageUpdate"
             }
           ],
-          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nContext window and cost update for the session.",
+          "description": "Context window and cost update for the session.",
           "properties": {
             "sessionUpdate": {
               "const": "usage_update",
@@ -6373,139 +6584,8 @@
           },
           "required": ["sessionUpdate"],
           "type": "object"
-        },
-        {
-          "additionalProperties": true,
-          "description": "Custom or future session update.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this update type should preserve the\nraw payload when storing, replaying, proxying, or forwarding session\nhistory, and otherwise ignore it or display it generically.",
-          "not": {
-            "anyOf": [
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "user_message_chunk",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "agent_message_chunk",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "agent_thought_chunk",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "tool_call",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "tool_call_update",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "plan_update",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "available_commands_update",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "config_option_update",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "session_info_update",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "plan_removed",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "sessionUpdate": {
-                    "const": "usage_update",
-                    "type": "string"
-                  }
-                },
-                "required": ["sessionUpdate"],
-                "type": "object"
-              }
-            ]
-          },
-          "properties": {
-            "sessionUpdate": {
-              "description": "Custom or future session update type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-              "type": "string"
-            }
-          },
-          "required": ["sessionUpdate"],
-          "title": "other",
-          "type": "object"
         }
-      ],
-      "description": "Different types of updates that can be sent during session processing.\n\nThese updates provide real-time feedback about the agent's progress.\n\nSee protocol docs: [Agent Reports Output](https://agentclientprotocol.com/protocol/prompt-turn#3-agent-reports-output)",
-      "discriminator": {
-        "propertyName": "sessionUpdate"
-      }
+      ]
     },
     "SetProviderRequest": {
       "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nRequest parameters for `providers/set`.\n\nReplaces the full configuration for one provider id.",
@@ -6643,6 +6723,49 @@
       "x-method": "session/set_config_option",
       "x-side": "agent"
     },
+    "SetSessionModeRequest": {
+      "description": "Request parameters for setting a session mode.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "modeId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionModeId"
+            }
+          ],
+          "description": "The ID of the mode to set."
+        },
+        "sessionId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            }
+          ],
+          "description": "The ID of the session to set the mode for."
+        }
+      },
+      "required": ["sessionId", "modeId"],
+      "type": "object",
+      "x-method": "session/set_mode",
+      "x-side": "agent"
+    },
+    "SetSessionModeResponse": {
+      "description": "Response to `session/set_mode` method.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object",
+      "x-method": "session/set_mode",
+      "x-side": "agent"
+    },
     "StartNesRequest": {
       "description": "Request to start an NES session.",
       "properties": {
@@ -6704,7 +6827,8 @@
       "x-side": "agent"
     },
     "StopReason": {
-      "anyOf": [
+      "description": "Reasons why an agent stops processing a prompt turn.\n\nSee protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/prompt-turn#stop-reasons)",
+      "oneOf": [
         {
           "const": "end_turn",
           "description": "The turn ended successfully.",
@@ -6729,17 +6853,12 @@
           "const": "cancelled",
           "description": "The turn was cancelled by the client via `session/cancel`.\n\nThis stop reason MUST be returned when the client sends a `session/cancel`\nnotification, even if the cancellation causes exceptions in underlying operations.\nAgents should catch these exceptions and return this semantically meaningful\nresponse to confirm successful cancellation.",
           "type": "string"
-        },
-        {
-          "description": "Custom or future stop reason.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-          "title": "other",
-          "type": "string"
         }
-      ],
-      "description": "Reasons why an agent stops processing a prompt turn.\n\nSee protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/prompt-turn#stop-reasons)"
+      ]
     },
     "StringFormat": {
-      "anyOf": [
+      "description": "String format types for string properties in elicitation schemas.",
+      "oneOf": [
         {
           "const": "email",
           "description": "Email address format.",
@@ -6759,14 +6878,8 @@
           "const": "date-time",
           "description": "Date-time format (ISO 8601).",
           "type": "string"
-        },
-        {
-          "description": "Custom or future string format.\n\nUnknown formats are preserved. Implementations that do not understand a\nformat should treat it as an annotation rather than rejecting the schema.",
-          "title": "other",
-          "type": "string"
         }
-      ],
-      "description": "String format types for string properties in elicitation schemas."
+      ]
     },
     "StringPropertySchema": {
       "description": "Schema for string properties in an elicitation form.\n\nWhen `enum` or `oneOf` is set, this represents a single-select enum\nwith `\"type\": \"string\"`.",
@@ -6920,6 +7033,101 @@
       "type": "object",
       "x-method": "nes/suggest",
       "x-side": "agent"
+    },
+    "Terminal": {
+      "description": "Embed a terminal created with `terminal/create` by its id.\n\nThe terminal must be added before calling `terminal/release`.\n\nSee protocol docs: [Terminal](https://agentclientprotocol.com/protocol/terminals)",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "terminalId": {
+          "type": "string"
+        }
+      },
+      "required": ["terminalId"],
+      "type": "object"
+    },
+    "TerminalExitStatus": {
+      "description": "Exit status of a terminal command.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "exitCode": {
+          "description": "The process exit code (may be null if terminated by signal).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "signal": {
+          "description": "The signal that terminated the process (may be null if exited normally).",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object"
+    },
+    "TerminalOutputRequest": {
+      "description": "Request to get the current output and status of a terminal.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "sessionId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            }
+          ],
+          "description": "The session ID for this request."
+        },
+        "terminalId": {
+          "description": "The ID of the terminal to get output from.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "terminalId"],
+      "type": "object",
+      "x-method": "terminal/output",
+      "x-side": "client"
+    },
+    "TerminalOutputResponse": {
+      "description": "Response containing the terminal output and exit status.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "exitStatus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TerminalExitStatus"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exit status if the command has completed."
+        },
+        "output": {
+          "description": "The terminal output captured so far.",
+          "type": "string"
+        },
+        "truncated": {
+          "description": "Whether the output was truncated due to byte limits.",
+          "type": "boolean"
+        }
+      },
+      "required": ["output", "truncated"],
+      "type": "object",
+      "x-method": "terminal/output",
+      "x-side": "client"
     },
     "TextContent": {
       "description": "Text provided to or from an LLM.",
@@ -7084,7 +7292,11 @@
       "type": "object"
     },
     "ToolCallContent": {
-      "anyOf": [
+      "description": "Content produced by a tool call.\n\nTool calls can produce different types of content including\nstandard content blocks (text, images) or file diffs.\n\nSee protocol docs: [Content](https://agentclientprotocol.com/protocol/tool-calls#content)",
+      "discriminator": {
+        "propertyName": "type"
+      },
+      "oneOf": [
         {
           "allOf": [
             {
@@ -7118,47 +7330,22 @@
           "type": "object"
         },
         {
-          "additionalProperties": true,
-          "description": "Custom or future tool call content.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content type should preserve the\nraw payload when storing, replaying, proxying, or forwarding tool call\noutput, and otherwise ignore it or display it generically.",
-          "not": {
-            "anyOf": [
-              {
-                "properties": {
-                  "type": {
-                    "const": "content",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              },
-              {
-                "properties": {
-                  "type": {
-                    "const": "diff",
-                    "type": "string"
-                  }
-                },
-                "required": ["type"],
-                "type": "object"
-              }
-            ]
-          },
+          "allOf": [
+            {
+              "$ref": "#/$defs/Terminal"
+            }
+          ],
+          "description": "Embed a terminal created with `terminal/create` by its id.\n\nThe terminal must be added before calling `terminal/release`.\n\nSee protocol docs: [Terminal](https://agentclientprotocol.com/protocol/terminals)",
           "properties": {
             "type": {
-              "description": "Custom or future tool call content type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
+              "const": "terminal",
               "type": "string"
             }
           },
           "required": ["type"],
-          "title": "other",
           "type": "object"
         }
-      ],
-      "description": "Content produced by a tool call.\n\nTool calls can produce different types of content including\nstandard content blocks (text, images) or file diffs.\n\nSee protocol docs: [Content](https://agentclientprotocol.com/protocol/tool-calls#content)",
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "ToolCallId": {
       "description": "Unique identifier for a tool call within a session.",
@@ -7187,7 +7374,8 @@
       "type": "object"
     },
     "ToolCallStatus": {
-      "anyOf": [
+      "description": "Execution status of a tool call.\n\nTool calls progress through different statuses during their lifecycle.\n\nSee protocol docs: [Status](https://agentclientprotocol.com/protocol/tool-calls#status)",
+      "oneOf": [
         {
           "const": "pending",
           "description": "The tool call hasn't started running yet because the input is either\nstreaming or we're awaiting approval.",
@@ -7207,14 +7395,8 @@
           "const": "failed",
           "description": "The tool call failed with an error.",
           "type": "string"
-        },
-        {
-          "description": "Custom or future tool call status.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-          "title": "other",
-          "type": "string"
         }
-      ],
-      "description": "Execution status of a tool call.\n\nTool calls progress through different statuses during their lifecycle.\n\nSee protocol docs: [Status](https://agentclientprotocol.com/protocol/tool-calls#status)"
+      ]
     },
     "ToolCallUpdate": {
       "description": "An update to an existing tool call.\n\nUsed to report progress and results as tools execute. All fields except\nthe tool call ID are optional - only changed fields need to be included.\n\nSee protocol docs: [Updating](https://agentclientprotocol.com/protocol/tool-calls#updating)",
@@ -7289,7 +7471,8 @@
       "type": "object"
     },
     "ToolKind": {
-      "anyOf": [
+      "description": "Categories of tools that can be invoked.\n\nTool kinds help clients choose appropriate icons and optimize how they\ndisplay tool execution progress.\n\nSee protocol docs: [Creating](https://agentclientprotocol.com/protocol/tool-calls#creating)",
+      "oneOf": [
         {
           "const": "read",
           "description": "Reading files or data.",
@@ -7339,21 +7522,11 @@
           "const": "other",
           "description": "Other tool types (default).",
           "type": "string"
-        },
-        {
-          "description": "Custom or future tool kind.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-          "title": "unknown",
-          "type": "string"
         }
-      ],
-      "description": "Categories of tools that can be invoked.\n\nTool kinds help clients choose appropriate icons and optimize how they\ndisplay tool execution progress.\n\nSee protocol docs: [Creating](https://agentclientprotocol.com/protocol/tool-calls#creating)"
+      ]
     },
     "UnstructuredCommandInput": {
       "description": "All text that was typed after the command name is provided as input.",
-      "not": {
-        "required": ["type"],
-        "type": "object"
-      },
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -7434,7 +7607,7 @@
       "type": "object"
     },
     "UsageUpdate": {
-      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nContext window and cost update for a session.",
+      "description": "Context window and cost update for a session.",
       "properties": {
         "_meta": {
           "additionalProperties": true,
@@ -7469,6 +7642,55 @@
       "required": ["used", "size"],
       "type": "object"
     },
+    "WaitForTerminalExitRequest": {
+      "description": "Request to wait for a terminal command to exit.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "sessionId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            }
+          ],
+          "description": "The session ID for this request."
+        },
+        "terminalId": {
+          "description": "The ID of the terminal to wait for.",
+          "type": "string"
+        }
+      },
+      "required": ["sessionId", "terminalId"],
+      "type": "object",
+      "x-method": "terminal/wait_for_exit",
+      "x-side": "client"
+    },
+    "WaitForTerminalExitResponse": {
+      "description": "Response containing the exit status of a terminal command.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "exitCode": {
+          "description": "The process exit code (may be null if terminated by signal).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": ["integer", "null"]
+        },
+        "signal": {
+          "description": "The signal that terminated the process (may be null if exited normally).",
+          "type": ["string", "null"]
+        }
+      },
+      "type": "object",
+      "x-method": "terminal/wait_for_exit",
+      "x-side": "client"
+    },
     "WorkspaceFolder": {
       "description": "A workspace folder.",
       "properties": {
@@ -7483,6 +7705,49 @@
       },
       "required": ["uri", "name"],
       "type": "object"
+    },
+    "WriteTextFileRequest": {
+      "description": "Request to write content to a text file.\n\nOnly available if the client supports the `fs.writeTextFile` capability.",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        },
+        "content": {
+          "description": "The text content to write to the file.",
+          "type": "string"
+        },
+        "path": {
+          "description": "Absolute path to the file to write.",
+          "type": "string"
+        },
+        "sessionId": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            }
+          ],
+          "description": "The session ID for this request."
+        }
+      },
+      "required": ["sessionId", "path", "content"],
+      "type": "object",
+      "x-method": "fs/write_text_file",
+      "x-side": "client"
+    },
+    "WriteTextFileResponse": {
+      "description": "Response to `fs/write_text_file`",
+      "properties": {
+        "_meta": {
+          "additionalProperties": true,
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)",
+          "type": ["object", "null"]
+        }
+      },
+      "type": "object",
+      "x-method": "fs/write_text_file",
+      "x-side": "client"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -7562,396 +7827,6 @@
       "required": ["jsonrpc"],
       "title": "Client",
       "type": "object"
-    },
-    {
-      "description": "A non-empty JSON-RPC 2.0 batch message.",
-      "items": {
-        "anyOf": [
-          {
-            "allOf": [
-              {
-                "$ref": "#/$defs/AgentRequest"
-              }
-            ],
-            "title": "Request"
-          },
-          {
-            "allOf": [
-              {
-                "$ref": "#/$defs/AgentNotification"
-              }
-            ],
-            "title": "Notification"
-          },
-          {
-            "allOf": [
-              {
-                "$ref": "#/$defs/ProtocolLevelNotification"
-              }
-            ],
-            "title": "ProtocolLevelNotification"
-          }
-        ],
-        "description": "A message (request, response, or notification) with `\"jsonrpc\": \"2.0\"` specified as\n[required by JSON-RPC 2.0 Specification][1].\n\n[1]: https://www.jsonrpc.org/specification#compatibility",
-        "properties": {
-          "jsonrpc": {
-            "enum": ["2.0"],
-            "type": "string"
-          }
-        },
-        "required": ["jsonrpc"],
-        "type": "object"
-      },
-      "minItems": 1,
-      "title": "AgentBatchCall",
-      "type": "array"
-    },
-    {
-      "description": "A non-empty JSON-RPC 2.0 batch message.",
-      "items": {
-        "anyOf": [
-          {
-            "properties": {
-              "id": {
-                "$ref": "#/$defs/RequestId"
-              },
-              "result": {
-                "anyOf": [
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/InitializeResponse"
-                      }
-                    ],
-                    "title": "InitializeResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/AuthenticateResponse"
-                      }
-                    ],
-                    "title": "AuthenticateResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/ListProvidersResponse"
-                      }
-                    ],
-                    "title": "ListProvidersResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/SetProviderResponse"
-                      }
-                    ],
-                    "title": "SetProviderResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/DisableProviderResponse"
-                      }
-                    ],
-                    "title": "DisableProviderResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/LogoutResponse"
-                      }
-                    ],
-                    "title": "LogoutResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/NewSessionResponse"
-                      }
-                    ],
-                    "title": "NewSessionResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/LoadSessionResponse"
-                      }
-                    ],
-                    "title": "LoadSessionResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/ListSessionsResponse"
-                      }
-                    ],
-                    "title": "ListSessionsResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/DeleteSessionResponse"
-                      }
-                    ],
-                    "title": "DeleteSessionResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/ForkSessionResponse"
-                      }
-                    ],
-                    "title": "ForkSessionResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/ResumeSessionResponse"
-                      }
-                    ],
-                    "title": "ResumeSessionResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/CloseSessionResponse"
-                      }
-                    ],
-                    "title": "CloseSessionResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/SetSessionConfigOptionResponse"
-                      }
-                    ],
-                    "title": "SetSessionConfigOptionResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/PromptResponse"
-                      }
-                    ],
-                    "title": "PromptResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/StartNesResponse"
-                      }
-                    ],
-                    "title": "StartNesResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/SuggestNesResponse"
-                      }
-                    ],
-                    "title": "SuggestNesResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/CloseNesResponse"
-                      }
-                    ],
-                    "title": "CloseNesResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/ExtResponse"
-                      }
-                    ],
-                    "title": "ExtMethodResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/MessageMcpResponse"
-                      }
-                    ],
-                    "title": "MessageMcpResponse"
-                  }
-                ],
-                "description": "All possible responses that an agent can send to a client.\n\nThis enum is used internally for routing RPC responses. You typically won't need\nto use this directly - the responses are handled automatically by the connection.\n\nThese are responses to the corresponding `ClientRequest` variants."
-              }
-            },
-            "required": ["id", "result"],
-            "title": "Result",
-            "type": "object"
-          },
-          {
-            "properties": {
-              "error": {
-                "$ref": "#/$defs/Error"
-              },
-              "id": {
-                "$ref": "#/$defs/RequestId"
-              }
-            },
-            "required": ["id", "error"],
-            "title": "Error",
-            "type": "object"
-          }
-        ],
-        "description": "A message (request, response, or notification) with `\"jsonrpc\": \"2.0\"` specified as\n[required by JSON-RPC 2.0 Specification][1].\n\n[1]: https://www.jsonrpc.org/specification#compatibility",
-        "properties": {
-          "jsonrpc": {
-            "enum": ["2.0"],
-            "type": "string"
-          }
-        },
-        "required": ["jsonrpc"],
-        "type": "object",
-        "x-docs-ignore": true
-      },
-      "minItems": 1,
-      "title": "AgentBatchResponse",
-      "type": "array"
-    },
-    {
-      "description": "A non-empty JSON-RPC 2.0 batch message.",
-      "items": {
-        "anyOf": [
-          {
-            "allOf": [
-              {
-                "$ref": "#/$defs/ClientRequest"
-              }
-            ],
-            "title": "Request"
-          },
-          {
-            "allOf": [
-              {
-                "$ref": "#/$defs/ClientNotification"
-              }
-            ],
-            "title": "Notification"
-          },
-          {
-            "allOf": [
-              {
-                "$ref": "#/$defs/ProtocolLevelNotification"
-              }
-            ],
-            "title": "ProtocolLevelNotification"
-          }
-        ],
-        "description": "A message (request, response, or notification) with `\"jsonrpc\": \"2.0\"` specified as\n[required by JSON-RPC 2.0 Specification][1].\n\n[1]: https://www.jsonrpc.org/specification#compatibility",
-        "properties": {
-          "jsonrpc": {
-            "enum": ["2.0"],
-            "type": "string"
-          }
-        },
-        "required": ["jsonrpc"],
-        "type": "object"
-      },
-      "minItems": 1,
-      "title": "ClientBatchCall",
-      "type": "array"
-    },
-    {
-      "description": "A non-empty JSON-RPC 2.0 batch message.",
-      "items": {
-        "anyOf": [
-          {
-            "properties": {
-              "id": {
-                "$ref": "#/$defs/RequestId"
-              },
-              "result": {
-                "anyOf": [
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/RequestPermissionResponse"
-                      }
-                    ],
-                    "title": "RequestPermissionResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/CreateElicitationResponse"
-                      }
-                    ],
-                    "title": "CreateElicitationResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/ConnectMcpResponse"
-                      }
-                    ],
-                    "title": "ConnectMcpResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/DisconnectMcpResponse"
-                      }
-                    ],
-                    "title": "DisconnectMcpResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/ExtResponse"
-                      }
-                    ],
-                    "title": "ExtMethodResponse"
-                  },
-                  {
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/MessageMcpResponse"
-                      }
-                    ],
-                    "title": "MessageMcpResponse"
-                  }
-                ],
-                "description": "All possible responses that a client can send to an agent.\n\nThis enum is used internally for routing RPC responses. You typically won't need\nto use this directly - the responses are handled automatically by the connection.\n\nThese are responses to the corresponding `AgentRequest` variants."
-              }
-            },
-            "required": ["id", "result"],
-            "title": "Result",
-            "type": "object"
-          },
-          {
-            "properties": {
-              "error": {
-                "$ref": "#/$defs/Error"
-              },
-              "id": {
-                "$ref": "#/$defs/RequestId"
-              }
-            },
-            "required": ["id", "error"],
-            "title": "Error",
-            "type": "object"
-          }
-        ],
-        "description": "A message (request, response, or notification) with `\"jsonrpc\": \"2.0\"` specified as\n[required by JSON-RPC 2.0 Specification][1].\n\n[1]: https://www.jsonrpc.org/specification#compatibility",
-        "properties": {
-          "jsonrpc": {
-            "enum": ["2.0"],
-            "type": "string"
-          }
-        },
-        "required": ["jsonrpc"],
-        "type": "object",
-        "x-docs-ignore": true
-      },
-      "minItems": 1,
-      "title": "ClientBatchResponse",
-      "type": "array"
     },
     {
       "description": "A message (request, response, or notification) with `\"jsonrpc\": \"2.0\"` specified as\n[required by JSON-RPC 2.0 Specification][1].\n\n[1]: https://www.jsonrpc.org/specification#compatibility",

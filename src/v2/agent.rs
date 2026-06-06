@@ -57,7 +57,7 @@ pub struct InitializeRequest {
     pub protocol_version: ProtocolVersion,
     /// Capabilities supported by the client.
     #[serde(default)]
-    pub client_capabilities: ClientCapabilities,
+    pub capabilities: ClientCapabilities,
     /// Information about the Client name and version sent to the Agent.
     ///
     /// Note: in future versions of the protocol, this will be required.
@@ -79,7 +79,7 @@ impl InitializeRequest {
     pub fn new(protocol_version: ProtocolVersion) -> Self {
         Self {
             protocol_version,
-            client_capabilities: ClientCapabilities::default(),
+            capabilities: ClientCapabilities::default(),
             client_info: None,
             meta: None,
         }
@@ -87,8 +87,8 @@ impl InitializeRequest {
 
     /// Capabilities supported by the client.
     #[must_use]
-    pub fn client_capabilities(mut self, client_capabilities: ClientCapabilities) -> Self {
-        self.client_capabilities = client_capabilities;
+    pub fn capabilities(mut self, capabilities: ClientCapabilities) -> Self {
+        self.capabilities = capabilities;
         self
     }
 
@@ -130,7 +130,7 @@ pub struct InitializeResponse {
     pub protocol_version: ProtocolVersion,
     /// Capabilities supported by the agent.
     #[serde(default)]
-    pub agent_capabilities: AgentCapabilities,
+    pub capabilities: AgentCapabilities,
     /// Authentication methods supported by the agent.
     #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
     #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
@@ -157,7 +157,7 @@ impl InitializeResponse {
     pub fn new(protocol_version: ProtocolVersion) -> Self {
         Self {
             protocol_version,
-            agent_capabilities: AgentCapabilities::default(),
+            capabilities: AgentCapabilities::default(),
             auth_methods: vec![],
             agent_info: None,
             meta: None,
@@ -166,8 +166,8 @@ impl InitializeResponse {
 
     /// Capabilities supported by the agent.
     #[must_use]
-    pub fn agent_capabilities(mut self, agent_capabilities: AgentCapabilities) -> Self {
-        self.agent_capabilities = agent_capabilities;
+    pub fn capabilities(mut self, capabilities: AgentCapabilities) -> Self {
+        self.capabilities = capabilities;
         self
     }
 
@@ -1228,7 +1228,7 @@ impl NewSessionResponse {
 
 /// Request parameters for loading an existing session.
 ///
-/// Only available if the Agent supports the `loadSession` capability.
+/// Only available if the Agent supports the `session.load` capability.
 ///
 /// See protocol docs: [Loading Sessions](https://agentclientprotocol.com/protocol/session-setup#loading-sessions)
 #[skip_serializing_none]
@@ -1498,7 +1498,7 @@ impl ForkSessionResponse {
 /// Resumes an existing session without returning previous messages (unlike `session/load`).
 /// This is useful for agents that can resume sessions but don't implement full session loading.
 ///
-/// Only available if the Agent supports the `sessionCapabilities.resume` capability.
+/// Only available if the Agent supports the `session.resume` capability.
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[schemars(extend("x-side" = "agent", "x-method" = SESSION_RESUME_METHOD_NAME))]
@@ -1625,7 +1625,7 @@ impl ResumeSessionResponse {
 /// (treat it as if `session/cancel` was called) and then free up any resources
 /// associated with the session.
 ///
-/// Only available if the Agent supports the `sessionCapabilities.close` capability.
+/// Only available if the Agent supports the `session.close` capability.
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[schemars(extend("x-side" = "agent", "x-method" = SESSION_CLOSE_METHOD_NAME))]
@@ -1702,7 +1702,7 @@ impl CloseSessionResponse {
 
 /// Request parameters for listing existing sessions.
 ///
-/// Only available if the Agent supports the `sessionCapabilities.list` capability.
+/// Only available if the Agent supports the `session.list` capability.
 #[skip_serializing_none]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[schemars(extend("x-side" = "agent", "x-method" = SESSION_LIST_METHOD_NAME))]
@@ -1808,14 +1808,9 @@ impl ListSessionsResponse {
 
 // Delete session
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Request parameters for deleting an existing session from `session/list`.
 ///
-/// Only available if the Agent supports the `sessionCapabilities.delete` capability.
-#[cfg(feature = "unstable_session_delete")]
+/// Only available if the Agent supports the `session.delete` capability.
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[schemars(extend("x-side" = "agent", "x-method" = SESSION_DELETE_METHOD_NAME))]
@@ -1833,7 +1828,6 @@ pub struct DeleteSessionRequest {
     pub meta: Option<Meta>,
 }
 
-#[cfg(feature = "unstable_session_delete")]
 impl DeleteSessionRequest {
     #[must_use]
     pub fn new(session_id: impl Into<SessionId>) -> Self {
@@ -1855,12 +1849,7 @@ impl DeleteSessionRequest {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Response from deleting a session.
-#[cfg(feature = "unstable_session_delete")]
 #[skip_serializing_none]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[schemars(extend("x-side" = "agent", "x-method" = SESSION_DELETE_METHOD_NAME))]
@@ -1876,7 +1865,6 @@ pub struct DeleteSessionResponse {
     pub meta: Option<Meta>,
 }
 
-#[cfg(feature = "unstable_session_delete")]
 impl DeleteSessionResponse {
     #[must_use]
     pub fn new() -> Self {
@@ -2642,31 +2630,113 @@ impl SetSessionConfigOptionResponse {
 /// See protocol docs: [MCP Servers](https://agentclientprotocol.com/protocol/session-setup#mcp-servers)
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[schemars(extend("discriminator" = {"propertyName": "type"}))]
 #[non_exhaustive]
 pub enum McpServer {
     /// HTTP transport configuration
     ///
-    /// Only available when the Agent capabilities indicate `mcp_capabilities.http` is `true`.
+    /// Only available when the Agent capabilities include `session.mcp.http`.
     Http(McpServerHttp),
-    /// SSE transport configuration
-    ///
-    /// Only available when the Agent capabilities indicate `mcp_capabilities.sse` is `true`.
-    Sse(McpServerSse),
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
     ///
     /// ACP transport configuration
     ///
-    /// Only available when the Agent capabilities indicate `mcp_capabilities.acp` is `true`.
+    /// Only available when the Agent capabilities include `session.mcp.acp`.
     /// The MCP server is provided by an ACP component and communicates over the ACP channel.
     #[cfg(feature = "unstable_mcp_over_acp")]
     Acp(McpServerAcp),
     /// Stdio transport configuration
     ///
-    /// All Agents MUST support this transport.
-    #[serde(untagged)]
+    /// Only available when the Agent capabilities include `session.mcp.stdio`.
     Stdio(McpServerStdio),
+    /// Custom or future MCP server transport configuration.
+    ///
+    /// Values beginning with `_` are reserved for implementation-specific
+    /// extensions. Unknown values that do not begin with `_` are reserved for
+    /// future ACP variants.
+    ///
+    /// Receivers that do not understand this transport should preserve the raw
+    /// payload when storing, replaying, proxying, or forwarding session setup
+    /// data, and otherwise ignore it or reject the server configuration.
+    #[serde(untagged)]
+    Other(OtherMcpServer),
+}
+
+/// Custom or future MCP server transport payload.
+#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq, Eq)]
+#[schemars(inline)]
+#[schemars(transform = other_mcp_server_schema)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct OtherMcpServer {
+    /// Custom or future MCP server transport type.
+    ///
+    /// Values beginning with `_` are reserved for implementation-specific
+    /// extensions. Unknown values that do not begin with `_` are reserved for
+    /// future ACP variants.
+    #[serde(rename = "type")]
+    pub type_: String,
+    /// Additional fields from the unknown MCP server transport payload.
+    #[serde(flatten)]
+    pub fields: BTreeMap<String, serde_json::Value>,
+}
+
+impl OtherMcpServer {
+    #[must_use]
+    pub fn new(type_: impl Into<String>, mut fields: BTreeMap<String, serde_json::Value>) -> Self {
+        fields.remove("type");
+        Self {
+            type_: type_.into(),
+            fields,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for OtherMcpServer {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let type_ = fields
+            .remove("type")
+            .ok_or_else(|| serde::de::Error::missing_field("type"))?;
+        let serde_json::Value::String(type_) = type_ else {
+            return Err(serde::de::Error::custom("`type` must be a string"));
+        };
+
+        if is_known_mcp_server_type(&type_) {
+            return Err(serde::de::Error::custom(format!(
+                "known MCP server transport `{type_}` did not match its schema"
+            )));
+        }
+
+        Ok(Self { type_, fields })
+    }
+}
+
+fn is_known_mcp_server_type(type_: &str) -> bool {
+    match type_ {
+        "http" | "stdio" => true,
+        #[cfg(feature = "unstable_mcp_over_acp")]
+        "acp" => true,
+        _ => false,
+    }
+}
+
+fn other_mcp_server_schema(schema: &mut Schema) {
+    super::schema_util::reject_known_string_discriminators(
+        schema,
+        "type",
+        &[
+            "http",
+            "stdio",
+            #[cfg(feature = "unstable_mcp_over_acp")]
+            "acp",
+        ],
+    );
 }
 
 /// HTTP transport configuration for MCP.
@@ -2691,57 +2761,6 @@ pub struct McpServerHttp {
 }
 
 impl McpServerHttp {
-    #[must_use]
-    pub fn new(name: impl Into<String>, url: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            url: url.into(),
-            headers: Vec::new(),
-            meta: None,
-        }
-    }
-
-    /// HTTP headers to set when making requests to the MCP server.
-    #[must_use]
-    pub fn headers(mut self, headers: Vec<HttpHeader>) -> Self {
-        self.headers = headers;
-        self
-    }
-
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
-    ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-    #[must_use]
-    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
-        self.meta = meta.into_option();
-        self
-    }
-}
-
-/// SSE transport configuration for MCP.
-#[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct McpServerSse {
-    /// Human-readable name identifying this MCP server.
-    pub name: String,
-    /// URL to the MCP server.
-    pub url: String,
-    /// HTTP headers to set when making requests to the MCP server.
-    pub headers: Vec<HttpHeader>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
-    ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-    #[serde(rename = "_meta")]
-    pub meta: Option<Meta>,
-}
-
-impl McpServerSse {
     #[must_use]
     pub fn new(name: impl Into<String>, url: impl Into<String>) -> Self {
         Self {
@@ -3633,17 +3652,16 @@ impl DisableProviderResponse {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AgentCapabilities {
-    /// Whether the agent supports `session/load`.
+    /// Session capabilities supported by the agent.
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not support the
+    /// `session/*` method surface. Supplying `{}` means the agent supports the
+    /// baseline session methods: `session/new`, `session/prompt`,
+    /// `session/cancel`, and `session/update`.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
-    pub load_session: bool,
-    /// Prompt capabilities supported by the agent.
-    #[serde(default)]
-    pub prompt_capabilities: PromptCapabilities,
-    /// MCP capabilities supported by the agent.
-    #[serde(default)]
-    pub mcp_capabilities: McpCapabilities,
-    #[serde(default)]
-    pub session_capabilities: SessionCapabilities,
+    pub session: Option<SessionCapabilities>,
     /// Authentication-related capabilities supported by the agent.
     #[serde(default)]
     pub auth: AgentAuthCapabilities,
@@ -3694,31 +3712,15 @@ impl AgentCapabilities {
         Self::default()
     }
 
-    /// Whether the agent supports `session/load`.
-    #[must_use]
-    pub fn load_session(mut self, load_session: bool) -> Self {
-        self.load_session = load_session;
-        self
-    }
-
-    /// Prompt capabilities supported by the agent.
-    #[must_use]
-    pub fn prompt_capabilities(mut self, prompt_capabilities: PromptCapabilities) -> Self {
-        self.prompt_capabilities = prompt_capabilities;
-        self
-    }
-
-    /// MCP capabilities supported by the agent.
-    #[must_use]
-    pub fn mcp_capabilities(mut self, mcp_capabilities: McpCapabilities) -> Self {
-        self.mcp_capabilities = mcp_capabilities;
-        self
-    }
-
     /// Session capabilities supported by the agent.
+    ///
+    /// Omitted or `null` both mean the agent does not support the `session/*`
+    /// method surface. Supplying `{}` means the agent supports the baseline
+    /// session methods: `session/new`, `session/prompt`, `session/cancel`, and
+    /// `session/update`.
     #[must_use]
-    pub fn session_capabilities(mut self, session_capabilities: SessionCapabilities) -> Self {
-        self.session_capabilities = session_capabilities;
+    pub fn session(mut self, session: impl IntoOption<SessionCapabilities>) -> Self {
+        self.session = session.into_option();
         self
     }
 
@@ -3820,11 +3822,12 @@ impl ProvidersCapabilities {
 
 /// Session capabilities supported by the agent.
 ///
-/// As a baseline, all Agents **MUST** support `session/new`, `session/prompt`, `session/cancel`, and `session/update`.
+/// Supplying `{}` means the agent supports the baseline session methods:
+/// `session/new`, `session/prompt`, `session/cancel`, and `session/update`.
 ///
-/// Optionally, they **MAY** support other session methods and notifications by specifying additional capabilities.
-///
-/// Note: `session/load` is still handled by the top-level `load_session` capability. This will be unified in future versions of the protocol.
+/// Agents that support sessions **MAY** support additional session methods,
+/// prompt content types, and MCP transports by specifying additional
+/// capabilities.
 ///
 /// See protocol docs: [Session Capabilities](https://agentclientprotocol.com/protocol/initialization#session-capabilities)
 #[serde_as]
@@ -3833,20 +3836,40 @@ impl ProvidersCapabilities {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct SessionCapabilities {
+    /// Prompt capabilities supported by the agent in `session/prompt` requests.
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not advertise any
+    /// prompt extensions beyond the baseline text and resource-link content
+    /// required by `session/prompt`.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
+    #[serde(default)]
+    pub prompt: Option<PromptCapabilities>,
+    /// MCP capabilities supported by the agent for session lifecycle requests.
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not advertise MCP
+    /// server transport support for sessions.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
+    #[serde(default)]
+    pub mcp: Option<McpCapabilities>,
+    /// Whether the agent supports `session/load`.
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports loading sessions.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
+    #[serde(default)]
+    pub load: Option<SessionLoadCapabilities>,
     /// Whether the agent supports `session/list`.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub list: Option<SessionListCapabilities>,
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// Whether the agent supports `session/delete`.
     ///
     /// Optional. Omitted or `null` both mean the agent does not advertise support.
     /// Supplying `{}` means the agent supports deleting sessions from `session/list`.
-    #[cfg(feature = "unstable_session_delete")]
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
@@ -3895,6 +3918,37 @@ impl SessionCapabilities {
         Self::default()
     }
 
+    /// Prompt capabilities supported by the agent in `session/prompt` requests.
+    ///
+    /// Omitted or `null` both mean the agent does not advertise any prompt
+    /// extensions beyond the baseline text and resource-link content required by
+    /// `session/prompt`.
+    #[must_use]
+    pub fn prompt(mut self, prompt: impl IntoOption<PromptCapabilities>) -> Self {
+        self.prompt = prompt.into_option();
+        self
+    }
+
+    /// MCP capabilities supported by the agent for session lifecycle requests.
+    ///
+    /// Omitted or `null` both mean the agent does not advertise MCP server
+    /// transport support for sessions.
+    #[must_use]
+    pub fn mcp(mut self, mcp: impl IntoOption<McpCapabilities>) -> Self {
+        self.mcp = mcp.into_option();
+        self
+    }
+
+    /// Whether the agent supports `session/load`.
+    ///
+    /// Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports loading sessions.
+    #[must_use]
+    pub fn load(mut self, load: impl IntoOption<SessionLoadCapabilities>) -> Self {
+        self.load = load.into_option();
+        self
+    }
+
     /// Whether the agent supports `session/list`.
     #[must_use]
     pub fn list(mut self, list: impl IntoOption<SessionListCapabilities>) -> Self {
@@ -3902,15 +3956,10 @@ impl SessionCapabilities {
         self
     }
 
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// Whether the agent supports `session/delete`.
     ///
     /// Omitted or `null` both mean the agent does not advertise support.
     /// Supplying `{}` means the agent supports deleting sessions from `session/list`.
-    #[cfg(feature = "unstable_session_delete")]
     #[must_use]
     pub fn delete(mut self, delete: impl IntoOption<SessionDeleteCapabilities>) -> Self {
         self.delete = delete.into_option();
@@ -3965,6 +4014,40 @@ impl SessionCapabilities {
     }
 }
 
+/// Capabilities for the `session/load` method.
+///
+/// Supplying `{}` means the agent supports loading sessions.
+#[skip_serializing_none]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SessionLoadCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+impl SessionLoadCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
 /// Capabilities for the `session/list` method.
 ///
 /// By supplying `{}` it means that the agent supports listing of sessions.
@@ -3999,14 +4082,9 @@ impl SessionListCapabilities {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Capabilities for the `session/delete` method.
 ///
 /// Supplying `{}` means the agent supports deleting sessions from `session/list`.
-#[cfg(feature = "unstable_session_delete")]
 #[skip_serializing_none]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[non_exhaustive]
@@ -4020,7 +4098,6 @@ pub struct SessionDeleteCapabilities {
     pub meta: Option<Meta>,
 }
 
-#[cfg(feature = "unstable_session_delete")]
 impl SessionDeleteCapabilities {
     #[must_use]
     pub fn new() -> Self {
@@ -4196,23 +4273,39 @@ impl SessionCloseCapabilities {
 /// the agent can process.
 ///
 /// See protocol docs: [Prompt Capabilities](https://agentclientprotocol.com/protocol/initialization#prompt-capabilities)
+#[serde_as]
 #[skip_serializing_none]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct PromptCapabilities {
     /// Agent supports [`ContentBlock::Image`].
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports image content in prompts.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
-    pub image: bool,
+    pub image: Option<PromptImageCapabilities>,
     /// Agent supports [`ContentBlock::Audio`].
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports audio content in prompts.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
-    pub audio: bool,
+    pub audio: Option<PromptAudioCapabilities>,
     /// Agent supports embedded context in `session/prompt` requests.
     ///
     /// When enabled, the Client is allowed to include [`ContentBlock::Resource`]
     /// in prompt requests for pieces of context that are referenced in the message.
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports embedded context in prompts.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
-    pub embedded_context: bool,
+    pub embedded_context: Option<PromptEmbeddedContextCapabilities>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
@@ -4229,16 +4322,22 @@ impl PromptCapabilities {
     }
 
     /// Agent supports [`ContentBlock::Image`].
+    ///
+    /// Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports image content in prompts.
     #[must_use]
-    pub fn image(mut self, image: bool) -> Self {
-        self.image = image;
+    pub fn image(mut self, image: impl IntoOption<PromptImageCapabilities>) -> Self {
+        self.image = image.into_option();
         self
     }
 
     /// Agent supports [`ContentBlock::Audio`].
+    ///
+    /// Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports audio content in prompts.
     #[must_use]
-    pub fn audio(mut self, audio: bool) -> Self {
-        self.audio = audio;
+    pub fn audio(mut self, audio: impl IntoOption<PromptAudioCapabilities>) -> Self {
+        self.audio = audio.into_option();
         self
     }
 
@@ -4246,9 +4345,15 @@ impl PromptCapabilities {
     ///
     /// When enabled, the Client is allowed to include [`ContentBlock::Resource`]
     /// in prompt requests for pieces of context that are referenced in the message.
+    ///
+    /// Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports embedded context in prompts.
     #[must_use]
-    pub fn embedded_context(mut self, embedded_context: bool) -> Self {
-        self.embedded_context = embedded_context;
+    pub fn embedded_context(
+        mut self,
+        embedded_context: impl IntoOption<PromptEmbeddedContextCapabilities>,
+    ) -> Self {
+        self.embedded_context = embedded_context.into_option();
         self
     }
 
@@ -4264,26 +4369,144 @@ impl PromptCapabilities {
     }
 }
 
-/// MCP capabilities supported by the agent
+/// Capabilities for image content in prompt requests.
+///
+/// Supplying `{}` means the agent supports image content in prompts.
+#[skip_serializing_none]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PromptImageCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+impl PromptImageCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// Capabilities for audio content in prompt requests.
+///
+/// Supplying `{}` means the agent supports audio content in prompts.
+#[skip_serializing_none]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PromptAudioCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+impl PromptAudioCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// Capabilities for embedded context in prompt requests.
+///
+/// Supplying `{}` means the agent supports embedded context in prompts.
+#[skip_serializing_none]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PromptEmbeddedContextCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+impl PromptEmbeddedContextCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// MCP capabilities supported by the agent for session lifecycle requests.
+#[serde_as]
 #[skip_serializing_none]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct McpCapabilities {
+    /// Agent supports [`McpServer::Stdio`].
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports stdio MCP server transports.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
+    #[serde(default)]
+    pub stdio: Option<McpStdioCapabilities>,
     /// Agent supports [`McpServer::Http`].
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports HTTP MCP server transports.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
-    pub http: bool,
-    /// Agent supports [`McpServer::Sse`].
-    #[serde(default)]
-    pub sse: bool,
+    pub http: Option<McpHttpCapabilities>,
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
     ///
     /// Agent supports [`McpServer::Acp`].
     #[cfg(feature = "unstable_mcp_over_acp")]
+    ///
+    /// Optional. Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports ACP MCP server transports.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
-    pub acp: bool,
+    pub acp: Option<McpAcpCapabilities>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
@@ -4299,17 +4522,23 @@ impl McpCapabilities {
         Self::default()
     }
 
-    /// Agent supports [`McpServer::Http`].
+    /// Agent supports [`McpServer::Stdio`].
+    ///
+    /// Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports stdio MCP server transports.
     #[must_use]
-    pub fn http(mut self, http: bool) -> Self {
-        self.http = http;
+    pub fn stdio(mut self, stdio: impl IntoOption<McpStdioCapabilities>) -> Self {
+        self.stdio = stdio.into_option();
         self
     }
 
-    /// Agent supports [`McpServer::Sse`].
+    /// Agent supports [`McpServer::Http`].
+    ///
+    /// Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports HTTP MCP server transports.
     #[must_use]
-    pub fn sse(mut self, sse: bool) -> Self {
-        self.sse = sse;
+    pub fn http(mut self, http: impl IntoOption<McpHttpCapabilities>) -> Self {
+        self.http = http.into_option();
         self
     }
 
@@ -4319,10 +4548,121 @@ impl McpCapabilities {
     ///
     /// Agent supports [`McpServer::Acp`].
     #[cfg(feature = "unstable_mcp_over_acp")]
+    ///
+    /// Omitted or `null` both mean the agent does not advertise support.
+    /// Supplying `{}` means the agent supports ACP MCP server transports.
     #[must_use]
-    pub fn acp(mut self, acp: bool) -> Self {
-        self.acp = acp;
+    pub fn acp(mut self, acp: impl IntoOption<McpAcpCapabilities>) -> Self {
+        self.acp = acp.into_option();
         self
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// Capabilities for stdio MCP server transports.
+///
+/// Supplying `{}` means the agent supports stdio MCP server transports.
+#[skip_serializing_none]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct McpStdioCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+impl McpStdioCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// Capabilities for HTTP MCP server transports.
+///
+/// Supplying `{}` means the agent supports HTTP MCP server transports.
+#[skip_serializing_none]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct McpHttpCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+impl McpHttpCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// **UNSTABLE**
+///
+/// This capability is not part of the spec yet, and may be removed or changed at any point.
+///
+/// Capabilities for ACP MCP server transports.
+///
+/// Supplying `{}` means the agent supports ACP MCP server transports.
+#[cfg(feature = "unstable_mcp_over_acp")]
+#[skip_serializing_none]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct McpAcpCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+#[cfg(feature = "unstable_mcp_over_acp")]
+impl McpAcpCapabilities {
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -4374,7 +4714,6 @@ pub struct AgentMethodNames {
     /// Method for listing existing sessions.
     pub session_list: &'static str,
     /// Method for deleting an existing session.
-    #[cfg(feature = "unstable_session_delete")]
     pub session_delete: &'static str,
     /// Method for forking an existing session.
     #[cfg(feature = "unstable_session_fork")]
@@ -4435,7 +4774,6 @@ pub const AGENT_METHOD_NAMES: AgentMethodNames = AgentMethodNames {
     #[cfg(feature = "unstable_mcp_over_acp")]
     mcp_message: MCP_MESSAGE_METHOD_NAME,
     session_list: SESSION_LIST_METHOD_NAME,
-    #[cfg(feature = "unstable_session_delete")]
     session_delete: SESSION_DELETE_METHOD_NAME,
     #[cfg(feature = "unstable_session_fork")]
     session_fork: SESSION_FORK_METHOD_NAME,
@@ -4490,7 +4828,6 @@ pub(crate) const SESSION_CANCEL_METHOD_NAME: &str = "session/cancel";
 /// Method name for listing existing sessions.
 pub(crate) const SESSION_LIST_METHOD_NAME: &str = "session/list";
 /// Method name for deleting an existing session.
-#[cfg(feature = "unstable_session_delete")]
 pub(crate) const SESSION_DELETE_METHOD_NAME: &str = "session/delete";
 /// Method name for forking an existing session.
 #[cfg(feature = "unstable_session_fork")]
@@ -4576,7 +4913,7 @@ pub enum ClientRequest {
     NewSessionRequest(NewSessionRequest),
     /// Loads an existing session to resume a previous conversation.
     ///
-    /// This method is only available if the agent advertises the `loadSession` capability.
+    /// This method is only available if the agent advertises the `session.load` capability.
     ///
     /// The agent should:
     /// - Restore the session context and conversation history
@@ -4587,18 +4924,13 @@ pub enum ClientRequest {
     LoadSessionRequest(LoadSessionRequest),
     /// Lists existing sessions known to the agent.
     ///
-    /// This method is only available if the agent advertises the `sessionCapabilities.list` capability.
+    /// This method is only available if the agent advertises the `session.list` capability.
     ///
     /// The agent should return metadata about sessions with optional filtering and pagination support.
     ListSessionsRequest(ListSessionsRequest),
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// Deletes an existing session from `session/list`.
     ///
-    /// This method is only available if the agent advertises the `sessionCapabilities.delete` capability.
-    #[cfg(feature = "unstable_session_delete")]
+    /// This method is only available if the agent advertises the `session.delete` capability.
     DeleteSessionRequest(DeleteSessionRequest),
     #[cfg(feature = "unstable_session_fork")]
     /// **UNSTABLE**
@@ -4615,14 +4947,14 @@ pub enum ClientRequest {
     ForkSessionRequest(ForkSessionRequest),
     /// Resumes an existing session without returning previous messages.
     ///
-    /// This method is only available if the agent advertises the `sessionCapabilities.resume` capability.
+    /// This method is only available if the agent advertises the `session.resume` capability.
     ///
     /// The agent should resume the session context, allowing the conversation to continue
     /// without replaying the message history (unlike `session/load`).
     ResumeSessionRequest(ResumeSessionRequest),
     /// Closes an active session and frees up any resources associated with it.
     ///
-    /// This method is only available if the agent advertises the `sessionCapabilities.close` capability.
+    /// This method is only available if the agent advertises the `session.close` capability.
     ///
     /// The agent must cancel any ongoing work (as if `session/cancel` was called)
     /// and then free up any resources associated with the session.
@@ -4698,7 +5030,6 @@ impl ClientRequest {
             Self::NewSessionRequest(_) => AGENT_METHOD_NAMES.session_new,
             Self::LoadSessionRequest(_) => AGENT_METHOD_NAMES.session_load,
             Self::ListSessionsRequest(_) => AGENT_METHOD_NAMES.session_list,
-            #[cfg(feature = "unstable_session_delete")]
             Self::DeleteSessionRequest(_) => AGENT_METHOD_NAMES.session_delete,
             #[cfg(feature = "unstable_session_fork")]
             Self::ForkSessionRequest(_) => AGENT_METHOD_NAMES.session_fork,
@@ -4743,7 +5074,6 @@ pub enum AgentResponse {
     NewSessionResponse(NewSessionResponse),
     LoadSessionResponse(#[serde(default)] LoadSessionResponse),
     ListSessionsResponse(ListSessionsResponse),
-    #[cfg(feature = "unstable_session_delete")]
     DeleteSessionResponse(#[serde(default)] DeleteSessionResponse),
     #[cfg(feature = "unstable_session_fork")]
     ForkSessionResponse(ForkSessionResponse),
@@ -4921,6 +5251,7 @@ mod test_serialization {
         assert_eq!(
             json,
             json!({
+                "type": "stdio",
                 "name": "test-server",
                 "command": "/usr/bin/server",
                 "args": ["--port", "3000"],
@@ -4951,6 +5282,51 @@ mod test_serialization {
             }
             _ => panic!("Expected Stdio variant"),
         }
+    }
+
+    #[test]
+    fn test_mcp_server_unknown_transport_serialization() {
+        let json = json!({
+            "type": "websocket",
+            "name": "future-server",
+            "url": "wss://example.com/mcp",
+            "protocolVersion": "2026-01-01"
+        });
+
+        let deserialized: McpServer = serde_json::from_value(json.clone()).unwrap();
+        let McpServer::Other(OtherMcpServer { type_, fields }) = &deserialized else {
+            panic!("Expected Other variant");
+        };
+
+        assert_eq!(type_, "websocket");
+        assert_eq!(fields["name"], "future-server");
+        assert_eq!(fields["url"], "wss://example.com/mcp");
+        assert_eq!(fields["protocolVersion"], "2026-01-01");
+        assert_eq!(serde_json::to_value(&deserialized).unwrap(), json);
+    }
+
+    #[test]
+    fn test_mcp_server_stdio_requires_type() {
+        let result = serde_json::from_value::<McpServer>(json!({
+            "name": "test-server",
+            "command": "/usr/bin/server",
+            "args": [],
+            "env": []
+        }));
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_mcp_server_unknown_does_not_hide_malformed_known_transport() {
+        let result = serde_json::from_value::<McpServer>(json!({
+            "type": "stdio",
+            "name": "test-server",
+            "args": [],
+            "env": []
+        }));
+
+        assert!(result.is_err());
     }
 
     #[test]
@@ -5020,47 +5396,6 @@ mod test_serialization {
             .method(),
             "mcp/message"
         );
-    }
-
-    #[test]
-    fn test_mcp_server_sse_serialization() {
-        let server = McpServer::Sse(
-            McpServerSse::new("sse-server", "https://sse.example.com/events")
-                .headers(vec![HttpHeader::new("X-API-Key", "apikey456")]),
-        );
-
-        let json = serde_json::to_value(&server).unwrap();
-        assert_eq!(
-            json,
-            json!({
-                "type": "sse",
-                "name": "sse-server",
-                "url": "https://sse.example.com/events",
-                "headers": [
-                    {
-                        "name": "X-API-Key",
-                        "value": "apikey456"
-                    }
-                ]
-            })
-        );
-
-        let deserialized: McpServer = serde_json::from_value(json).unwrap();
-        match deserialized {
-            McpServer::Sse(McpServerSse {
-                name,
-                url,
-                headers,
-                meta: _,
-            }) => {
-                assert_eq!(name, "sse-server");
-                assert_eq!(url, "https://sse.example.com/events");
-                assert_eq!(headers.len(), 1);
-                assert_eq!(headers[0].name, "X-API-Key");
-                assert_eq!(headers[0].value, "apikey456");
-            }
-            _ => panic!("Expected Sse variant"),
-        }
     }
 
     #[test]
@@ -5228,7 +5563,6 @@ mod test_serialization {
         );
     }
 
-    #[cfg(feature = "unstable_session_delete")]
     #[test]
     fn test_session_delete_serialization() {
         assert_eq!(AGENT_METHOD_NAMES.session_delete, "session/delete");
@@ -5316,6 +5650,17 @@ mod test_serialization {
             Vec::<PathBuf>::new()
         );
     }
+    #[test]
+    fn test_session_load_capabilities_serialization() {
+        assert_eq!(
+            serde_json::to_value(SessionCapabilities::new().load(SessionLoadCapabilities::new()))
+                .unwrap(),
+            json!({
+                "load": {}
+            })
+        );
+    }
+
     #[test]
     fn test_session_additional_directories_capabilities_serialization() {
         assert_eq!(
@@ -6082,5 +6427,103 @@ mod test_serialization {
 
         let deserialized: AgentCapabilities = serde_json::from_value(json).unwrap();
         assert!(deserialized.providers.is_some());
+    }
+
+    #[test]
+    fn test_agent_capabilities_session_is_explicit() {
+        let json = serde_json::to_value(AgentCapabilities::new()).unwrap();
+        assert!(json.get("session").is_none());
+
+        let caps = AgentCapabilities::new().session(
+            SessionCapabilities::new()
+                .prompt(PromptCapabilities::new().image(PromptImageCapabilities::new()))
+                .mcp(McpCapabilities::new().stdio(McpStdioCapabilities::new()))
+                .load(SessionLoadCapabilities::new()),
+        );
+
+        assert_eq!(
+            serde_json::to_value(&caps).unwrap(),
+            json!({
+                "auth": {},
+                "session": {
+                    "prompt": {
+                        "image": {}
+                    },
+                    "mcp": {
+                        "stdio": {}
+                    },
+                    "load": {}
+                }
+            })
+        );
+
+        let deserialized: AgentCapabilities = serde_json::from_value(json!({
+            "session": false
+        }))
+        .unwrap();
+        assert!(deserialized.session.is_none());
+    }
+
+    #[test]
+    fn test_prompt_capabilities_serialize_supported_content_as_objects() {
+        let caps = PromptCapabilities::new()
+            .image(PromptImageCapabilities::new())
+            .audio(PromptAudioCapabilities::new())
+            .embedded_context(PromptEmbeddedContextCapabilities::new());
+
+        assert_eq!(
+            serde_json::to_value(&caps).unwrap(),
+            json!({
+                "image": {},
+                "audio": {},
+                "embeddedContext": {}
+            })
+        );
+
+        let deserialized: PromptCapabilities = serde_json::from_value(json!({
+            "image": null,
+            "audio": false,
+            "embeddedContext": {}
+        }))
+        .unwrap();
+        assert!(deserialized.image.is_none());
+        assert!(deserialized.audio.is_none());
+        assert!(deserialized.embedded_context.is_some());
+    }
+
+    #[test]
+    fn test_mcp_capabilities_serialize_supported_transports_as_objects() {
+        let caps = McpCapabilities::new()
+            .stdio(McpStdioCapabilities::new())
+            .http(McpHttpCapabilities::new());
+
+        assert_eq!(
+            serde_json::to_value(&caps).unwrap(),
+            json!({
+                "stdio": {},
+                "http": {}
+            })
+        );
+
+        let deserialized: McpCapabilities = serde_json::from_value(json!({
+            "stdio": null,
+            "http": false
+        }))
+        .unwrap();
+        assert!(deserialized.stdio.is_none());
+        assert!(deserialized.http.is_none());
+    }
+
+    #[cfg(feature = "unstable_mcp_over_acp")]
+    #[test]
+    fn test_mcp_capabilities_serialize_acp_support_as_object() {
+        let caps = McpCapabilities::new().acp(McpAcpCapabilities::new());
+
+        assert_eq!(
+            serde_json::to_value(&caps).unwrap(),
+            json!({
+                "acp": {}
+            })
+        );
     }
 }

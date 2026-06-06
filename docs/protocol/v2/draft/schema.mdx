@@ -4,9 +4,10 @@ description: "Schema definitions for the Agent Client Protocol"
 ---
 
 <Note>
-  The v2 schema is generated in this repository at
-  [`schema/schema.v2.unstable.json`](https://github.com/agentclientprotocol/agent-client-protocol/blob/main/schema/schema.v2.unstable.json).
-  ACP v2 remains hidden while it is being drafted.
+  This v2 schema file is generated in this repository at
+  [`schema/v2/schema.unstable.json`](https://github.com/agentclientprotocol/agent-client-protocol/blob/main/schema/v2/schema.unstable.json).
+  ACP v2 remains hidden while it is being drafted, and v2 schema GitHub releases
+  are not published yet.
 </Note>
 
 ## Agent
@@ -276,10 +277,10 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="clientCapabilities" type={<a href="#clientcapabilities">ClientCapabilities</a>} >
+<ResponseField name="capabilities" type={<a href="#clientcapabilities">ClientCapabilities</a>} >
   Capabilities supported by the client.
 
-    - Default: `{"auth":{"terminal":false}}`
+    - Default: `{"auth":{}}`
 
 </ResponseField>
 <ResponseField name="clientInfo" type={<><span><a href="#implementation">Implementation</a></span><span> | null</span></>} >
@@ -312,12 +313,6 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="agentCapabilities" type={<a href="#agentcapabilities">AgentCapabilities</a>} >
-  Capabilities supported by the agent.
-
-    - Default: `{"auth":{},"loadSession":false,"mcpCapabilities":{"acp":false,"http":false,"sse":false},"promptCapabilities":{"audio":false,"embeddedContext":false,"image":false},"sessionCapabilities":{}}`
-
-</ResponseField>
 <ResponseField name="agentInfo" type={<><span><a href="#implementation">Implementation</a></span><span> | null</span></>} >
   Information about the Agent name and version sent to the Client.
 
@@ -328,6 +323,12 @@ Note: in future versions of the protocol, this will be required.
   Authentication methods supported by the agent.
 
     - Default: `[]`
+
+</ResponseField>
+<ResponseField name="capabilities" type={<a href="#agentcapabilities">AgentCapabilities</a>} >
+  Capabilities supported by the agent.
+
+    - Default: `{"auth":{}}`
 
 </ResponseField>
 <ResponseField name="protocolVersion" type={<a href="#protocolversion">ProtocolVersion</a>} required>
@@ -923,7 +924,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 
 Closes an active session and frees up any resources associated with it.
 
-This method is only available if the agent advertises the `sessionCapabilities.close` capability.
+This method is only available if the agent advertises the `session.close` capability.
 
 The agent must cancel any ongoing work (as if `session/cancel` was called)
 and then free up any resources associated with the session.
@@ -936,7 +937,7 @@ If supported, the agent **must** cancel any ongoing work related to the session
 (treat it as if `session/cancel` was called) and then free up any resources
 associated with the session.
 
-Only available if the Agent supports the `sessionCapabilities.close` capability.
+Only available if the Agent supports the `session.close` capability.
 
 **Type:** Object
 
@@ -974,23 +975,15 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <a id="session-delete"></a>
 ### <span class="font-mono">session/delete</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 Deletes an existing session from `session/list`.
 
-This method is only available if the agent advertises the `sessionCapabilities.delete` capability.
+This method is only available if the agent advertises the `session.delete` capability.
 
 #### <span class="font-mono">DeleteSessionRequest</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 Request parameters for deleting an existing session from `session/list`.
 
-Only available if the Agent supports the `sessionCapabilities.delete` capability.
+Only available if the Agent supports the `session.delete` capability.
 
 **Type:** Object
 
@@ -1009,10 +1002,6 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 
 #### <span class="font-mono">DeleteSessionResponse</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Response from deleting a session.
 
@@ -1119,7 +1108,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 
 Lists existing sessions known to the agent.
 
-This method is only available if the agent advertises the `sessionCapabilities.list` capability.
+This method is only available if the agent advertises the `session.list` capability.
 
 The agent should return metadata about sessions with optional filtering and pagination support.
 
@@ -1127,7 +1116,7 @@ The agent should return metadata about sessions with optional filtering and pagi
 
 Request parameters for listing existing sessions.
 
-Only available if the Agent supports the `sessionCapabilities.list` capability.
+Only available if the Agent supports the `session.list` capability.
 
 **Type:** Object
 
@@ -1177,7 +1166,7 @@ to fetch the next page. If absent, there are no more results.
 
 Loads an existing session to resume a previous conversation.
 
-This method is only available if the agent advertises the `loadSession` capability.
+This method is only available if the agent advertises the `session.load` capability.
 
 The agent should:
 
@@ -1191,7 +1180,7 @@ See protocol docs: [Loading Sessions](https://agentclientprotocol.com/protocol/v
 
 Request parameters for loading an existing session.
 
-Only available if the Agent supports the `loadSession` capability.
+Only available if the Agent supports the `session.load` capability.
 
 See protocol docs: [Loading Sessions](https://agentclientprotocol.com/protocol/v2/draft/session-setup#loading-sessions)
 
@@ -1415,7 +1404,7 @@ Token usage for this turn (optional).
 
 Resumes an existing session without returning previous messages.
 
-This method is only available if the agent advertises the `sessionCapabilities.resume` capability.
+This method is only available if the agent advertises the `session.resume` capability.
 
 The agent should resume the session context, allowing the conversation to continue
 without replaying the message history (unlike `session/load`).
@@ -1427,7 +1416,7 @@ Request parameters for resuming an existing session.
 Resumes an existing session without returning previous messages (unlike `session/load`).
 This is useful for agents that can resume sessions but don't implement full session loading.
 
-Only available if the Agent supports the `sessionCapabilities.resume` capability.
+Only available if the Agent supports the `session.resume` capability.
 
 **Type:** Object
 
@@ -2163,18 +2152,6 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
     - Default: `{}`
 
 </ResponseField>
-<ResponseField name="loadSession" type={"boolean"} >
-  Whether the agent supports `session/load`.
-
-    - Default: `false`
-
-</ResponseField>
-<ResponseField name="mcpCapabilities" type={<a href="#mcpcapabilities">McpCapabilities</a>} >
-  MCP capabilities supported by the agent.
-
-    - Default: `{"acp":false,"http":false,"sse":false}`
-
-</ResponseField>
 <ResponseField name="nes" type={<><span><a href="#nescapabilities">NesCapabilities</a></span><span> | null</span></>} >
   **UNSTABLE**
 
@@ -2191,12 +2168,6 @@ This capability is not part of the spec yet, and may be removed or changed at an
 The position encoding selected by the agent from the client's supported encodings.
 
 </ResponseField>
-<ResponseField name="promptCapabilities" type={<a href="#promptcapabilities">PromptCapabilities</a>} >
-  Prompt capabilities supported by the agent.
-
-    - Default: `{"audio":false,"embeddedContext":false,"image":false}`
-
-</ResponseField>
 <ResponseField name="providers" type={<><span><a href="#providerscapabilities">ProvidersCapabilities</a></span><span> | null</span></>} >
   **UNSTABLE**
 
@@ -2207,9 +2178,13 @@ Provider configuration capabilities supported by the agent.
 By supplying `\{\}` it means that the agent supports provider configuration methods.
 
 </ResponseField>
-<ResponseField name="sessionCapabilities" type={<a href="#sessioncapabilities">SessionCapabilities</a>} >
+<ResponseField name="session" type={<><span><a href="#sessioncapabilities">SessionCapabilities</a></span><span> | null</span></>} >
+  Session capabilities supported by the agent.
 
-    - Default: `{}`
+Optional. Omitted or `null` both mean the agent does not support the
+`session/*` method surface. Supplying `\{\}` means the agent supports the
+baseline session methods: `session/new`, `session/prompt`,
+`session/cancel`, and `session/update`.
 
 </ResponseField>
 
@@ -2283,12 +2258,11 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="terminal" type={"boolean"} >
+<ResponseField name="terminal" type={<><span><a href="#terminalauthcapabilities">TerminalAuthCapabilities</a></span><span> | null</span></>} >
   Whether the client supports `terminal` authentication methods.
 
-When `true`, the agent may include `terminal` entries in its authentication methods.
-
-    - Default: `false`
+Optional. Omitted or `null` both mean the client does not advertise support.
+Supplying `\{\}` means the agent may include `terminal` entries in its authentication methods.
 
 </ResponseField>
 
@@ -2766,7 +2740,7 @@ Authentication capabilities supported by the client.
 Determines which authentication method types the agent may include
 in its `InitializeResponse`.
 
-    - Default: `{"terminal":false}`
+    - Default: `{}`
 
 </ResponseField>
 <ResponseField name="elicitation" type={<><span><a href="#elicitationcapabilities">ElicitationCapabilities</a></span><span> | null</span></>} >
@@ -3083,10 +3057,6 @@ A change in `messageId` indicates a new message has started.
 </ResponseField>
 
 ## <span class="font-mono">Cost</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Cost information for a session.
 
@@ -4060,9 +4030,15 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 
 </ResponseField>
 
-## <span class="font-mono">McpCapabilities</span>
+## <span class="font-mono">McpAcpCapabilities</span>
 
-MCP capabilities supported by the agent
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+Capabilities for ACP MCP server transports.
+
+Supplying `\{\}` means the agent supports ACP MCP server transports.
 
 **Type:** Object
 
@@ -4076,26 +4052,46 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="acp" type={"boolean"} >
+
+## <span class="font-mono">McpCapabilities</span>
+
+MCP capabilities supported by the agent for session lifecycle requests.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
+</ResponseField>
+<ResponseField name="acp" type={<><span><a href="#mcpacpcapabilities">McpAcpCapabilities</a></span><span> | null</span></>} >
   **UNSTABLE**
 
 This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Agent supports `McpServer::Acp`.
 
-    - Default: `false`
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports ACP MCP server transports.
 
 </ResponseField>
-<ResponseField name="http" type={"boolean"} >
+<ResponseField name="http" type={<><span><a href="#mcphttpcapabilities">McpHttpCapabilities</a></span><span> | null</span></>} >
   Agent supports `McpServer::Http`.
 
-    - Default: `false`
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports HTTP MCP server transports.
 
 </ResponseField>
-<ResponseField name="sse" type={"boolean"} >
-  Agent supports `McpServer::Sse`.
+<ResponseField name="stdio" type={<><span><a href="#mcpstdiocapabilities">McpStdioCapabilities</a></span><span> | null</span></>} >
+  Agent supports `McpServer::Stdio`.
 
-    - Default: `false`
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports stdio MCP server transports.
 
 </ResponseField>
 
@@ -4108,6 +4104,25 @@ This capability is not part of the spec yet, and may be removed or changed at an
 A unique identifier for an active MCP-over-ACP connection.
 
 **Type:** `string`
+
+## <span class="font-mono">McpHttpCapabilities</span>
+
+Capabilities for HTTP MCP server transports.
+
+Supplying `\{\}` means the agent supports HTTP MCP server transports.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
+</ResponseField>
 
 ## <span class="font-mono">McpServer</span>
 
@@ -4123,7 +4138,7 @@ See protocol docs: [MCP Servers](https://agentclientprotocol.com/protocol/v2/dra
 <ResponseField name="http" type="object">
 HTTP transport configuration
 
-Only available when the Agent capabilities indicate `mcp_capabilities.http` is `true`.
+Only available when the Agent capabilities include `session.mcp.http`.
 
 <Expandable title="Properties">
 
@@ -4151,37 +4166,6 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </Expandable>
 </ResponseField>
 
-<ResponseField name="sse" type="object">
-SSE transport configuration
-
-Only available when the Agent capabilities indicate `mcp_capabilities.sse` is `true`.
-
-<Expandable title="Properties">
-
-<ResponseField name="_meta" type={"object | null"} >
-  The _meta property is reserved by ACP to allow clients and agents to attach additional
-metadata to their interactions. Implementations MUST NOT make assumptions about values at
-these keys.
-
-See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
-
-</ResponseField>
-<ResponseField name="headers" type={<a href="#httpheader">HttpHeader[]</a>} required>
-  HTTP headers to set when making requests to the MCP server.
-</ResponseField>
-<ResponseField name="name" type={"string"} required>
-  Human-readable name identifying this MCP server.
-</ResponseField>
-<ResponseField name="type" type={"string"} required>
-  The discriminator value. Must be `"sse"`.
-</ResponseField>
-<ResponseField name="url" type={"string"} required>
-  URL to the MCP server.
-</ResponseField>
-
-</Expandable>
-</ResponseField>
-
 <ResponseField name="acp" type="object">
 **UNSTABLE**
 
@@ -4189,7 +4173,7 @@ This capability is not part of the spec yet, and may be removed or changed at an
 
 ACP transport configuration
 
-Only available when the Agent capabilities indicate `mcp_capabilities.acp` is `true`.
+Only available when the Agent capabilities include `session.mcp.acp`.
 The MCP server is provided by an ACP component and communicates over the ACP channel.
 
 <Expandable title="Properties">
@@ -4219,10 +4203,10 @@ on the same ACP connection.
 </Expandable>
 </ResponseField>
 
-<ResponseField name="stdio">
+<ResponseField name="stdio" type="object">
 Stdio transport configuration
 
-All Agents MUST support this transport.
+Only available when the Agent capabilities include `session.mcp.stdio`.
 
 <Expandable title="Properties">
 
@@ -4245,6 +4229,34 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
   Human-readable name identifying this MCP server.
+</ResponseField>
+<ResponseField name="type" type={"string"} required>
+  The discriminator value. Must be `"stdio"`.
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="other" type="object">
+Custom or future MCP server transport configuration.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+Receivers that do not understand this transport should preserve the raw
+payload when storing, replaying, proxying, or forwarding session setup
+data, and otherwise ignore it or reject the server configuration.
+
+<Expandable title="Properties">
+
+<ResponseField name="type" type={"string"} required>
+  Custom or future MCP server transport type.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
 </ResponseField>
 
 </Expandable>
@@ -4324,32 +4336,6 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
   URL to the MCP server.
 </ResponseField>
 
-## <span class="font-mono">McpServerSse</span>
-
-SSE transport configuration for MCP.
-
-**Type:** Object
-
-**Properties:**
-
-<ResponseField name="_meta" type={"object | null"} >
-  The _meta property is reserved by ACP to allow clients and agents to attach additional
-metadata to their interactions. Implementations MUST NOT make assumptions about values at
-these keys.
-
-See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
-
-</ResponseField>
-<ResponseField name="headers" type={<a href="#httpheader">HttpHeader[]</a>} required>
-  HTTP headers to set when making requests to the MCP server.
-</ResponseField>
-<ResponseField name="name" type={"string"} required>
-  Human-readable name identifying this MCP server.
-</ResponseField>
-<ResponseField name="url" type={"string"} required>
-  URL to the MCP server.
-</ResponseField>
-
 ## <span class="font-mono">McpServerStdio</span>
 
 Stdio transport configuration for MCP.
@@ -4377,6 +4363,25 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
   Human-readable name identifying this MCP server.
+</ResponseField>
+
+## <span class="font-mono">McpStdioCapabilities</span>
+
+Capabilities for stdio MCP server transports.
+
+Supplying `\{\}` means the agent supports stdio MCP server transports.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
 </ResponseField>
 
 ## <span class="font-mono">MessageId</span>
@@ -4471,6 +4476,9 @@ Schema for multi-select (array) properties in an elicitation form.
 ## <span class="font-mono">NesCapabilities</span>
 
 NES capabilities advertised by the agent during initialization.
+
+Supplying `\{\}` means the agent supports the NES method surface. Omitted or
+`null` both mean the agent does not advertise support for `nes/*` methods.
 
 **Type:** Object
 
@@ -5861,6 +5869,25 @@ Follows the same conventions as LSP 3.17. The default is UTF-16.
   Character offsets count UTF-8 code units (bytes).
 </ResponseField>
 
+## <span class="font-mono">PromptAudioCapabilities</span>
+
+Capabilities for audio content in prompt requests.
+
+Supplying `\{\}` means the agent supports audio content in prompts.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
+</ResponseField>
+
 ## <span class="font-mono">PromptCapabilities</span>
 
 Prompt capabilities supported by the agent in `session/prompt` requests.
@@ -5888,25 +5915,66 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="audio" type={"boolean"} >
+<ResponseField name="audio" type={<><span><a href="#promptaudiocapabilities">PromptAudioCapabilities</a></span><span> | null</span></>} >
   Agent supports `ContentBlock::Audio`.
 
-    - Default: `false`
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports audio content in prompts.
 
 </ResponseField>
-<ResponseField name="embeddedContext" type={"boolean"} >
+<ResponseField name="embeddedContext" type={<><span><a href="#promptembeddedcontextcapabilities">PromptEmbeddedContextCapabilities</a></span><span> | null</span></>} >
   Agent supports embedded context in `session/prompt` requests.
 
 When enabled, the Client is allowed to include `ContentBlock::Resource`
 in prompt requests for pieces of context that are referenced in the message.
 
-    - Default: `false`
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports embedded context in prompts.
 
 </ResponseField>
-<ResponseField name="image" type={"boolean"} >
+<ResponseField name="image" type={<><span><a href="#promptimagecapabilities">PromptImageCapabilities</a></span><span> | null</span></>} >
   Agent supports `ContentBlock::Image`.
 
-    - Default: `false`
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports image content in prompts.
+
+</ResponseField>
+
+## <span class="font-mono">PromptEmbeddedContextCapabilities</span>
+
+Capabilities for embedded context in prompt requests.
+
+Supplying `\{\}` means the agent supports embedded context in prompts.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
+</ResponseField>
+
+## <span class="font-mono">PromptImageCapabilities</span>
+
+Capabilities for image content in prompt requests.
+
+Supplying `\{\}` means the agent supports image content in prompts.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
 
@@ -6189,11 +6257,12 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 
 Session capabilities supported by the agent.
 
-As a baseline, all Agents **MUST** support `session/new`, `session/prompt`, `session/cancel`, and `session/update`.
+Supplying `\{\}` means the agent supports the baseline session methods:
+`session/new`, `session/prompt`, `session/cancel`, and `session/update`.
 
-Optionally, they **MAY** support other session methods and notifications by specifying additional capabilities.
-
-Note: `session/load` is still handled by the top-level `load_session` capability. This will be unified in future versions of the protocol.
+Agents that support sessions **MAY** support additional session methods,
+prompt content types, and MCP transports by specifying additional
+capabilities.
 
 See protocol docs: [Session Capabilities](https://agentclientprotocol.com/protocol/v2/draft/initialization#session-capabilities)
 
@@ -6221,11 +6290,7 @@ additional-root list associated with a listed session.
   Whether the agent supports `session/close`.
 </ResponseField>
 <ResponseField name="delete" type={<><span><a href="#sessiondeletecapabilities">SessionDeleteCapabilities</a></span><span> | null</span></>} >
-  **UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
-Whether the agent supports `session/delete`.
+  Whether the agent supports `session/delete`.
 
 Optional. Omitted or `null` both mean the agent does not advertise support.
 Supplying `\{\}` means the agent supports deleting sessions from `session/list`.
@@ -6241,6 +6306,28 @@ Whether the agent supports `session/fork`.
 </ResponseField>
 <ResponseField name="list" type={<><span><a href="#sessionlistcapabilities">SessionListCapabilities</a></span><span> | null</span></>} >
   Whether the agent supports `session/list`.
+</ResponseField>
+<ResponseField name="load" type={<><span><a href="#sessionloadcapabilities">SessionLoadCapabilities</a></span><span> | null</span></>} >
+  Whether the agent supports `session/load`.
+
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports loading sessions.
+
+</ResponseField>
+<ResponseField name="mcp" type={<><span><a href="#mcpcapabilities">McpCapabilities</a></span><span> | null</span></>} >
+  MCP capabilities supported by the agent for session lifecycle requests.
+
+Optional. Omitted or `null` both mean the agent does not advertise MCP
+server transport support for sessions.
+
+</ResponseField>
+<ResponseField name="prompt" type={<><span><a href="#promptcapabilities">PromptCapabilities</a></span><span> | null</span></>} >
+  Prompt capabilities supported by the agent in `session/prompt` requests.
+
+Optional. Omitted or `null` both mean the agent does not advertise any
+prompt extensions beyond the baseline text and resource-link content
+required by `session/prompt`.
+
 </ResponseField>
 <ResponseField name="resume" type={<><span><a href="#sessionresumecapabilities">SessionResumeCapabilities</a></span><span> | null</span></>} >
   Whether the agent supports `session/resume`.
@@ -6526,10 +6613,6 @@ Unique identifier for a session configuration option value.
 
 ## <span class="font-mono">SessionDeleteCapabilities</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 Capabilities for the `session/delete` method.
 
 Supplying `\{\}` means the agent supports deleting sessions from `session/list`.
@@ -6649,6 +6732,25 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 Capabilities for the `session/list` method.
 
 By supplying `\{\}` it means that the agent supports listing of sessions.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
+</ResponseField>
+
+## <span class="font-mono">SessionLoadCapabilities</span>
+
+Capabilities for the `session/load` method.
+
+Supplying `\{\}` means the agent supports loading sessions.
 
 **Type:** Object
 
@@ -6996,10 +7098,6 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 
 <ResponseField name="usage_update" type="object">
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 Context window and cost update for the session.
 
 <Expandable title="Properties">
@@ -7178,6 +7276,29 @@ with `"type": "string"`.
 </ResponseField>
 <ResponseField name="title" type={"string | null"} >
   Optional title for the property.
+</ResponseField>
+
+## <span class="font-mono">TerminalAuthCapabilities</span>
+
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+Capabilities for terminal authentication methods.
+
+Supplying `\{\}` means the client supports terminal authentication methods.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
 </ResponseField>
 
 ## <span class="font-mono">TextContent</span>
@@ -7696,10 +7817,6 @@ Token usage information for a prompt turn.
 </ResponseField>
 
 ## <span class="font-mono">UsageUpdate</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Context window and cost update for a session.
 

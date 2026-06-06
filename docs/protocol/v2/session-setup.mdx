@@ -58,6 +58,7 @@ Clients create a new session by calling the `session/new` method with:
     "cwd": "/home/user/project",
     "mcpServers": [
       {
+        "type": "stdio",
         "name": "workspace-tools",
         "command": "/path/to/mcp-server",
         "args": ["--stdio"],
@@ -82,11 +83,11 @@ The Agent **MUST** respond with a unique [Session ID](#session-id) that identifi
 
 ## Loading Sessions
 
-Agents that support the `loadSession` capability allow Clients to resume previous conversations. This feature enables persistence across restarts and sharing sessions between different Client instances.
+Agents that support the `session.load` capability allow Clients to resume previous conversations. This feature enables persistence across restarts and sharing sessions between different Client instances.
 
 ### Checking Support
 
-Before attempting to load a session, Clients **MUST** verify that the Agent supports this capability by checking the `loadSession` field in the `initialize` response:
+Before attempting to load a session, Clients **MUST** verify that the Agent supports this capability by checking the `session.load` field in the `initialize` response:
 
 ```json highlight={7}
 {
@@ -94,14 +95,16 @@ Before attempting to load a session, Clients **MUST** verify that the Agent supp
   "id": 0,
   "result": {
     "protocolVersion": 2,
-    "agentCapabilities": {
-      "loadSession": true
+    "capabilities": {
+      "session": {
+        "load": {}
+      }
     }
   }
 }
 ```
 
-If `loadSession` is `false` or not present, the Agent does not support loading sessions and Clients **MUST NOT** attempt to call `session/load`.
+If `session.load` is omitted or `null`, the Agent does not support loading sessions and Clients **MUST NOT** attempt to call `session/load`.
 
 ### Loading a Session
 
@@ -121,6 +124,7 @@ To load an existing session, Clients **MUST** call the `session/load` method wit
     "cwd": "/home/user/project",
     "mcpServers": [
       {
+        "type": "stdio",
         "name": "workspace-tools",
         "command": "/path/to/mcp-server",
         "args": ["--mode", "workspace"],
@@ -143,6 +147,7 @@ For example, a user message from the conversation history:
     "sessionId": "sess_789xyz",
     "update": {
       "sessionUpdate": "user_message_chunk",
+      "messageId": "msg_user_8f7a1",
       "content": {
         "type": "text",
         "text": "What's the capital of France?"
@@ -162,6 +167,7 @@ Followed by the agent's response:
     "sessionId": "sess_789xyz",
     "update": {
       "sessionUpdate": "agent_message_chunk",
+      "messageId": "msg_agent_c42b9",
       "content": {
         "type": "text",
         "text": "The capital of France is Paris."
@@ -170,6 +176,8 @@ Followed by the agent's response:
   }
 }
 ```
+
+During replay, the Agent **MUST** include an opaque, unique `messageId` for each replayed message.
 
 When **all** the conversation entries have been streamed to the Client, the Agent **MUST** respond to the original `session/load` request.
 
@@ -185,11 +193,11 @@ The Client can then continue sending prompts as if the session was never interru
 
 ## Resuming Sessions
 
-Agents that advertise `sessionCapabilities.resume` allow Clients to reconnect to an existing session without replaying the conversation history.
+Agents that advertise `session.resume` allow Clients to reconnect to an existing session without replaying the conversation history.
 
 ### Checking Support
 
-Before attempting to resume a session, Clients **MUST** verify that the Agent supports this capability by checking for the `sessionCapabilities.resume` field in the `initialize` response:
+Before attempting to resume a session, Clients **MUST** verify that the Agent supports this capability by checking for the `session.resume` field in the `initialize` response:
 
 ```json highlight={7-9}
 {
@@ -197,8 +205,8 @@ Before attempting to resume a session, Clients **MUST** verify that the Agent su
   "id": 0,
   "result": {
     "protocolVersion": 2,
-    "agentCapabilities": {
-      "sessionCapabilities": {
+    "capabilities": {
+      "session": {
         "resume": {}
       }
     }
@@ -206,7 +214,7 @@ Before attempting to resume a session, Clients **MUST** verify that the Agent su
 }
 ```
 
-If `sessionCapabilities.resume` is not present, the Agent does not support resuming sessions and Clients **MUST NOT** attempt to call `session/resume`.
+If `session.resume` is not present, the Agent does not support resuming sessions and Clients **MUST NOT** attempt to call `session/resume`.
 
 ### Resuming a Session
 
@@ -226,6 +234,7 @@ To resume an existing session without replaying prior messages, Clients **MUST**
     "cwd": "/home/user/project",
     "mcpServers": [
       {
+        "type": "stdio",
         "name": "workspace-tools",
         "command": "/path/to/mcp-server",
         "args": ["--mode", "workspace"],
@@ -251,11 +260,11 @@ feature is supported by the Agent.
 
 ## Closing Active Sessions
 
-Agents that advertise `sessionCapabilities.close` allow Clients to tell the Agent to cancel any ongoing work for a session and free any resources associated with that active session.
+Agents that advertise `session.close` allow Clients to tell the Agent to cancel any ongoing work for a session and free any resources associated with that active session.
 
 ### Checking Support
 
-Before attempting to close a session, Clients **MUST** verify that the Agent supports this capability by checking the `sessionCapabilities.close` field in the `initialize` response:
+Before attempting to close a session, Clients **MUST** verify that the Agent supports this capability by checking the `session.close` field in the `initialize` response:
 
 ```json highlight={7-9}
 {
@@ -263,8 +272,8 @@ Before attempting to close a session, Clients **MUST** verify that the Agent sup
   "id": 0,
   "result": {
     "protocolVersion": 2,
-    "agentCapabilities": {
-      "sessionCapabilities": {
+    "capabilities": {
+      "session": {
         "close": {}
       }
     }
@@ -272,7 +281,7 @@ Before attempting to close a session, Clients **MUST** verify that the Agent sup
 }
 ```
 
-If `sessionCapabilities.close` is not present, the Agent does not support closing sessions and Clients **MUST NOT** attempt to call `session/close`.
+If `session.close` is not present, the Agent does not support closing sessions and Clients **MUST NOT** attempt to call `session/close`.
 
 ### Closing a Session
 
@@ -309,7 +318,7 @@ Agents MAY return an error if the session does not exist or is not currently act
 
 ## Additional Workspace Roots
 
-Agents that advertise `sessionCapabilities.additionalDirectories` allow Clients
+Agents that advertise `session.additionalDirectories` allow Clients
 to include `additionalDirectories` on supported session lifecycle requests to
 expand the session's effective workspace root set. Supported stable lifecycle
 requests include `session/new`, `session/load`, and `session/resume`.
@@ -338,7 +347,7 @@ When present, `additionalDirectories` has the following behavior:
 - omitting the field or providing an empty array activates no additional roots for the resulting session
 - on `session/load` and `session/resume`, Clients must send the full intended additional-root list again; that list may differ from any previous or reported list as long as the request `cwd` matches the session's `cwd`, and omitting the field or providing an empty array does not restore stored roots implicitly
 
-Clients **MUST** only send `additionalDirectories` when the Agent advertises `sessionCapabilities.additionalDirectories`.
+Clients **MUST** only send `additionalDirectories` when the Agent advertises `session.additionalDirectories`.
 
 ## Session ID
 
@@ -348,9 +357,9 @@ Clients use this ID to:
 
 - Send prompt requests via `session/prompt`
 - Cancel ongoing operations via `session/cancel`
-- Load previous sessions via `session/load` (if the Agent supports the `loadSession` capability)
-- Resume previous sessions via `session/resume` (if the Agent supports the `sessionCapabilities.resume` capability)
-- Close active sessions via `session/close` (if the Agent supports the `sessionCapabilities.close` capability)
+- Load previous sessions via `session/load` (if the Agent supports the `session.load` capability)
+- Resume previous sessions via `session/resume` (if the Agent supports the `session.resume` capability)
+- Close active sessions via `session/close` (if the Agent supports the `session.close` capability)
 
 ## Working Directory
 
@@ -361,21 +370,25 @@ The `cwd` (current working directory) parameter establishes the primary file sys
 - **MUST** remain the base for relative-path resolution
 - **MUST** be part of the session's effective root set
 
-When `sessionCapabilities.additionalDirectories` is in use, the session's effective root set is `[cwd, ...additionalDirectories]`. This root set **SHOULD** serve as a boundary for tool operations on the file system.
+When `session.additionalDirectories` is in use, the session's effective root set is `[cwd, ...additionalDirectories]`. This root set **SHOULD** serve as a boundary for tool operations on the file system.
 
 ## MCP Servers
 
 The [Model Context Protocol (MCP)](https://modelcontextprotocol.io) allows Agents to access external tools and data sources. When creating a session, Clients **MAY** include connection details for MCP servers that the Agent should connect to.
 
-MCP servers can be connected to using different transports. All Agents **MUST** support the stdio transport, while HTTP and SSE transports are optional capabilities that can be checked during initialization.
-
-While they are not required to by the spec, new Agents **SHOULD** support the HTTP transport to ensure compatibility with modern MCP servers.
+MCP servers can be connected to using different transports. Agents advertise supported transports during initialization using `session.mcp.stdio`, `session.mcp.http`, and any extension-specific transport capabilities.
 
 ### Transport Types
 
+Every MCP server object has a `type` discriminator that identifies its transport. Custom implementation-specific transport types **MUST** begin with `_`; unknown non-underscore transport types are reserved for future ACP variants.
+
 #### Stdio Transport
 
-All Agents **MUST** support connecting to MCP servers via stdio (standard input/output). This is the default transport mechanism.
+When the Agent supports `session.mcp.stdio`, Clients can specify MCP servers configurations using the stdio transport.
+
+<ParamField path="type" type="string" required>
+  Must be `"stdio"` to indicate stdio transport
+</ParamField>
 
 <ParamField path="name" type="string" required>
   A human-readable identifier for the server
@@ -406,6 +419,7 @@ Example stdio transport configuration:
 
 ```json
 {
+  "type": "stdio",
   "name": "workspace-tools",
   "command": "/path/to/mcp-server",
   "args": ["--stdio"],
@@ -420,7 +434,7 @@ Example stdio transport configuration:
 
 #### HTTP Transport
 
-When the Agent supports `mcpCapabilities.http`, Clients can specify MCP servers configurations using the HTTP transport.
+When the Agent supports `session.mcp.http`, Clients can specify MCP servers configurations using the HTTP transport.
 
 <ParamField path="type" type="string" required>
   Must be `"http"` to indicate HTTP transport
@@ -467,56 +481,9 @@ Example HTTP transport configuration:
 }
 ```
 
-#### SSE Transport
-
-When the Agent supports `mcpCapabilities.sse`, Clients can specify MCP servers configurations using the SSE transport.
-
-<Warning>This transport was deprecated by the MCP spec.</Warning>
-
-<ParamField path="type" type="string" required>
-  Must be `"sse"` to indicate SSE transport
-</ParamField>
-
-<ParamField path="name" type="string" required>
-  A human-readable identifier for the server
-</ParamField>
-
-<ParamField path="url" type="string" required>
-  The URL of the SSE endpoint
-</ParamField>
-
-<ParamField path="headers" type="HttpHeader[]" required>
-  HTTP headers to include when establishing the SSE connection
-
-  <Expandable title="HttpHeader">
-      <ParamField path="name" type="string">
-        The name of the HTTP header.
-      </ParamField>
-      <ParamField path="value" type="string">
-        The value to set for the HTTP header.
-      </ParamField>
-  </Expandable>
-</ParamField>
-
-Example SSE transport configuration:
-
-```json
-{
-  "type": "sse",
-  "name": "event-stream",
-  "url": "https://events.example.com/mcp",
-  "headers": [
-    {
-      "name": "X-API-Key",
-      "value": "apikey456"
-    }
-  ]
-}
-```
-
 ### Checking Transport Support
 
-Before using HTTP or SSE transports, Clients **MUST** verify the Agent's capabilities during initialization:
+Before using stdio or HTTP transports, Clients **MUST** verify the Agent's capabilities during initialization:
 
 ```json highlight={7-10}
 {
@@ -524,18 +491,21 @@ Before using HTTP or SSE transports, Clients **MUST** verify the Agent's capabil
   "id": 0,
   "result": {
     "protocolVersion": 2,
-    "agentCapabilities": {
-      "mcpCapabilities": {
-        "http": true,
-        "sse": true
+    "capabilities": {
+      "session": {
+        "mcp": {
+          "stdio": {},
+          "http": {}
+        }
       }
     }
   }
 }
 ```
 
-If `mcpCapabilities.http` is `false` or not present, the Agent does not support HTTP transport.
-If `mcpCapabilities.sse` is `false` or not present, the Agent does not support SSE transport.
+If `session.mcp.stdio` is omitted or `null`, the Agent does not support stdio transport.
+If `session.mcp.http` is omitted or `null`, the Agent does not support HTTP transport.
+Supplying `{}` means the Agent supports the corresponding transport.
 
 Agents **SHOULD** connect to all MCP servers specified by the Client.
 

@@ -128,12 +128,7 @@ pub enum SessionUpdate {
     ConfigOptionUpdate(ConfigOptionUpdate),
     /// Session metadata has been updated (title, timestamps, custom metadata)
     SessionInfoUpdate(SessionInfoUpdate),
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// Context window and cost update for the session.
-    #[cfg(feature = "unstable_session_usage")]
     UsageUpdate(UsageUpdate),
 }
 
@@ -274,12 +269,7 @@ impl SessionInfoUpdate {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Context window and cost update for a session.
-#[cfg(feature = "unstable_session_usage")]
 #[serde_as]
 #[skip_serializing_none]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -304,7 +294,6 @@ pub struct UsageUpdate {
     pub meta: Option<Meta>,
 }
 
-#[cfg(feature = "unstable_session_usage")]
 impl UsageUpdate {
     #[must_use]
     pub fn new(used: u64, size: u64) -> Self {
@@ -335,12 +324,7 @@ impl UsageUpdate {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Cost information for a session.
-#[cfg(feature = "unstable_session_usage")]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -351,7 +335,6 @@ pub struct Cost {
     pub currency: String,
 }
 
-#[cfg(feature = "unstable_session_usage")]
 impl Cost {
     #[must_use]
     pub fn new(amount: f64, currency: impl Into<String>) -> Self {
@@ -370,15 +353,10 @@ impl Cost {
 pub struct ContentChunk {
     /// A single item of content
     pub content: ContentBlock,
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// A unique identifier for the message this chunk belongs to.
     ///
     /// All chunks belonging to the same message share the same `messageId`.
     /// A change in `messageId` indicates a new message has started.
-    #[cfg(feature = "unstable_message_id")]
     pub message_id: Option<MessageId>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
@@ -394,21 +372,15 @@ impl ContentChunk {
     pub fn new(content: ContentBlock) -> Self {
         Self {
             content,
-            #[cfg(feature = "unstable_message_id")]
             message_id: None,
             meta: None,
         }
     }
 
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// A unique identifier for the message this chunk belongs to.
     ///
     /// All chunks belonging to the same message share the same `messageId`.
     /// A change in `messageId` indicates a new message has started.
-    #[cfg(feature = "unstable_message_id")]
     #[must_use]
     pub fn message_id(mut self, message_id: impl IntoOption<MessageId>) -> Self {
         self.message_id = message_id.into_option();
@@ -428,14 +400,12 @@ impl ContentChunk {
 }
 
 /// Unique identifier for a message within a session.
-#[cfg(feature = "unstable_message_id")]
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq, Hash, Display, From)]
 #[serde(transparent)]
 #[from(Arc<str>, String, &'static str)]
 #[non_exhaustive]
 pub struct MessageId(pub Arc<str>);
 
-#[cfg(feature = "unstable_message_id")]
 impl MessageId {
     #[must_use]
     pub fn new(id: impl Into<Arc<str>>) -> Self {
@@ -443,7 +413,6 @@ impl MessageId {
     }
 }
 
-#[cfg(feature = "unstable_message_id")]
 impl IntoOption<MessageId> for &str {
     fn into_option(self) -> Option<MessageId> {
         Some(MessageId::new(self))
@@ -1579,7 +1548,7 @@ pub struct ClientCapabilities {
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
-    pub plan_capabilities: Option<PlanCapabilities>,
+    pub plan: Option<PlanCapabilities>,
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
@@ -1662,11 +1631,8 @@ impl ClientCapabilities {
     /// Supplying `{}` means the client can receive both update types.
     #[cfg(feature = "unstable_plan_operations")]
     #[must_use]
-    pub fn plan_capabilities(
-        mut self,
-        plan_capabilities: impl IntoOption<PlanCapabilities>,
-    ) -> Self {
-        self.plan_capabilities = plan_capabilities.into_option();
+    pub fn plan(mut self, plan: impl IntoOption<PlanCapabilities>) -> Self {
+        self.plan = plan.into_option();
         self
     }
 
@@ -2238,6 +2204,100 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_content_chunk_message_id_serialization() {
+        use serde_json::json;
+
+        assert_eq!(
+            serde_json::to_value(SessionUpdate::AgentMessageChunk(ContentChunk::new(
+                ContentBlock::Text(crate::TextContent::new("Hello"))
+            )))
+            .unwrap(),
+            json!({
+                "sessionUpdate": "agent_message_chunk",
+                "content": {
+                    "type": "text",
+                    "text": "Hello"
+                }
+            })
+        );
+
+        assert_eq!(
+            serde_json::to_value(SessionUpdate::AgentMessageChunk(
+                ContentChunk::new(ContentBlock::Text(crate::TextContent::new("Hello")))
+                    .message_id("msg_agent_c42b9")
+            ))
+            .unwrap(),
+            json!({
+                "sessionUpdate": "agent_message_chunk",
+                "messageId": "msg_agent_c42b9",
+                "content": {
+                    "type": "text",
+                    "text": "Hello"
+                }
+            })
+        );
+
+        let SessionUpdate::AgentMessageChunk(chunk) = serde_json::from_value(json!({
+            "sessionUpdate": "agent_message_chunk",
+            "messageId": null,
+            "content": {
+                "type": "text",
+                "text": "Hello"
+            }
+        }))
+        .unwrap() else {
+            panic!("expected agent message chunk");
+        };
+
+        assert_eq!(chunk.message_id, None);
+    }
+
+    #[test]
+    fn test_usage_update_serialization() {
+        use serde_json::json;
+
+        assert_eq!(
+            serde_json::to_value(SessionUpdate::UsageUpdate(UsageUpdate::new(
+                53_000, 200_000
+            )))
+            .unwrap(),
+            json!({
+                "sessionUpdate": "usage_update",
+                "used": 53000,
+                "size": 200_000
+            })
+        );
+
+        assert_eq!(
+            serde_json::to_value(SessionUpdate::UsageUpdate(
+                UsageUpdate::new(53_000, 200_000).cost(Cost::new(0.045, "USD"))
+            ))
+            .unwrap(),
+            json!({
+                "sessionUpdate": "usage_update",
+                "used": 53000,
+                "size": 200_000,
+                "cost": {
+                    "amount": 0.045,
+                    "currency": "USD"
+                }
+            })
+        );
+
+        let SessionUpdate::UsageUpdate(update) = serde_json::from_value(json!({
+            "sessionUpdate": "usage_update",
+            "used": 53000,
+            "size": 200_000,
+            "cost": null
+        }))
+        .unwrap() else {
+            panic!("expected usage update");
+        };
+
+        assert_eq!(update.cost, None);
+    }
+
     #[cfg(feature = "unstable_nes")]
     #[test]
     fn test_client_capabilities_position_encodings_serialization() {
@@ -2293,14 +2353,14 @@ mod tests {
             })
         );
 
-        let capabilities = ClientCapabilities::new().plan_capabilities(PlanCapabilities::new());
+        let capabilities = ClientCapabilities::new().plan(PlanCapabilities::new());
         let json = serde_json::to_value(&capabilities).unwrap();
-        assert_eq!(json["planCapabilities"], json!({}));
+        assert_eq!(json["plan"], json!({}));
 
         assert_eq!(
-            serde_json::from_value::<ClientCapabilities>(json!({ "planCapabilities": null }))
+            serde_json::from_value::<ClientCapabilities>(json!({ "plan": null }))
                 .unwrap()
-                .plan_capabilities,
+                .plan,
             None
         );
     }

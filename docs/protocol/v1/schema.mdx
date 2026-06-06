@@ -297,6 +297,52 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/e
 
 </ResponseField>
 
+<a id="session-delete"></a>
+### <span class="font-mono">session/delete</span>
+
+Deletes an existing session from `session/list`.
+
+This method is only available if the agent advertises the `sessionCapabilities.delete` capability.
+
+#### <span class="font-mono">DeleteSessionRequest</span>
+
+Request parameters for deleting an existing session from `session/list`.
+
+Only available if the Agent supports the `sessionCapabilities.delete` capability.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/extensibility)
+
+</ResponseField>
+<ResponseField name="sessionId" type={<a href="#sessionid">SessionId</a>} required>
+  The ID of the session to delete.
+</ResponseField>
+
+#### <span class="font-mono">DeleteSessionResponse</span>
+
+Response from deleting a session.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/extensibility)
+
+</ResponseField>
+
 <a id="session-list"></a>
 ### <span class="font-mono">session/list</span>
 
@@ -1861,6 +1907,28 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/e
 <ResponseField name="content" type={<a href="#contentblock">ContentBlock</a>} required>
   A single item of content
 </ResponseField>
+<ResponseField name="messageId" type={<><span><a href="#messageid">MessageId</a></span><span> | null</span></>} >
+  A unique identifier for the message this chunk belongs to.
+
+All chunks belonging to the same message share the same `messageId`.
+A change in `messageId` indicates a new message has started.
+
+</ResponseField>
+
+## <span class="font-mono">Cost</span>
+
+Cost information for a session.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="amount" type={"number"} required>
+  Total cumulative cost for session.
+</ResponseField>
+<ResponseField name="currency" type={"string"} required>
+  ISO 4217 currency code (e.g., "USD", "EUR").
+</ResponseField>
 
 ## <span class="font-mono">CurrentModeUpdate</span>
 
@@ -2451,6 +2519,12 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/e
   Human-readable name identifying this MCP server.
 </ResponseField>
 
+## <span class="font-mono">MessageId</span>
+
+Unique identifier for a message within a session.
+
+**Type:** `string`
+
 ## <span class="font-mono">PermissionOption</span>
 
 An option presented to the user when requesting permission.
@@ -2866,6 +2940,13 @@ additional-root list associated with a listed session.
 <ResponseField name="close" type={<><span><a href="#sessionclosecapabilities">SessionCloseCapabilities</a></span><span> | null</span></>} >
   Whether the agent supports `session/close`.
 </ResponseField>
+<ResponseField name="delete" type={<><span><a href="#sessiondeletecapabilities">SessionDeleteCapabilities</a></span><span> | null</span></>} >
+  Whether the agent supports `session/delete`.
+
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports deleting sessions from `session/list`.
+
+</ResponseField>
 <ResponseField name="list" type={<><span><a href="#sessionlistcapabilities">SessionListCapabilities</a></span><span> | null</span></>} >
   Whether the agent supports `session/list`.
 </ResponseField>
@@ -3056,6 +3137,25 @@ Possible values for a session configuration option.
 Unique identifier for a session configuration option value.
 
 **Type:** `string`
+
+## <span class="font-mono">SessionDeleteCapabilities</span>
+
+Capabilities for the `session/delete` method.
+
+Supplying `\{\}` means the agent supports deleting sessions from `session/list`.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/extensibility)
+
+</ResponseField>
 
 ## <span class="font-mono">SessionId</span>
 
@@ -3249,6 +3349,13 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/e
 <ResponseField name="content" type={<a href="#contentblock">ContentBlock</a>} required>
   A single item of content
 </ResponseField>
+<ResponseField name="messageId" type={<><span><a href="#messageid">MessageId</a></span><span> | null</span></>} >
+  A unique identifier for the message this chunk belongs to.
+
+All chunks belonging to the same message share the same `messageId`.
+A change in `messageId` indicates a new message has started.
+
+</ResponseField>
 <ResponseField name="sessionUpdate" type={"string"} required>
   The discriminator value. Must be `"user_message_chunk"`.
 </ResponseField>
@@ -3272,6 +3379,13 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/e
 <ResponseField name="content" type={<a href="#contentblock">ContentBlock</a>} required>
   A single item of content
 </ResponseField>
+<ResponseField name="messageId" type={<><span><a href="#messageid">MessageId</a></span><span> | null</span></>} >
+  A unique identifier for the message this chunk belongs to.
+
+All chunks belonging to the same message share the same `messageId`.
+A change in `messageId` indicates a new message has started.
+
+</ResponseField>
 <ResponseField name="sessionUpdate" type={"string"} required>
   The discriminator value. Must be `"agent_message_chunk"`.
 </ResponseField>
@@ -3294,6 +3408,13 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/e
 </ResponseField>
 <ResponseField name="content" type={<a href="#contentblock">ContentBlock</a>} required>
   A single item of content
+</ResponseField>
+<ResponseField name="messageId" type={<><span><a href="#messageid">MessageId</a></span><span> | null</span></>} >
+  A unique identifier for the message this chunk belongs to.
+
+All chunks belonging to the same message share the same `messageId`.
+A change in `messageId` indicates a new message has started.
+
 </ResponseField>
 <ResponseField name="sessionUpdate" type={"string"} required>
   The discriminator value. Must be `"agent_thought_chunk"`.
@@ -3512,6 +3633,41 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/e
 </ResponseField>
 <ResponseField name="updatedAt" type={"string | null"} >
   ISO 8601 timestamp of last activity. Set to null to clear.
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="usage_update" type="object">
+Context window and cost update for the session.
+
+<Expandable title="Properties">
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/extensibility)
+
+</ResponseField>
+<ResponseField name="cost" type={<><span><a href="#cost">Cost</a></span><span> | null</span></>} >
+  Cumulative session cost (optional).
+</ResponseField>
+<ResponseField name="sessionUpdate" type={"string"} required>
+  The discriminator value. Must be `"usage_update"`.
+</ResponseField>
+<ResponseField name="size" type={"uint64"} required>
+  Total context window size in tokens.
+
+    - Minimum: `0`
+
+</ResponseField>
+<ResponseField name="used" type={"uint64"} required>
+  Tokens currently in context.
+
+    - Minimum: `0`
+
 </ResponseField>
 
 </Expandable>
@@ -3963,4 +4119,36 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/e
 </ResponseField>
 <ResponseField name="hint" type={"string"} required>
   A hint to display when the input hasn't been provided yet
+</ResponseField>
+
+## <span class="font-mono">UsageUpdate</span>
+
+Context window and cost update for a session.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/extensibility)
+
+</ResponseField>
+<ResponseField name="cost" type={<><span><a href="#cost">Cost</a></span><span> | null</span></>} >
+  Cumulative session cost (optional).
+</ResponseField>
+<ResponseField name="size" type={"uint64"} required>
+  Total context window size in tokens.
+
+    - Minimum: `0`
+
+</ResponseField>
+<ResponseField name="used" type={"uint64"} required>
+  Tokens currently in context.
+
+    - Minimum: `0`
+
 </ResponseField>
