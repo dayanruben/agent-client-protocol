@@ -67,7 +67,7 @@ jobs:
         run: npm run format:check
 
       - name: Check for typos
-        uses: crate-ci/typos@f8a58b6b53f2279f71eb605f03a4ae4d10608f45
+        uses: crate-ci/typos@37bb98842b0d8c4ffebdb75301a13db0267cef89
         with:
           config: ./typos.toml
 
@@ -146,7 +146,7 @@ jobs:
           toolchain: stable
 
       - name: Install cargo-hack
-        uses: taiki-e/install-action@6887963ccf37a9ddcd8c5fa4baeb3e1e5fd61fa1
+        uses: taiki-e/install-action@0631aa6515c7d545823c67cfae7ef4fc7f490154
         with:
           tool: cargo-hack
 
