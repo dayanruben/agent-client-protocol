@@ -1275,10 +1275,15 @@ impl IntoV1 for super::Cost {
     type Output = crate::v1::Cost;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { amount, currency } = self;
+        let Self {
+            amount,
+            currency,
+            meta,
+        } = self;
         Ok(crate::v1::Cost {
             amount: amount.into_v1()?,
             currency: currency.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -1287,10 +1292,15 @@ impl IntoV2 for crate::v1::Cost {
     type Output = super::Cost;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { amount, currency } = self;
+        let Self {
+            amount,
+            currency,
+            meta,
+        } = self;
         Ok(super::Cost {
             amount: amount.into_v2()?,
             currency: currency.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -4389,6 +4399,7 @@ impl IntoV1 for super::Usage {
             thought_tokens,
             cached_read_tokens,
             cached_write_tokens,
+            meta,
         } = self;
         Ok(crate::v1::Usage {
             total_tokens: total_tokens.into_v1()?,
@@ -4397,6 +4408,7 @@ impl IntoV1 for super::Usage {
             thought_tokens: thought_tokens.into_v1()?,
             cached_read_tokens: cached_read_tokens.into_v1()?,
             cached_write_tokens: cached_write_tokens.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -4413,6 +4425,7 @@ impl IntoV2 for crate::v1::Usage {
             thought_tokens,
             cached_read_tokens,
             cached_write_tokens,
+            meta,
         } = self;
         Ok(super::Usage {
             total_tokens: total_tokens.into_v2()?,
@@ -4421,6 +4434,7 @@ impl IntoV2 for crate::v1::Usage {
             thought_tokens: thought_tokens.into_v2()?,
             cached_read_tokens: cached_read_tokens.into_v2()?,
             cached_write_tokens: cached_write_tokens.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -4462,10 +4476,15 @@ impl IntoV1 for super::ProviderCurrentConfig {
     type Output = crate::v1::ProviderCurrentConfig;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { api_type, base_url } = self;
+        let Self {
+            api_type,
+            base_url,
+            meta,
+        } = self;
         Ok(crate::v1::ProviderCurrentConfig {
             api_type: api_type.into_v1()?,
             base_url: base_url.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -4475,10 +4494,15 @@ impl IntoV2 for crate::v1::ProviderCurrentConfig {
     type Output = super::ProviderCurrentConfig;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { api_type, base_url } = self;
+        let Self {
+            api_type,
+            base_url,
+            meta,
+        } = self;
         Ok(super::ProviderCurrentConfig {
             api_type: api_type.into_v2()?,
             base_url: base_url.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -5199,7 +5223,7 @@ impl IntoV2 for crate::v1::ClientRequest {
             }
             #[cfg(feature = "unstable_llm_providers")]
             Self::SetProviderRequest(value) => {
-                super::ClientRequest::SetProviderRequest(value.into_v2()?)
+                super::ClientRequest::SetProviderRequest(Box::new(value.into_v2()?))
             }
             #[cfg(feature = "unstable_llm_providers")]
             Self::DisableProviderRequest(value) => {
@@ -5236,10 +5260,12 @@ impl IntoV2 for crate::v1::ClientRequest {
             }
             Self::PromptRequest(value) => super::ClientRequest::PromptRequest(value.into_v2()?),
             #[cfg(feature = "unstable_nes")]
-            Self::StartNesRequest(value) => super::ClientRequest::StartNesRequest(value.into_v2()?),
+            Self::StartNesRequest(value) => {
+                super::ClientRequest::StartNesRequest(Box::new(value.into_v2()?))
+            }
             #[cfg(feature = "unstable_nes")]
             Self::SuggestNesRequest(value) => {
-                super::ClientRequest::SuggestNesRequest(value.into_v2()?)
+                super::ClientRequest::SuggestNesRequest(Box::new(value.into_v2()?))
             }
             #[cfg(feature = "unstable_nes")]
             Self::CloseNesRequest(value) => super::ClientRequest::CloseNesRequest(value.into_v2()?),
@@ -5480,7 +5506,7 @@ impl IntoV2 for crate::v1::ClientNotification {
             }
             #[cfg(feature = "unstable_nes")]
             Self::DidFocusDocumentNotification(value) => {
-                super::ClientNotification::DidFocusDocumentNotification(value.into_v2()?)
+                super::ClientNotification::DidFocusDocumentNotification(Box::new(value.into_v2()?))
             }
             #[cfg(feature = "unstable_nes")]
             Self::AcceptNesNotification(value) => {
@@ -5556,10 +5582,15 @@ impl IntoV1 for super::Position {
     type Output = crate::v1::Position;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { line, character } = self;
+        let Self {
+            line,
+            character,
+            meta,
+        } = self;
         Ok(crate::v1::Position {
             line: line.into_v1()?,
             character: character.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -5569,10 +5600,15 @@ impl IntoV2 for crate::v1::Position {
     type Output = super::Position;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { line, character } = self;
+        let Self {
+            line,
+            character,
+            meta,
+        } = self;
         Ok(super::Position {
             line: line.into_v2()?,
             character: character.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -5582,10 +5618,11 @@ impl IntoV1 for super::Range {
     type Output = crate::v1::Range;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { start, end } = self;
+        let Self { start, end, meta } = self;
         Ok(crate::v1::Range {
             start: start.into_v1()?,
             end: end.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -5595,10 +5632,11 @@ impl IntoV2 for crate::v1::Range {
     type Output = super::Range;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { start, end } = self;
+        let Self { start, end, meta } = self;
         Ok(super::Range {
             start: start.into_v2()?,
             end: end.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -6270,10 +6308,11 @@ impl IntoV1 for super::TextDocumentContentChangeEvent {
     type Output = crate::v1::TextDocumentContentChangeEvent;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { range, text } = self;
+        let Self { range, text, meta } = self;
         Ok(crate::v1::TextDocumentContentChangeEvent {
             range: range.into_v1()?,
             text: text.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -6283,10 +6322,11 @@ impl IntoV2 for crate::v1::TextDocumentContentChangeEvent {
     type Output = super::TextDocumentContentChangeEvent;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { range, text } = self;
+        let Self { range, text, meta } = self;
         Ok(super::TextDocumentContentChangeEvent {
             range: range.into_v2()?,
             text: text.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -6456,10 +6496,11 @@ impl IntoV1 for super::WorkspaceFolder {
     type Output = crate::v1::WorkspaceFolder;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { uri, name } = self;
+        let Self { uri, name, meta } = self;
         Ok(crate::v1::WorkspaceFolder {
             uri: uri.into_v1()?,
             name: name.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -6469,10 +6510,11 @@ impl IntoV2 for crate::v1::WorkspaceFolder {
     type Output = super::WorkspaceFolder;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { uri, name } = self;
+        let Self { uri, name, meta } = self;
         Ok(super::WorkspaceFolder {
             uri: uri.into_v2()?,
             name: name.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -6486,11 +6528,13 @@ impl IntoV1 for super::NesRepository {
             name,
             owner,
             remote_url,
+            meta,
         } = self;
         Ok(crate::v1::NesRepository {
             name: name.into_v1()?,
             owner: owner.into_v1()?,
             remote_url: remote_url.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -6504,11 +6548,13 @@ impl IntoV2 for crate::v1::NesRepository {
             name,
             owner,
             remote_url,
+            meta,
         } = self;
         Ok(super::NesRepository {
             name: name.into_v2()?,
             owner: owner.into_v2()?,
             remote_url: remote_url.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -6733,11 +6779,13 @@ impl IntoV1 for super::NesRecentFile {
             uri,
             language_id,
             text,
+            meta,
         } = self;
         Ok(crate::v1::NesRecentFile {
             uri: uri.into_v1()?,
             language_id: language_id.into_v1()?,
             text: text.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -6751,11 +6799,13 @@ impl IntoV2 for crate::v1::NesRecentFile {
             uri,
             language_id,
             text,
+            meta,
         } = self;
         Ok(super::NesRecentFile {
             uri: uri.into_v2()?,
             language_id: language_id.into_v2()?,
             text: text.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -6765,10 +6815,15 @@ impl IntoV1 for super::NesRelatedSnippet {
     type Output = crate::v1::NesRelatedSnippet;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { uri, excerpts } = self;
+        let Self {
+            uri,
+            excerpts,
+            meta,
+        } = self;
         Ok(crate::v1::NesRelatedSnippet {
             uri: uri.into_v1()?,
             excerpts: excerpts.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -6778,10 +6833,15 @@ impl IntoV2 for crate::v1::NesRelatedSnippet {
     type Output = super::NesRelatedSnippet;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { uri, excerpts } = self;
+        let Self {
+            uri,
+            excerpts,
+            meta,
+        } = self;
         Ok(super::NesRelatedSnippet {
             uri: uri.into_v2()?,
             excerpts: excerpts.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -6795,11 +6855,13 @@ impl IntoV1 for super::NesExcerpt {
             start_line,
             end_line,
             text,
+            meta,
         } = self;
         Ok(crate::v1::NesExcerpt {
             start_line: start_line.into_v1()?,
             end_line: end_line.into_v1()?,
             text: text.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -6813,11 +6875,13 @@ impl IntoV2 for crate::v1::NesExcerpt {
             start_line,
             end_line,
             text,
+            meta,
         } = self;
         Ok(super::NesExcerpt {
             start_line: start_line.into_v2()?,
             end_line: end_line.into_v2()?,
             text: text.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -6827,10 +6891,11 @@ impl IntoV1 for super::NesEditHistoryEntry {
     type Output = crate::v1::NesEditHistoryEntry;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { uri, diff } = self;
+        let Self { uri, diff, meta } = self;
         Ok(crate::v1::NesEditHistoryEntry {
             uri: uri.into_v1()?,
             diff: diff.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -6840,10 +6905,11 @@ impl IntoV2 for crate::v1::NesEditHistoryEntry {
     type Output = super::NesEditHistoryEntry;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { uri, diff } = self;
+        let Self { uri, diff, meta } = self;
         Ok(super::NesEditHistoryEntry {
             uri: uri.into_v2()?,
             diff: diff.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -6858,12 +6924,14 @@ impl IntoV1 for super::NesUserAction {
             uri,
             position,
             timestamp_ms,
+            meta,
         } = self;
         Ok(crate::v1::NesUserAction {
             action: action.into_v1()?,
             uri: uri.into_v1()?,
             position: position.into_v1()?,
             timestamp_ms: timestamp_ms.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -6878,12 +6946,14 @@ impl IntoV2 for crate::v1::NesUserAction {
             uri,
             position,
             timestamp_ms,
+            meta,
         } = self;
         Ok(super::NesUserAction {
             action: action.into_v2()?,
             uri: uri.into_v2()?,
             position: position.into_v2()?,
             timestamp_ms: timestamp_ms.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -6898,12 +6968,14 @@ impl IntoV1 for super::NesOpenFile {
             language_id,
             visible_range,
             last_focused_ms,
+            meta,
         } = self;
         Ok(crate::v1::NesOpenFile {
             uri: uri.into_v1()?,
             language_id: language_id.into_v1()?,
             visible_range: into_v1_default_on_error(visible_range),
             last_focused_ms: into_v1_default_on_error(last_focused_ms),
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -6918,12 +6990,14 @@ impl IntoV2 for crate::v1::NesOpenFile {
             language_id,
             visible_range,
             last_focused_ms,
+            meta,
         } = self;
         Ok(super::NesOpenFile {
             uri: uri.into_v2()?,
             language_id: language_id.into_v2()?,
             visible_range: into_v2_default_on_error(visible_range),
             last_focused_ms: into_v2_default_on_error(last_focused_ms),
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -6938,12 +7012,14 @@ impl IntoV1 for super::NesDiagnostic {
             range,
             severity,
             message,
+            meta,
         } = self;
         Ok(crate::v1::NesDiagnostic {
             uri: uri.into_v1()?,
             range: range.into_v1()?,
             severity: severity.into_v1()?,
             message: message.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -6958,12 +7034,14 @@ impl IntoV2 for crate::v1::NesDiagnostic {
             range,
             severity,
             message,
+            meta,
         } = self;
         Ok(super::NesDiagnostic {
             uri: uri.into_v2()?,
             range: range.into_v2()?,
             severity: severity.into_v2()?,
             message: message.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7070,12 +7148,14 @@ impl IntoV1 for super::NesEditSuggestion {
             uri,
             edits,
             cursor_position,
+            meta,
         } = self;
         Ok(crate::v1::NesEditSuggestion {
             id: id.into_v1()?,
             uri: uri.into_v1()?,
             edits: edits.into_v1()?,
             cursor_position: into_v1_default_on_error(cursor_position),
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7090,12 +7170,14 @@ impl IntoV2 for crate::v1::NesEditSuggestion {
             uri,
             edits,
             cursor_position,
+            meta,
         } = self;
         Ok(super::NesEditSuggestion {
             id: id.into_v2()?,
             uri: uri.into_v2()?,
             edits: edits.into_v2()?,
             cursor_position: into_v2_default_on_error(cursor_position),
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7105,10 +7187,15 @@ impl IntoV1 for super::NesTextEdit {
     type Output = crate::v1::NesTextEdit;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { range, new_text } = self;
+        let Self {
+            range,
+            new_text,
+            meta,
+        } = self;
         Ok(crate::v1::NesTextEdit {
             range: range.into_v1()?,
             new_text: new_text.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7118,10 +7205,15 @@ impl IntoV2 for crate::v1::NesTextEdit {
     type Output = super::NesTextEdit;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { range, new_text } = self;
+        let Self {
+            range,
+            new_text,
+            meta,
+        } = self;
         Ok(super::NesTextEdit {
             range: range.into_v2()?,
             new_text: new_text.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7131,11 +7223,17 @@ impl IntoV1 for super::NesJumpSuggestion {
     type Output = crate::v1::NesJumpSuggestion;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { id, uri, position } = self;
+        let Self {
+            id,
+            uri,
+            position,
+            meta,
+        } = self;
         Ok(crate::v1::NesJumpSuggestion {
             id: id.into_v1()?,
             uri: uri.into_v1()?,
             position: position.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7145,11 +7243,17 @@ impl IntoV2 for crate::v1::NesJumpSuggestion {
     type Output = super::NesJumpSuggestion;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { id, uri, position } = self;
+        let Self {
+            id,
+            uri,
+            position,
+            meta,
+        } = self;
         Ok(super::NesJumpSuggestion {
             id: id.into_v2()?,
             uri: uri.into_v2()?,
             position: position.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7164,12 +7268,14 @@ impl IntoV1 for super::NesRenameSuggestion {
             uri,
             position,
             new_name,
+            meta,
         } = self;
         Ok(crate::v1::NesRenameSuggestion {
             id: id.into_v1()?,
             uri: uri.into_v1()?,
             position: position.into_v1()?,
             new_name: new_name.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7184,12 +7290,14 @@ impl IntoV2 for crate::v1::NesRenameSuggestion {
             uri,
             position,
             new_name,
+            meta,
         } = self;
         Ok(super::NesRenameSuggestion {
             id: id.into_v2()?,
             uri: uri.into_v2()?,
             position: position.into_v2()?,
             new_name: new_name.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7205,6 +7313,7 @@ impl IntoV1 for super::NesSearchAndReplaceSuggestion {
             search,
             replace,
             is_regex,
+            meta,
         } = self;
         Ok(crate::v1::NesSearchAndReplaceSuggestion {
             id: id.into_v1()?,
@@ -7212,6 +7321,7 @@ impl IntoV1 for super::NesSearchAndReplaceSuggestion {
             search: search.into_v1()?,
             replace: replace.into_v1()?,
             is_regex: is_regex.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7227,6 +7337,7 @@ impl IntoV2 for crate::v1::NesSearchAndReplaceSuggestion {
             search,
             replace,
             is_regex,
+            meta,
         } = self;
         Ok(super::NesSearchAndReplaceSuggestion {
             id: id.into_v2()?,
@@ -7234,6 +7345,7 @@ impl IntoV2 for crate::v1::NesSearchAndReplaceSuggestion {
             search: search.into_v2()?,
             replace: replace.into_v2()?,
             is_regex: is_regex.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7417,10 +7529,11 @@ impl IntoV1 for super::EnumOption {
     type Output = crate::v1::EnumOption;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { value, title } = self;
+        let Self { value, title, meta } = self;
         Ok(crate::v1::EnumOption {
             value: value.into_v1()?,
             title: title.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7430,10 +7543,11 @@ impl IntoV2 for crate::v1::EnumOption {
     type Output = super::EnumOption;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { value, title } = self;
+        let Self { value, title, meta } = self;
         Ok(super::EnumOption {
             value: value.into_v2()?,
             title: title.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7453,6 +7567,7 @@ impl IntoV1 for super::StringPropertySchema {
             default,
             enum_values,
             one_of,
+            meta,
         } = self;
         Ok(crate::v1::StringPropertySchema {
             title: title.into_v1()?,
@@ -7464,6 +7579,7 @@ impl IntoV1 for super::StringPropertySchema {
             default: default.into_v1()?,
             enum_values: enum_values.into_v1()?,
             one_of: one_of.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7483,6 +7599,7 @@ impl IntoV2 for crate::v1::StringPropertySchema {
             default,
             enum_values,
             one_of,
+            meta,
         } = self;
         Ok(super::StringPropertySchema {
             title: title.into_v2()?,
@@ -7494,6 +7611,7 @@ impl IntoV2 for crate::v1::StringPropertySchema {
             default: default.into_v2()?,
             enum_values: enum_values.into_v2()?,
             one_of: one_of.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7509,6 +7627,7 @@ impl IntoV1 for super::NumberPropertySchema {
             minimum,
             maximum,
             default,
+            meta,
         } = self;
         Ok(crate::v1::NumberPropertySchema {
             title: title.into_v1()?,
@@ -7516,6 +7635,7 @@ impl IntoV1 for super::NumberPropertySchema {
             minimum: minimum.into_v1()?,
             maximum: maximum.into_v1()?,
             default: default.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7531,6 +7651,7 @@ impl IntoV2 for crate::v1::NumberPropertySchema {
             minimum,
             maximum,
             default,
+            meta,
         } = self;
         Ok(super::NumberPropertySchema {
             title: title.into_v2()?,
@@ -7538,6 +7659,7 @@ impl IntoV2 for crate::v1::NumberPropertySchema {
             minimum: minimum.into_v2()?,
             maximum: maximum.into_v2()?,
             default: default.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7553,6 +7675,7 @@ impl IntoV1 for super::IntegerPropertySchema {
             minimum,
             maximum,
             default,
+            meta,
         } = self;
         Ok(crate::v1::IntegerPropertySchema {
             title: title.into_v1()?,
@@ -7560,6 +7683,7 @@ impl IntoV1 for super::IntegerPropertySchema {
             minimum: minimum.into_v1()?,
             maximum: maximum.into_v1()?,
             default: default.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7575,6 +7699,7 @@ impl IntoV2 for crate::v1::IntegerPropertySchema {
             minimum,
             maximum,
             default,
+            meta,
         } = self;
         Ok(super::IntegerPropertySchema {
             title: title.into_v2()?,
@@ -7582,6 +7707,7 @@ impl IntoV2 for crate::v1::IntegerPropertySchema {
             minimum: minimum.into_v2()?,
             maximum: maximum.into_v2()?,
             default: default.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7595,11 +7721,13 @@ impl IntoV1 for super::BooleanPropertySchema {
             title,
             description,
             default,
+            meta,
         } = self;
         Ok(crate::v1::BooleanPropertySchema {
             title: title.into_v1()?,
             description: description.into_v1()?,
             default: default.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7613,11 +7741,13 @@ impl IntoV2 for crate::v1::BooleanPropertySchema {
             title,
             description,
             default,
+            meta,
         } = self;
         Ok(super::BooleanPropertySchema {
             title: title.into_v2()?,
             description: description.into_v2()?,
             default: default.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7649,10 +7779,15 @@ impl IntoV1 for super::UntitledMultiSelectItems {
     type Output = crate::v1::UntitledMultiSelectItems;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { type_, values } = self;
+        let Self {
+            type_,
+            values,
+            meta,
+        } = self;
         Ok(crate::v1::UntitledMultiSelectItems {
             type_: type_.into_v1()?,
             values: values.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7662,10 +7797,15 @@ impl IntoV2 for crate::v1::UntitledMultiSelectItems {
     type Output = super::UntitledMultiSelectItems;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { type_, values } = self;
+        let Self {
+            type_,
+            values,
+            meta,
+        } = self;
         Ok(super::UntitledMultiSelectItems {
             type_: type_.into_v2()?,
             values: values.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7675,9 +7815,10 @@ impl IntoV1 for super::TitledMultiSelectItems {
     type Output = crate::v1::TitledMultiSelectItems;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { options } = self;
+        let Self { options, meta } = self;
         Ok(crate::v1::TitledMultiSelectItems {
             options: options.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7687,9 +7828,10 @@ impl IntoV2 for crate::v1::TitledMultiSelectItems {
     type Output = super::TitledMultiSelectItems;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { options } = self;
+        let Self { options, meta } = self;
         Ok(super::TitledMultiSelectItems {
             options: options.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7730,6 +7872,7 @@ impl IntoV1 for super::MultiSelectPropertySchema {
             max_items,
             items,
             default,
+            meta,
         } = self;
         Ok(crate::v1::MultiSelectPropertySchema {
             title: title.into_v1()?,
@@ -7738,6 +7881,7 @@ impl IntoV1 for super::MultiSelectPropertySchema {
             max_items: max_items.into_v1()?,
             items: items.into_v1()?,
             default: default.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7754,6 +7898,7 @@ impl IntoV2 for crate::v1::MultiSelectPropertySchema {
             max_items,
             items,
             default,
+            meta,
         } = self;
         Ok(super::MultiSelectPropertySchema {
             title: title.into_v2()?,
@@ -7762,6 +7907,7 @@ impl IntoV2 for crate::v1::MultiSelectPropertySchema {
             max_items: max_items.into_v2()?,
             items: items.into_v2()?,
             default: default.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
@@ -7807,6 +7953,7 @@ impl IntoV1 for super::ElicitationSchema {
             properties,
             required,
             description,
+            meta,
         } = self;
         Ok(crate::v1::ElicitationSchema {
             type_: type_.into_v1()?,
@@ -7814,6 +7961,7 @@ impl IntoV1 for super::ElicitationSchema {
             properties: properties.into_v1()?,
             required: required.into_v1()?,
             description: description.into_v1()?,
+            meta: meta.into_v1()?,
         })
     }
 }
@@ -7829,6 +7977,7 @@ impl IntoV2 for crate::v1::ElicitationSchema {
             properties,
             required,
             description,
+            meta,
         } = self;
         Ok(super::ElicitationSchema {
             type_: type_.into_v2()?,
@@ -7836,6 +7985,7 @@ impl IntoV2 for crate::v1::ElicitationSchema {
             properties: properties.into_v2()?,
             required: required.into_v2()?,
             description: description.into_v2()?,
+            meta: meta.into_v2()?,
         })
     }
 }
