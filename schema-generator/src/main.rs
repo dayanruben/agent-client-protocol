@@ -1,14 +1,8 @@
+//! Generates ACP JSON Schema and schema documentation artifacts.
+
 use agent_client_protocol_schema::ProtocolVersion;
-#[cfg(feature = "unstable_protocol_v2")]
-use agent_client_protocol_schema::v2::{
-    AGENT_METHOD_NAMES, AgentNotification, AgentRequest, AgentResponse, CLIENT_METHOD_NAMES,
-    ClientNotification, ClientRequest, ClientResponse, JsonRpcBatch, JsonRpcMessage, Notification,
-    Request, Response,
-};
-#[cfg(all(feature = "unstable_cancel_request", feature = "unstable_protocol_v2"))]
-use agent_client_protocol_schema::v2::{PROTOCOL_LEVEL_METHOD_NAMES, ProtocolLevelNotification};
 #[cfg(not(feature = "unstable_protocol_v2"))]
-use agent_client_protocol_schema::{
+use agent_client_protocol_schema::v1::{
     AGENT_METHOD_NAMES, AgentNotification, AgentRequest, AgentResponse, CLIENT_METHOD_NAMES,
     ClientNotification, ClientRequest, ClientResponse, JsonRpcMessage, Notification, Request,
     Response,
@@ -17,7 +11,15 @@ use agent_client_protocol_schema::{
     feature = "unstable_cancel_request",
     not(feature = "unstable_protocol_v2")
 ))]
-use agent_client_protocol_schema::{PROTOCOL_LEVEL_METHOD_NAMES, ProtocolLevelNotification};
+use agent_client_protocol_schema::v1::{PROTOCOL_LEVEL_METHOD_NAMES, ProtocolLevelNotification};
+#[cfg(feature = "unstable_protocol_v2")]
+use agent_client_protocol_schema::v2::{
+    AGENT_METHOD_NAMES, AgentNotification, AgentRequest, AgentResponse, CLIENT_METHOD_NAMES,
+    ClientNotification, ClientRequest, ClientResponse, JsonRpcBatch, JsonRpcMessage, Notification,
+    Request, Response,
+};
+#[cfg(all(feature = "unstable_cancel_request", feature = "unstable_protocol_v2"))]
+use agent_client_protocol_schema::v2::{PROTOCOL_LEVEL_METHOD_NAMES, ProtocolLevelNotification};
 use schemars::{
     JsonSchema,
     generate::SchemaSettings,
@@ -121,6 +123,11 @@ fn repo_root() -> PathBuf {
         .parent()
         .expect("schema-generator manifest directory should have a repository root parent")
         .to_path_buf()
+}
+
+#[cfg(test)]
+fn schema_crate_dir() -> PathBuf {
+    repo_root().join("agent-client-protocol-schema")
 }
 
 fn root_schema_value() -> serde_json::Value {
@@ -299,7 +306,7 @@ fn replace_string_values(value: &mut serde_json::Value, from: &str, to: &str) {
 mod schema_annotation_tests {
     #[cfg(feature = "unstable_protocol_v2")]
     use super::schema_value_for_publication;
-    use super::{repo_root, root_schema_value};
+    use super::{root_schema_value, schema_crate_dir};
     use serde_json::Value;
     use std::fs;
 
@@ -399,7 +406,7 @@ mod schema_annotation_tests {
 
     #[test]
     fn source_default_on_error_fields_are_schema_annotated() {
-        let root = repo_root();
+        let root = schema_crate_dir();
         for module_dir in ["src/v1", "src/v2"] {
             for entry in fs::read_dir(root.join(module_dir)).unwrap() {
                 let path = entry.unwrap().path();
@@ -1619,6 +1626,8 @@ starting with '$/' it is free to ignore the notification."
             .args([
                 "+nightly",
                 "rustdoc",
+                "-p",
+                "agent-client-protocol-schema",
                 "--lib",
                 "--all-features",
                 "--",
@@ -1737,8 +1746,10 @@ starting with '$/' it is free to ignore the notification."
 
         if cfg!(feature = "unstable_protocol_v2") {
             filename.starts_with("src/v2/")
+                || filename.starts_with("agent-client-protocol-schema/src/v2/")
         } else {
             filename.starts_with("src/v1/")
+                || filename.starts_with("agent-client-protocol-schema/src/v1/")
         }
     }
 
