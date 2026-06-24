@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.0](https://github.com/agentclientprotocol/agent-client-protocol/compare/v0.14.0...v1.0.0) - 2026-06-24
+
+### Added
+
+- *(unstable)* Add boolean config option capabilities ([#1490](https://github.com/agentclientprotocol/agent-client-protocol/pull/1490))
+
 ## [0.14.0](https://github.com/agentclientprotocol/agent-client-protocol/compare/v0.13.8...v0.14.0) - 2026-06-18
 
 ### Added
