@@ -175,10 +175,9 @@ fn write_schema(schema_value: &serde_json::Value, schema_dir: &Path, docs_protoc
         .unwrap_or_else(|e| panic!("Failed to write {schema_file}: {e}"));
 
     // The version embedded in `meta*.json` reflects the protocol version the
-    // *schema itself describes*, not `ProtocolVersion::LATEST` (which always
-    // tracks the latest **stable** version). Generating with the
-    // `unstable_protocol_v2` feature emits v2-shaped types, so the metadata
-    // file must advertise version 2 to stay consistent with its contents.
+    // *schema itself describes*. Generating with the `unstable_protocol_v2`
+    // feature emits v2-shaped types, so the metadata file must advertise
+    // version 2 to stay consistent with its contents.
     #[cfg(feature = "unstable_protocol_v2")]
     let schema_protocol_version = ProtocolVersion::V2;
     #[cfg(not(feature = "unstable_protocol_v2"))]
@@ -317,9 +316,34 @@ mod schema_annotation_tests {
     fn generated_schema_includes_tolerant_deserialization_extensions() {
         let schema = root_schema_value();
 
-        let client_info = property_schema(&schema, "InitializeRequest", "clientInfo");
-        assert_bool_extension(client_info, DEFAULT_ON_ERROR_EXTENSION);
-        assert_no_extension(client_info, SKIP_INVALID_ITEMS_EXTENSION);
+        #[cfg(not(feature = "unstable_protocol_v2"))]
+        {
+            let client_info = property_schema(&schema, "InitializeRequest", "clientInfo");
+            assert_bool_extension(client_info, DEFAULT_ON_ERROR_EXTENSION);
+            assert_no_extension(client_info, SKIP_INVALID_ITEMS_EXTENSION);
+        }
+
+        #[cfg(feature = "unstable_protocol_v2")]
+        {
+            let request = def_schema(&schema, "InitializeRequest");
+            assert!(
+                request
+                    .pointer("/required")
+                    .and_then(Value::as_array)
+                    .is_some_and(|required| required.iter().any(|field| field == "info"))
+            );
+            let info = property_schema(&schema, "InitializeRequest", "info");
+            assert_no_extension(info, DEFAULT_ON_ERROR_EXTENSION);
+            assert_no_extension(info, SKIP_INVALID_ITEMS_EXTENSION);
+
+            let response = def_schema(&schema, "InitializeResponse");
+            assert!(
+                response
+                    .pointer("/required")
+                    .and_then(Value::as_array)
+                    .is_some_and(|required| required.iter().any(|field| field == "info"))
+            );
+        }
 
         let auth_methods = property_schema(&schema, "InitializeResponse", "authMethods");
         assert_bool_extension(auth_methods, DEFAULT_ON_ERROR_EXTENSION);
@@ -1553,6 +1577,7 @@ starting with '$/' it is free to ignore the notification."
             match method_name {
                 "initialize" => self.agent.get("InitializeRequest").unwrap(),
                 "authenticate" => self.agent.get("AuthenticateRequest").unwrap(),
+                "auth/login" => self.agent.get("LoginAuthRequest").unwrap(),
                 "providers/list" => self.agent.get("ListProvidersRequest").unwrap(),
                 "providers/set" => self.agent.get("SetProviderRequest").unwrap(),
                 "providers/disable" => self.agent.get("DisableProviderRequest").unwrap(),
@@ -1570,6 +1595,7 @@ starting with '$/' it is free to ignore the notification."
                 "session/cancel" => self.agent.get("CancelNotification").unwrap(),
                 "session/close" => self.agent.get("CloseSessionRequest").unwrap(),
                 "logout" => self.agent.get("LogoutRequest").unwrap(),
+                "auth/logout" => self.agent.get("LogoutAuthRequest").unwrap(),
                 "nes/start" => self.agent.get("StartNesRequest").unwrap(),
                 "nes/suggest" => self.agent.get("SuggestNesRequest").unwrap(),
                 "nes/close" => self.agent.get("CloseNesRequest").unwrap(),

@@ -2697,13 +2697,13 @@ impl IntoV1 for super::InitializeRequest {
         let Self {
             protocol_version,
             capabilities,
-            client_info,
+            info,
             meta,
         } = self;
         Ok(crate::v1::InitializeRequest {
             protocol_version: protocol_version.into_v1()?,
             client_capabilities: capabilities.into_v1()?,
-            client_info: into_v1_default_on_error(client_info),
+            client_info: Some(info.into_v1()?),
             meta: meta.into_v1()?,
         })
     }
@@ -2719,10 +2719,18 @@ impl IntoV2 for crate::v1::InitializeRequest {
             client_info,
             meta,
         } = self;
+        let info = match client_info {
+            Some(client_info) => client_info.into_v2()?,
+            None => {
+                return Err(ProtocolConversionError::new(
+                    "v1 InitializeRequest without `clientInfo` cannot be represented in v2",
+                ));
+            }
+        };
         Ok(super::InitializeRequest {
             protocol_version: protocol_version.into_v2()?,
             capabilities: client_capabilities.into_v2()?,
-            client_info: into_v2_default_on_error(client_info),
+            info,
             meta: meta.into_v2()?,
         })
     }
@@ -2736,14 +2744,14 @@ impl IntoV1 for super::InitializeResponse {
             protocol_version,
             capabilities: agent_capabilities,
             auth_methods,
-            agent_info,
+            info,
             meta,
         } = self;
         Ok(crate::v1::InitializeResponse {
             protocol_version: protocol_version.into_v1()?,
             agent_capabilities: agent_capabilities.into_v1()?,
             auth_methods: into_v1_vec_skip_errors(auth_methods),
-            agent_info: into_v1_default_on_error(agent_info),
+            agent_info: Some(info.into_v1()?),
             meta: meta.into_v1()?,
         })
     }
@@ -2760,11 +2768,19 @@ impl IntoV2 for crate::v1::InitializeResponse {
             agent_info,
             meta,
         } = self;
+        let info = match agent_info {
+            Some(agent_info) => agent_info.into_v2()?,
+            None => {
+                return Err(ProtocolConversionError::new(
+                    "v1 InitializeResponse without `agentInfo` cannot be represented in v2",
+                ));
+            }
+        };
         Ok(super::InitializeResponse {
             protocol_version: protocol_version.into_v2()?,
             capabilities: agent_capabilities.into_v2()?,
             auth_methods: into_v2_vec_skip_errors(auth_methods),
-            agent_info: into_v2_default_on_error(agent_info),
+            info,
             meta: meta.into_v2()?,
         })
     }
@@ -2808,7 +2824,7 @@ impl IntoV2 for crate::v1::Implementation {
     }
 }
 
-impl IntoV1 for super::AuthenticateRequest {
+impl IntoV1 for super::LoginAuthRequest {
     type Output = crate::v1::AuthenticateRequest;
 
     fn into_v1(self) -> Result<Self::Output> {
@@ -2821,18 +2837,18 @@ impl IntoV1 for super::AuthenticateRequest {
 }
 
 impl IntoV2 for crate::v1::AuthenticateRequest {
-    type Output = super::AuthenticateRequest;
+    type Output = super::LoginAuthRequest;
 
     fn into_v2(self) -> Result<Self::Output> {
         let Self { method_id, meta } = self;
-        Ok(super::AuthenticateRequest {
+        Ok(super::LoginAuthRequest {
             method_id: method_id.into_v2()?,
             meta: meta.into_v2()?,
         })
     }
 }
 
-impl IntoV1 for super::AuthenticateResponse {
+impl IntoV1 for super::LoginAuthResponse {
     type Output = crate::v1::AuthenticateResponse;
 
     fn into_v1(self) -> Result<Self::Output> {
@@ -2844,17 +2860,17 @@ impl IntoV1 for super::AuthenticateResponse {
 }
 
 impl IntoV2 for crate::v1::AuthenticateResponse {
-    type Output = super::AuthenticateResponse;
+    type Output = super::LoginAuthResponse;
 
     fn into_v2(self) -> Result<Self::Output> {
         let Self { meta } = self;
-        Ok(super::AuthenticateResponse {
+        Ok(super::LoginAuthResponse {
             meta: meta.into_v2()?,
         })
     }
 }
 
-impl IntoV1 for super::LogoutRequest {
+impl IntoV1 for super::LogoutAuthRequest {
     type Output = crate::v1::LogoutRequest;
 
     fn into_v1(self) -> Result<Self::Output> {
@@ -2866,17 +2882,17 @@ impl IntoV1 for super::LogoutRequest {
 }
 
 impl IntoV2 for crate::v1::LogoutRequest {
-    type Output = super::LogoutRequest;
+    type Output = super::LogoutAuthRequest;
 
     fn into_v2(self) -> Result<Self::Output> {
         let Self { meta } = self;
-        Ok(super::LogoutRequest {
+        Ok(super::LogoutAuthRequest {
             meta: meta.into_v2()?,
         })
     }
 }
 
-impl IntoV1 for super::LogoutResponse {
+impl IntoV1 for super::LogoutAuthResponse {
     type Output = crate::v1::LogoutResponse;
 
     fn into_v1(self) -> Result<Self::Output> {
@@ -2888,11 +2904,11 @@ impl IntoV1 for super::LogoutResponse {
 }
 
 impl IntoV2 for crate::v1::LogoutResponse {
-    type Output = super::LogoutResponse;
+    type Output = super::LogoutAuthResponse;
 
     fn into_v2(self) -> Result<Self::Output> {
         let Self { meta } = self;
-        Ok(super::LogoutResponse {
+        Ok(super::LogoutAuthResponse {
             meta: meta.into_v2()?,
         })
     }
@@ -2902,9 +2918,9 @@ impl IntoV1 for super::AgentAuthCapabilities {
     type Output = crate::v1::AgentAuthCapabilities;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { logout, meta } = self;
+        let Self { meta } = self;
         Ok(crate::v1::AgentAuthCapabilities {
-            logout: into_v1_default_on_error(logout),
+            logout: Some(crate::v1::LogoutCapabilities::new()),
             meta: meta.into_v1()?,
         })
     }
@@ -2914,31 +2930,8 @@ impl IntoV2 for crate::v1::AgentAuthCapabilities {
     type Output = super::AgentAuthCapabilities;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { logout, meta } = self;
+        let Self { logout: _, meta } = self;
         Ok(super::AgentAuthCapabilities {
-            logout: into_v2_default_on_error(logout),
-            meta: meta.into_v2()?,
-        })
-    }
-}
-
-impl IntoV1 for super::LogoutCapabilities {
-    type Output = crate::v1::LogoutCapabilities;
-
-    fn into_v1(self) -> Result<Self::Output> {
-        let Self { meta } = self;
-        Ok(crate::v1::LogoutCapabilities {
-            meta: meta.into_v1()?,
-        })
-    }
-}
-
-impl IntoV2 for crate::v1::LogoutCapabilities {
-    type Output = super::LogoutCapabilities;
-
-    fn into_v2(self) -> Result<Self::Output> {
-        let Self { meta } = self;
-        Ok(super::LogoutCapabilities {
             meta: meta.into_v2()?,
         })
     }
@@ -5139,7 +5132,7 @@ impl IntoV1 for super::ClientRequest {
             Self::InitializeRequest(value) => {
                 crate::v1::ClientRequest::InitializeRequest(value.into_v1()?)
             }
-            Self::AuthenticateRequest(value) => {
+            Self::LoginAuthRequest(value) => {
                 crate::v1::ClientRequest::AuthenticateRequest(value.into_v1()?)
             }
             #[cfg(feature = "unstable_llm_providers")]
@@ -5154,7 +5147,9 @@ impl IntoV1 for super::ClientRequest {
             Self::DisableProviderRequest(value) => {
                 crate::v1::ClientRequest::DisableProviderRequest(value.into_v1()?)
             }
-            Self::LogoutRequest(value) => crate::v1::ClientRequest::LogoutRequest(value.into_v1()?),
+            Self::LogoutAuthRequest(value) => {
+                crate::v1::ClientRequest::LogoutRequest(value.into_v1()?)
+            }
             Self::NewSessionRequest(value) => {
                 crate::v1::ClientRequest::NewSessionRequest(value.into_v1()?)
             }
@@ -5213,7 +5208,7 @@ impl IntoV2 for crate::v1::ClientRequest {
                 super::ClientRequest::InitializeRequest(Box::new(value.into_v2()?))
             }
             Self::AuthenticateRequest(value) => {
-                super::ClientRequest::AuthenticateRequest(value.into_v2()?)
+                super::ClientRequest::LoginAuthRequest(value.into_v2()?)
             }
             #[cfg(feature = "unstable_llm_providers")]
             Self::ListProvidersRequest(value) => {
@@ -5227,7 +5222,7 @@ impl IntoV2 for crate::v1::ClientRequest {
             Self::DisableProviderRequest(value) => {
                 super::ClientRequest::DisableProviderRequest(value.into_v2()?)
             }
-            Self::LogoutRequest(value) => super::ClientRequest::LogoutRequest(value.into_v2()?),
+            Self::LogoutRequest(value) => super::ClientRequest::LogoutAuthRequest(value.into_v2()?),
             Self::NewSessionRequest(value) => {
                 super::ClientRequest::NewSessionRequest(value.into_v2()?)
             }
@@ -5286,7 +5281,7 @@ impl IntoV1 for super::AgentResponse {
             Self::InitializeResponse(value) => {
                 crate::v1::AgentResponse::InitializeResponse(value.into_v1()?)
             }
-            Self::AuthenticateResponse(value) => {
+            Self::LoginAuthResponse(value) => {
                 crate::v1::AgentResponse::AuthenticateResponse(value.into_v1()?)
             }
             #[cfg(feature = "unstable_llm_providers")]
@@ -5301,7 +5296,7 @@ impl IntoV1 for super::AgentResponse {
             Self::DisableProviderResponse(value) => {
                 crate::v1::AgentResponse::DisableProviderResponse(value.into_v1()?)
             }
-            Self::LogoutResponse(value) => {
+            Self::LogoutAuthResponse(value) => {
                 crate::v1::AgentResponse::LogoutResponse(value.into_v1()?)
             }
             Self::NewSessionResponse(value) => {
@@ -5364,7 +5359,7 @@ impl IntoV2 for crate::v1::AgentResponse {
                 super::AgentResponse::InitializeResponse(Box::new(value.into_v2()?))
             }
             Self::AuthenticateResponse(value) => {
-                super::AgentResponse::AuthenticateResponse(value.into_v2()?)
+                super::AgentResponse::LoginAuthResponse(value.into_v2()?)
             }
             #[cfg(feature = "unstable_llm_providers")]
             Self::ListProvidersResponse(value) => {
@@ -5378,7 +5373,9 @@ impl IntoV2 for crate::v1::AgentResponse {
             Self::DisableProviderResponse(value) => {
                 super::AgentResponse::DisableProviderResponse(value.into_v2()?)
             }
-            Self::LogoutResponse(value) => super::AgentResponse::LogoutResponse(value.into_v2()?),
+            Self::LogoutResponse(value) => {
+                super::AgentResponse::LogoutAuthResponse(value.into_v2()?)
+            }
             Self::NewSessionResponse(value) => {
                 super::AgentResponse::NewSessionResponse(value.into_v2()?)
             }
@@ -9049,20 +9046,41 @@ mod tests {
 
     #[test]
     fn converts_v2_initialize_request_to_v1_without_serde() {
-        let request = v2::InitializeRequest::new(ProtocolVersion::V2);
+        let request = v2::InitializeRequest::new(
+            ProtocolVersion::V2,
+            v2::Implementation::new("test-client", "1.0.0"),
+        );
 
         let converted: v1::InitializeRequest = v2_to_v1(request).unwrap();
 
         assert_eq!(converted.protocol_version, ProtocolVersion::V2);
+        assert_eq!(
+            converted
+                .client_info
+                .as_ref()
+                .map(|info| info.name.as_str()),
+            Some("test-client")
+        );
     }
 
     #[test]
-    fn converts_v1_initialize_request_to_v2_without_serde() {
+    fn v1_initialize_request_without_client_info_does_not_convert_to_v2() {
         let request = v1::InitializeRequest::new(ProtocolVersion::V1);
 
-        let converted: v2::InitializeRequest = v1_to_v2(request).unwrap();
+        assert_v1_to_v2_error(
+            request,
+            "v1 InitializeRequest without `clientInfo` cannot be represented in v2",
+        );
+    }
 
-        assert_eq!(converted.protocol_version, ProtocolVersion::V1);
+    #[test]
+    fn v1_initialize_response_without_agent_info_does_not_convert_to_v2() {
+        let response = v1::InitializeResponse::new(ProtocolVersion::V1);
+
+        assert_v1_to_v2_error(
+            response,
+            "v1 InitializeResponse without `agentInfo` cannot be represented in v2",
+        );
     }
 
     #[test]
@@ -9086,14 +9104,22 @@ mod tests {
         let converted: v2::InitializeRequest =
             v1_to_v2(request).expect("v1 -> v2 conversion failed");
         let converted_capabilities =
-            serde_json::to_value(converted.capabilities).expect("v2 serialize");
+            serde_json::to_value(&converted.capabilities).expect("v2 serialize");
         assert_eq!(converted_capabilities.get("fs"), None);
         assert_eq!(converted_capabilities.get("terminal"), None);
+        let converted_json = serde_json::to_value(&converted).expect("v2 serialize");
+        assert_eq!(converted_json.get("clientInfo"), None);
+        assert_eq!(converted_json.get("implementation"), None);
+        assert!(converted_json.get("info").is_some());
     }
 
     #[test]
     fn round_trips_initialize_response() {
         let response = v1::InitializeResponse::new(ProtocolVersion::V1)
+            .agent_capabilities(
+                v1::AgentCapabilities::new()
+                    .auth(v1::AgentAuthCapabilities::new().logout(v1::LogoutCapabilities::new())),
+            )
             .agent_info(v1::Implementation::new("test-agent", "2.0.0").title("Test Agent"));
         assert_v1_round_trip::<v1::InitializeResponse, v2::InitializeResponse>(response.clone());
         let converted: v2::InitializeResponse =
@@ -9101,6 +9127,9 @@ mod tests {
         let converted_json = serde_json::to_value(&converted).expect("v2 serialize");
         assert_eq!(converted_json.get("agentCapabilities"), None);
         assert!(converted_json.get("capabilities").is_some());
+        assert_eq!(converted_json.get("agentInfo"), None);
+        assert_eq!(converted_json.get("implementation"), None);
+        assert!(converted_json.get("info").is_some());
         assert_eq!(converted_json.pointer("/capabilities/loadSession"), None);
     }
 
@@ -9134,6 +9163,22 @@ mod tests {
             error.message(),
             "v2 AgentCapabilities without `session` cannot be represented in v1"
         );
+    }
+
+    #[test]
+    fn v2_auth_logout_is_baseline_not_capability_marker() {
+        let v2_auth = v2::AgentAuthCapabilities::new();
+        let v2_json = serde_json::to_value(&v2_auth).expect("v2 serialize");
+        assert_eq!(v2_json.get("logout"), None);
+
+        let v1_auth: v1::AgentAuthCapabilities = v2_to_v1(v2_auth).expect("v2 -> v1 conversion");
+        assert!(v1_auth.logout.is_some());
+
+        let v1_auth_without_logout = v1::AgentAuthCapabilities::new();
+        let v2_auth: v2::AgentAuthCapabilities =
+            v1_to_v2(v1_auth_without_logout).expect("v1 -> v2 conversion");
+        let v2_json = serde_json::to_value(&v2_auth).expect("v2 serialize");
+        assert_eq!(v2_json.get("logout"), None);
     }
 
     #[test]
@@ -9918,17 +9963,20 @@ mod tests {
 
     #[test]
     fn v2_collection_conversion_skips_items_like_v1_vec_skip_error() {
-        let response = v2::InitializeResponse::new(ProtocolVersion::V2)
-            .capabilities(v2::AgentCapabilities::new().session(v2::SessionCapabilities::new()))
-            .auth_methods(vec![
-                v2::AuthMethod::Other(v2::OtherAuthMethod::new(
-                    "_oauth",
-                    "oauth",
-                    "OAuth",
-                    BTreeMap::default(),
-                )),
-                v2::AuthMethod::Agent(v2::AuthMethodAgent::new("agent", "Agent")),
-            ]);
+        let response = v2::InitializeResponse::new(
+            ProtocolVersion::V2,
+            v2::Implementation::new("test-agent", "2.0.0"),
+        )
+        .capabilities(v2::AgentCapabilities::new().session(v2::SessionCapabilities::new()))
+        .auth_methods(vec![
+            v2::AuthMethod::Other(v2::OtherAuthMethod::new(
+                "_oauth",
+                "oauth",
+                "OAuth",
+                BTreeMap::default(),
+            )),
+            v2::AuthMethod::Agent(v2::AuthMethodAgent::new("agent", "Agent")),
+        ]);
         let converted: v1::InitializeResponse = v2_to_v1(response).unwrap();
         assert_eq!(converted.auth_methods.len(), 1);
         assert!(matches!(
@@ -10136,11 +10184,9 @@ mod tests {
     }
 
     #[test]
-    fn protocol_version_v1_constant_is_unchanged_by_feature_flag() {
-        // Guards against `LATEST` accidentally being re-pointed to V2 in the
-        // future; the contract is that `LATEST` is always the latest **stable**
-        // version, even when the v2 draft feature is enabled.
-        assert_eq!(ProtocolVersion::LATEST, ProtocolVersion::V1);
+    fn protocol_version_constants_remain_explicit() {
+        assert_eq!(ProtocolVersion::V1.as_u16(), 1);
+        assert_eq!(ProtocolVersion::V2.as_u16(), 2);
     }
 
     /// `?` bubbles a [`ProtocolConversionError`] into a [`v1::Error`] without

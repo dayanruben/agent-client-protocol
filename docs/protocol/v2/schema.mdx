@@ -16,7 +16,8 @@ Defines the interface that all ACP-compliant agents must implement.
 Agents are programs that use generative AI to autonomously modify code. They handle
 requests from clients and execute tasks using language models and tools.
 
-### <span class="font-mono">authenticate</span>
+<a id="auth-login"></a>
+### <span class="font-mono">auth/login</span>
 
 Authenticates the client using the specified authentication method.
 
@@ -28,9 +29,9 @@ After successful authentication, the client can proceed to create sessions with
 
 See protocol docs: [Initialization](https://agentclientprotocol.com/protocol/v2/initialization)
 
-#### <span class="font-mono">AuthenticateRequest</span>
+#### <span class="font-mono">LoginAuthRequest</span>
 
-Request parameters for the authenticate method.
+Request parameters for the `auth/login` method.
 
 Specifies which authentication method to use.
 
@@ -51,9 +52,53 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Must be one of the methods advertised in the initialize response.
 </ResponseField>
 
-#### <span class="font-mono">AuthenticateResponse</span>
+#### <span class="font-mono">LoginAuthResponse</span>
 
-Response to the `authenticate` method.
+Response to the `auth/login` method.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+
+</ResponseField>
+
+<a id="auth-logout"></a>
+### <span class="font-mono">auth/logout</span>
+
+Logs out of the current authenticated state.
+
+After a successful logout, all new sessions will require authentication.
+There is no guarantee about the behavior of already running sessions.
+
+#### <span class="font-mono">LogoutAuthRequest</span>
+
+Request parameters for the `auth/logout` method.
+
+Terminates the current authenticated session.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+
+</ResponseField>
+
+#### <span class="font-mono">LogoutAuthResponse</span>
+
+Response to the `auth/logout` method.
 
 **Type:** Object
 
@@ -108,11 +153,8 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
     - Default: `{}`
 
 </ResponseField>
-<ResponseField name="clientInfo" type={<><span><a href="#implementation">Implementation</a></span><span> | null</span></>} >
-  Information about the Client name and version sent to the Agent.
-
-Note: in future versions of the protocol, this will be required.
-
+<ResponseField name="info" type={<a href="#implementation">Implementation</a>} required>
+  Information about the implementation sending this initialize request.
 </ResponseField>
 <ResponseField name="protocolVersion" type={<a href="#protocolversion">ProtocolVersion</a>} required>
   The latest protocol version supported by the client.
@@ -138,12 +180,6 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
 
 </ResponseField>
-<ResponseField name="agentInfo" type={<><span><a href="#implementation">Implementation</a></span><span> | null</span></>} >
-  Information about the Agent name and version sent to the Client.
-
-Note: in future versions of the protocol, this will be required.
-
-</ResponseField>
 <ResponseField name="authMethods" type={<a href="#authmethod">AuthMethod[]</a>} >
   Authentication methods supported by the agent.
 
@@ -156,54 +192,14 @@ Note: in future versions of the protocol, this will be required.
     - Default: `{"auth":{}}`
 
 </ResponseField>
+<ResponseField name="info" type={<a href="#implementation">Implementation</a>} required>
+  Information about the implementation sending this initialize response.
+</ResponseField>
 <ResponseField name="protocolVersion" type={<a href="#protocolversion">ProtocolVersion</a>} required>
   The protocol version the client specified if supported by the agent,
 or the latest protocol version supported by the agent.
 
 The client should disconnect, if it doesn't support this version.
-
-</ResponseField>
-
-### <span class="font-mono">logout</span>
-
-Logs out of the current authenticated state.
-
-After a successful logout, all new sessions will require authentication.
-There is no guarantee about the behavior of already running sessions.
-
-#### <span class="font-mono">LogoutRequest</span>
-
-Request parameters for the logout method.
-
-Terminates the current authenticated session.
-
-**Type:** Object
-
-**Properties:**
-
-<ResponseField name="_meta" type={"object | null"} >
-  The _meta property is reserved by ACP to allow clients and agents to attach additional
-metadata to their interactions. Implementations MUST NOT make assumptions about values at
-these keys.
-
-See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
-
-</ResponseField>
-
-#### <span class="font-mono">LogoutResponse</span>
-
-Response to the `logout` method.
-
-**Type:** Object
-
-**Properties:**
-
-<ResponseField name="_meta" type={"object | null"} >
-  The _meta property is reserved by ACP to allow clients and agents to attach additional
-metadata to their interactions. Implementations MUST NOT make assumptions about values at
-these keys.
-
-See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
 
 </ResponseField>
 
@@ -884,12 +880,6 @@ metadata to their interactions. Implementations MUST NOT make assumptions about 
 these keys.
 
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
-
-</ResponseField>
-<ResponseField name="logout" type={<><span><a href="#logoutcapabilities">LogoutCapabilities</a></span><span> | null</span></>} >
-  Whether the agent supports the logout method.
-
-By supplying `\{\}` it means that the agent supports the logout method.
 
 </ResponseField>
 
@@ -1924,7 +1914,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 ## <span class="font-mono">Implementation</span>
 
 Metadata about the implementation of the client or agent.
-Describes the name and version of an MCP implementation, with an optional
+Describes the name and version of an ACP implementation, with an optional
 title for UI representation.
 
 **Type:** Object
@@ -1953,25 +1943,6 @@ If not provided, the name should be used for display.
 <ResponseField name="version" type={"string"} required>
   Version of the implementation. Can be displayed to the user or used
 for debugging or metrics purposes. (e.g. "1.0.0").
-</ResponseField>
-
-## <span class="font-mono">LogoutCapabilities</span>
-
-Logout capabilities supported by the agent.
-
-By supplying `\{\}` it means that the agent supports the logout method.
-
-**Type:** Object
-
-**Properties:**
-
-<ResponseField name="_meta" type={"object | null"} >
-  The _meta property is reserved by ACP to allow clients and agents to attach additional
-metadata to their interactions. Implementations MUST NOT make assumptions about values at
-these keys.
-
-See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
-
 </ResponseField>
 
 ## <span class="font-mono">McpCapabilities</span>
