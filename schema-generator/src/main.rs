@@ -515,6 +515,133 @@ mod schema_annotation_tests {
         }
     }
 
+    #[test]
+    fn source_defaultable_and_vec_fields_are_lenient() {
+        let root = schema_crate_dir();
+        let mut checked_defaultable = 0;
+        let mut checked_vec = 0;
+
+        for module_dir in ["src/v1", "src/v2"] {
+            for entry in fs::read_dir(root.join(module_dir)).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
+                    continue;
+                }
+
+                let source = fs::read_to_string(&path).unwrap();
+                let lines: Vec<_> = source.lines().collect();
+                for (line_index, line) in lines.iter().enumerate() {
+                    let Some(field_type) = public_struct_field_type(line) else {
+                        continue;
+                    };
+
+                    let annotations = field_annotations(&lines, line_index);
+                    let has_serde_default = serde_annotations_contain_default(&annotations);
+                    let is_option_like = field_type.starts_with("Option<")
+                        || field_type.starts_with("MaybeUndefined<");
+                    let is_defaultable = is_option_like || has_serde_default;
+                    let is_vec = is_top_level_vec(field_type);
+
+                    if is_defaultable {
+                        checked_defaultable += 1;
+                        assert!(
+                            annotations.contains("DefaultOnError")
+                                || annotations.contains("DefaultTrueOnError"),
+                            "{}:{} defaultable field missing lenient deserialization",
+                            path.display(),
+                            line_index + 1
+                        );
+                        assert!(
+                            annotations.contains(r#""x-deserialize-default-on-error" = true"#),
+                            "{}:{} defaultable field missing {DEFAULT_ON_ERROR_EXTENSION}",
+                            path.display(),
+                            line_index + 1
+                        );
+                        if is_option_like {
+                            assert!(
+                                has_serde_default,
+                                "{}:{} option-like field needs #[serde(default)] with serde_as",
+                                path.display(),
+                                line_index + 1
+                            );
+                        }
+                    }
+
+                    if is_vec {
+                        checked_vec += 1;
+                        assert!(
+                            annotations.contains("VecSkipError"),
+                            "{}:{} vector field missing VecSkipError",
+                            path.display(),
+                            line_index + 1
+                        );
+                        assert!(
+                            annotations.contains(r#""x-deserialize-skip-invalid-items" = true"#),
+                            "{}:{} vector field missing {SKIP_INVALID_ITEMS_EXTENSION}",
+                            path.display(),
+                            line_index + 1
+                        );
+                    }
+                }
+            }
+        }
+
+        assert!(
+            checked_defaultable > 0,
+            "expected at least one defaultable field"
+        );
+        assert!(checked_vec > 0, "expected at least one vector field");
+    }
+
+    #[test]
+    fn source_meta_fields_are_default_on_error_annotated() {
+        let root = schema_crate_dir();
+        for module_dir in ["src/v1", "src/v2"] {
+            for entry in fs::read_dir(root.join(module_dir)).unwrap() {
+                let path = entry.unwrap().path();
+                if path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
+                    continue;
+                }
+
+                let source = fs::read_to_string(&path).unwrap();
+                let lines: Vec<_> = source.lines().collect();
+                for (line_index, line) in lines.iter().enumerate() {
+                    if !line.trim_start().starts_with("pub meta:") || !line.contains("Meta") {
+                        continue;
+                    }
+
+                    let annotations = lines
+                        .get(line_index.saturating_sub(8)..line_index)
+                        .unwrap_or_default()
+                        .join("\n");
+
+                    assert!(
+                        annotations.contains(r#"#[serde_as(deserialize_as = "DefaultOnError"#),
+                        "{}:{} missing DefaultOnError on meta field",
+                        path.display(),
+                        line_index + 1
+                    );
+                    assert!(
+                        annotations.contains(r#""x-deserialize-default-on-error" = true"#),
+                        "{}:{} missing {DEFAULT_ON_ERROR_EXTENSION} on meta field",
+                        path.display(),
+                        line_index + 1
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn generated_schema_meta_fields_are_default_on_error_annotated() {
+        let schema = root_schema_value();
+        let mut checked = 0;
+
+        assert_meta_properties_are_annotated(&schema, &mut checked);
+
+        assert!(checked > 0, "expected at least one _meta schema property");
+    }
+
     fn property_schema<'a>(schema: &'a Value, def_name: &str, prop_name: &str) -> &'a Value {
         def_schema(schema, def_name)
             .pointer(&format!("/properties/{prop_name}"))
@@ -546,6 +673,123 @@ mod schema_annotation_tests {
             Some(true),
             "missing extension {extension} on {schema}"
         );
+    }
+
+    fn assert_meta_properties_are_annotated(schema: &Value, checked: &mut usize) {
+        match schema {
+            Value::Object(object) => {
+                if let Some(properties) = object.get("properties").and_then(Value::as_object)
+                    && let Some(meta) = properties.get("_meta")
+                {
+                    *checked += 1;
+                    assert_bool_extension(meta, DEFAULT_ON_ERROR_EXTENSION);
+                }
+
+                for value in object.values() {
+                    assert_meta_properties_are_annotated(value, checked);
+                }
+            }
+            Value::Array(values) => {
+                for value in values {
+                    assert_meta_properties_are_annotated(value, checked);
+                }
+            }
+            Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) => {}
+        }
+    }
+
+    fn public_struct_field_type(line: &str) -> Option<&str> {
+        let line = line.trim();
+        if !line.starts_with("pub ") || !line.ends_with(',') {
+            return None;
+        }
+
+        let (_, field_type) = line.split_once(':')?;
+        Some(field_type.trim_end_matches(',').trim())
+    }
+
+    fn field_annotations(lines: &[&str], line_index: usize) -> String {
+        let mut start = line_index;
+        let mut cursor = line_index;
+        while cursor > 0 {
+            let previous = lines[cursor - 1].trim();
+            if previous.is_empty() || previous.starts_with("///") || previous.starts_with("//!") {
+                break;
+            }
+
+            if previous.starts_with("#[") {
+                start = cursor - 1;
+                cursor -= 1;
+                continue;
+            }
+
+            if previous.ends_with(']') {
+                cursor -= 1;
+                while cursor > 0 && !lines[cursor].trim_start().starts_with("#[") {
+                    cursor -= 1;
+                }
+                start = cursor;
+                continue;
+            }
+
+            break;
+        }
+
+        lines[start..line_index].join("\n")
+    }
+
+    fn serde_annotations_contain_default(annotations: &str) -> bool {
+        let mut in_serde = false;
+        for line in annotations.lines() {
+            let line = line.trim();
+            if line.starts_with("#[serde") {
+                if line.contains("default") {
+                    return true;
+                }
+                in_serde = !line.ends_with(']');
+            } else if in_serde {
+                if line.contains("default") {
+                    return true;
+                }
+                if line.ends_with(']') {
+                    in_serde = false;
+                }
+            }
+        }
+        false
+    }
+
+    fn is_top_level_vec(field_type: &str) -> bool {
+        let mut field_type = field_type.trim();
+        while let Some(inner) = strip_outer_type(field_type, "Option")
+            .or_else(|| strip_outer_type(field_type, "MaybeUndefined"))
+        {
+            field_type = inner;
+        }
+        field_type.starts_with("Vec<")
+    }
+
+    fn strip_outer_type<'a>(field_type: &'a str, wrapper: &str) -> Option<&'a str> {
+        let prefix = format!("{wrapper}<");
+        if !field_type.starts_with(&prefix) {
+            return None;
+        }
+
+        let mut depth = 0;
+        for (index, character) in field_type[prefix.len() - 1..].char_indices() {
+            match character {
+                '<' => depth += 1,
+                '>' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        let end = prefix.len() - 1 + index;
+                        return Some(field_type[prefix.len()..end].trim());
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
     }
 
     fn assert_no_extension(schema: &Value, extension: &str) {
