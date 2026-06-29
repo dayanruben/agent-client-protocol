@@ -7746,20 +7746,20 @@
                   ]
                 },
                 {
-                  "title": "ExtMethodResponse",
-                  "description": "Successful result returned by an extension method outside the core ACP method set.",
-                  "allOf": [
-                    {
-                      "$ref": "#/$defs/ExtResponse"
-                    }
-                  ]
-                },
-                {
                   "title": "MessageMcpResponse",
                   "description": "Successful result returned by an MCP-over-ACP `mcp/message` request.",
                   "allOf": [
                     {
                       "$ref": "#/$defs/MessageMcpResponse"
+                    }
+                  ]
+                },
+                {
+                  "title": "ExtMethodResponse",
+                  "description": "Successful result returned by an extension method outside the core ACP method set.",
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/ExtResponse"
                     }
                   ]
                 }
