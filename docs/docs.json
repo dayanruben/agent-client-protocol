@@ -77,6 +77,7 @@
                   "protocol/v1/content",
                   "protocol/v1/tool-calls",
                   "protocol/v1/file-system",
+                  "protocol/v1/cancellation",
                   "protocol/v1/terminals",
                   "protocol/v1/agent-plan",
                   "protocol/v1/session-modes",
@@ -126,6 +127,7 @@
                   "protocol/v2/prompt-lifecycle",
                   "protocol/v2/content",
                   "protocol/v2/tool-calls",
+                  "protocol/v2/cancellation",
                   "protocol/v2/agent-plan",
                   "protocol/v2/session-config-options",
                   "protocol/v2/slash-commands",
@@ -191,6 +193,7 @@
               "rfds/next-edit-suggestions",
               "rfds/custom-llm-endpoint",
               "rfds/plan-operations",
+              "rfds/streamable-http-websocket-transport",
               {
                 "group": "v2 Draft",
                 "expanded": true,
@@ -201,15 +204,14 @@
                   "rfds/v2/client-filesystem-terminal-capabilities",
                   "rfds/v2/plan-variants",
                   "rfds/v2/tool-call-updates",
-                  "rfds/v2/message-updates",
-                  "rfds/streamable-http-websocket-transport"
+                  "rfds/v2/message-updates"
                 ]
               }
             ]
           },
           {
             "group": "Preview",
-            "pages": ["rfds/request-cancellation"]
+            "pages": []
           },
           {
             "group": "Completed",
@@ -228,7 +230,8 @@
               "rfds/session-usage",
               "rfds/session-delete",
               "rfds/model-config-category",
-              "rfds/rust-sdk-v1"
+              "rfds/rust-sdk-v1",
+              "rfds/request-cancellation"
             ]
           }
         ]

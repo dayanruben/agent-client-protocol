@@ -324,7 +324,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="capabilities" type={<a href="#clientcapabilities">ClientCapabilities</a>} >
   Capabilities supported by the client.
 
-    - Default: `{"auth":{}}`
+    - Default: `{}`
 
 </ResponseField>
 <ResponseField name="info" type={<a href="#implementation">Implementation</a>} required>
@@ -363,7 +363,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="capabilities" type={<a href="#agentcapabilities">AgentCapabilities</a>} >
   Capabilities supported by the agent.
 
-    - Default: `{"auth":{}}`
+    - Default: `{}`
 
 </ResponseField>
 <ResponseField name="info" type={<a href="#implementation">Implementation</a>} required>
@@ -894,7 +894,7 @@ Upon receiving this notification, the Agent SHOULD:
 
 See protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#cancellation)
 
-#### <span class="font-mono">CancelNotification</span>
+#### <span class="font-mono">CancelSessionNotification</span>
 
 Notification to cancel ongoing operations for a session.
 
@@ -2005,7 +2005,7 @@ stop reason.
 
 See protocol docs: [Agent Reports Output](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#3-agent-reports-output)
 
-#### <span class="font-mono">SessionNotification</span>
+#### <span class="font-mono">UpdateSessionNotification</span>
 
 Notification containing a session update from the agent.
 
@@ -2046,18 +2046,13 @@ starting with '$/' it is free to ignore the notification.
 <a id="$-cancel_request"></a>
 ### <span class="font-mono">$/cancel_request</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or
-changed at any point.
-
 Cancels an ongoing request.
 
 This is a notification sent by the side that sent a request to cancel that request.
 
 Upon receiving this notification, the receiver:
 
-1. MUST cancel the corresponding request activity and all nested activities
+1. MAY cancel the corresponding request activity and all nested activities
 2. MAY send any pending notifications.
 3. MUST send one of these responses for the original request:
 
@@ -2067,10 +2062,6 @@ Upon receiving this notification, the receiver:
 See protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/cancellation)
 
 #### <span class="font-mono">CancelRequestNotification</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Notification to cancel an ongoing request.
 
@@ -2130,11 +2121,8 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="auth" type={<a href="#agentauthcapabilities">AgentAuthCapabilities</a>} >
+<ResponseField name="auth" type={<><span><a href="#agentauthcapabilities">AgentAuthCapabilities</a></span><span> | null</span></>} >
   Authentication-related capabilities supported by the agent.
-
-    - Default: `{}`
-
 </ResponseField>
 <ResponseField name="nes" type={<><span><a href="#nescapabilities">NesCapabilities</a></span><span> | null</span></>} >
   **UNSTABLE**
@@ -2810,7 +2798,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="auth" type={<a href="#authcapabilities">AuthCapabilities</a>} >
+<ResponseField name="auth" type={<><span><a href="#authcapabilities">AuthCapabilities</a></span><span> | null</span></>} >
   **UNSTABLE**
 
 This capability is not part of the spec yet, and may be removed or changed at any point.
@@ -2818,8 +2806,6 @@ This capability is not part of the spec yet, and may be removed or changed at an
 Authentication capabilities supported by the client.
 Determines which authentication method types the agent may include
 in its `InitializeResponse`.
-
-    - Default: `{}`
 
 </ResponseField>
 <ResponseField name="elicitation" type={<><span><a href="#elicitationcapabilities">ElicitationCapabilities</a></span><span> | null</span></>} >
@@ -3978,13 +3964,9 @@ and use the reserved range (-32000 to -32099) for protocol-specific errors.
 </ResponseField>
 
 <ResponseField name="-32800" type="int32">
-**Request cancelled**: **UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
-Execution of the method was aborted either due to a cancellation request from the caller or
-because of resource constraints or shutdown.
-
+  **Request cancelled**: Execution of the method was aborted either due to a
+  cancellation request from the caller or because of resource constraints or
+  shutdown.
 </ResponseField>
 
 <ResponseField name="-32000" type="int32">

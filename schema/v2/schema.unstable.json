@@ -477,20 +477,20 @@
                     ]
                   },
                   {
-                    "title": "ExtMethodResponse",
-                    "description": "Successful result returned by an extension method outside the core ACP method set.",
-                    "allOf": [
-                      {
-                        "$ref": "#/$defs/ExtResponse"
-                      }
-                    ]
-                  },
-                  {
                     "title": "MessageMcpResponse",
                     "description": "Successful result returned by an MCP-over-ACP `mcp/message` request.",
                     "allOf": [
                       {
                         "$ref": "#/$defs/MessageMcpResponse"
+                      }
+                    ]
+                  },
+                  {
+                    "title": "ExtMethodResponse",
+                    "description": "Successful result returned by an extension method outside the core ACP method set.",
+                    "allOf": [
+                      {
+                        "$ref": "#/$defs/ExtResponse"
                       }
                     ]
                   }
@@ -549,7 +549,7 @@
               "anyOf": [
                 {
                   "title": "CancelRequestNotification",
-                  "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or\nchanged at any point.\n\nCancels an ongoing request.\n\nThis is a notification sent by the side that sent a request to cancel that request.\n\nUpon receiving this notification, the receiver:\n\n1. MUST cancel the corresponding request activity and all nested activities\n2. MAY send any pending notifications.\n3. MUST send one of these responses for the original request:\n  - Valid response with appropriate data (partial results or cancellation marker)\n  - Error response with code `-32800` (Cancelled)\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/cancellation)",
+                  "description": "Cancels an ongoing request.\n\nThis is a notification sent by the side that sent a request to cancel that request.\n\nUpon receiving this notification, the receiver:\n\n1. MAY cancel the corresponding request activity and all nested activities\n2. MAY send any pending notifications.\n3. MUST send one of these responses for the original request:\n  - Valid response with appropriate data (partial results or cancellation marker)\n  - Error response with code `-32800` (Cancelled)\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/cancellation)",
                   "allOf": [
                     {
                       "$ref": "#/$defs/CancelRequestNotification"
@@ -1179,6 +1179,10 @@
       "description": "Text provided to or from an LLM.",
       "type": "object",
       "properties": {
+        "text": {
+          "description": "Text payload carried by this content block.",
+          "type": "string"
+        },
         "annotations": {
           "description": "Optional annotations that help clients decide how to display or route this content.",
           "anyOf": [
@@ -1190,10 +1194,6 @@
             }
           ],
           "x-deserialize-default-on-error": true
-        },
-        "text": {
-          "description": "Text payload carried by this content block.",
-          "type": "string"
         },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
@@ -1208,18 +1208,6 @@
       "description": "An image provided to or from an LLM.",
       "type": "object",
       "properties": {
-        "annotations": {
-          "description": "Optional annotations that help clients decide how to display or route this content.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Annotations"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "x-deserialize-default-on-error": true
-        },
         "data": {
           "description": "Base64-encoded media payload.",
           "type": "string"
@@ -1231,6 +1219,18 @@
         "uri": {
           "description": "URI associated with this resource or media payload.",
           "type": ["string", "null"],
+          "x-deserialize-default-on-error": true
+        },
+        "annotations": {
+          "description": "Optional annotations that help clients decide how to display or route this content.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Annotations"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "x-deserialize-default-on-error": true
         },
         "_meta": {
@@ -1246,6 +1246,14 @@
       "description": "Audio provided to or from an LLM.",
       "type": "object",
       "properties": {
+        "data": {
+          "description": "Base64-encoded media payload.",
+          "type": "string"
+        },
+        "mimeType": {
+          "description": "MIME type describing the encoded media payload.",
+          "type": "string"
+        },
         "annotations": {
           "description": "Optional annotations that help clients decide how to display or route this content.",
           "anyOf": [
@@ -1257,14 +1265,6 @@
             }
           ],
           "x-deserialize-default-on-error": true
-        },
-        "data": {
-          "description": "Base64-encoded media payload.",
-          "type": "string"
-        },
-        "mimeType": {
-          "description": "MIME type describing the encoded media payload.",
-          "type": "string"
         },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
@@ -1279,16 +1279,17 @@
       "description": "A resource that the server is capable of reading, included in a prompt or tool call result.",
       "type": "object",
       "properties": {
-        "annotations": {
-          "description": "Optional annotations that help clients decide how to display or route this content.",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Annotations"
-            },
-            {
-              "type": "null"
-            }
-          ],
+        "name": {
+          "description": "Human-readable name shown for this protocol object.",
+          "type": "string"
+        },
+        "uri": {
+          "description": "URI associated with this resource or media payload.",
+          "type": "string"
+        },
+        "title": {
+          "description": "Optional display title for end-user UI.",
+          "type": ["string", "null"],
           "x-deserialize-default-on-error": true
         },
         "description": {
@@ -1301,24 +1302,23 @@
           "type": ["string", "null"],
           "x-deserialize-default-on-error": true
         },
-        "name": {
-          "description": "Human-readable name shown for this protocol object.",
-          "type": "string"
-        },
         "size": {
           "description": "Optional size of the linked resource in bytes, if known.",
           "type": ["integer", "null"],
           "format": "int64",
           "x-deserialize-default-on-error": true
         },
-        "title": {
-          "description": "Optional display title for end-user UI.",
-          "type": ["string", "null"],
+        "annotations": {
+          "description": "Optional annotations that help clients decide how to display or route this content.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Annotations"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "x-deserialize-default-on-error": true
-        },
-        "uri": {
-          "description": "URI associated with this resource or media payload.",
-          "type": "string"
         },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
@@ -1356,11 +1356,6 @@
       "description": "Text-based resource contents.",
       "type": "object",
       "properties": {
-        "mimeType": {
-          "description": "MIME type describing the encoded media payload.",
-          "type": ["string", "null"],
-          "x-deserialize-default-on-error": true
-        },
         "text": {
           "description": "Text payload carried by this content block.",
           "type": "string"
@@ -1368,6 +1363,11 @@
         "uri": {
           "description": "URI associated with this resource or media payload.",
           "type": "string"
+        },
+        "mimeType": {
+          "description": "MIME type describing the encoded media payload.",
+          "type": ["string", "null"],
+          "x-deserialize-default-on-error": true
         },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
@@ -1386,14 +1386,14 @@
           "description": "Base64-encoded bytes for a binary resource payload.",
           "type": "string"
         },
+        "uri": {
+          "description": "URI associated with this resource or media payload.",
+          "type": "string"
+        },
         "mimeType": {
           "description": "MIME type describing the encoded media payload.",
           "type": ["string", "null"],
           "x-deserialize-default-on-error": true
-        },
-        "uri": {
-          "description": "URI associated with this resource or media payload.",
-          "type": "string"
         },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
@@ -1408,6 +1408,14 @@
       "description": "The contents of a resource, embedded into a prompt or tool call result.",
       "type": "object",
       "properties": {
+        "resource": {
+          "description": "Embedded resource payload, either text or binary data.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/EmbeddedResourceResource"
+            }
+          ]
+        },
         "annotations": {
           "description": "Optional annotations that help clients decide how to display or route this content.",
           "anyOf": [
@@ -1419,14 +1427,6 @@
             }
           ],
           "x-deserialize-default-on-error": true
-        },
-        "resource": {
-          "description": "Embedded resource payload, either text or binary data.",
-          "allOf": [
-            {
-              "$ref": "#/$defs/EmbeddedResourceResource"
-            }
-          ]
         },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
@@ -2606,12 +2606,18 @@
             }
           ]
         },
+        "info": {
+          "description": "Information about the implementation sending this initialize response.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/Implementation"
+            }
+          ]
+        },
         "capabilities": {
           "description": "Capabilities supported by the agent.",
           "x-deserialize-default-on-error": true,
-          "default": {
-            "auth": {}
-          },
+          "default": {},
           "allOf": [
             {
               "$ref": "#/$defs/AgentCapabilities"
@@ -2627,14 +2633,6 @@
           "default": [],
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
-        },
-        "info": {
-          "description": "Information about the implementation sending this initialize response.",
-          "allOf": [
-            {
-              "$ref": "#/$defs/Implementation"
-            }
-          ]
         },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
@@ -2654,6 +2652,32 @@
       "minimum": 0,
       "maximum": 65535
     },
+    "Implementation": {
+      "description": "Metadata about the implementation of the client or agent.\nDescribes the name and version of an ACP implementation, with an optional\ntitle for UI representation.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Intended for programmatic or logical use, but can be used as a display\nname fallback if title isn’t present.",
+          "type": "string"
+        },
+        "title": {
+          "description": "Intended for UI and end-user contexts — optimized to be human-readable\nand easily understood.\n\nIf not provided, the name should be used for display.",
+          "type": ["string", "null"],
+          "x-deserialize-default-on-error": true
+        },
+        "version": {
+          "description": "Version of the implementation. Can be displayed to the user or used\nfor debugging or metrics purposes. (e.g. \"1.0.0\").",
+          "type": "string"
+        },
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      },
+      "required": ["name", "version"]
+    },
     "AgentCapabilities": {
       "description": "Capabilities supported by the agent.\n\nAdvertised during initialization to inform the client about\navailable features and content types.\n\nSee protocol docs: [Agent Capabilities](https://agentclientprotocol.com/protocol/v2/draft/initialization#agent-capabilities)",
       "type": "object",
@@ -2672,13 +2696,15 @@
         },
         "auth": {
           "description": "Authentication-related capabilities supported by the agent.",
-          "x-deserialize-default-on-error": true,
-          "default": {},
-          "allOf": [
+          "anyOf": [
             {
               "$ref": "#/$defs/AgentAuthCapabilities"
+            },
+            {
+              "type": "null"
             }
-          ]
+          ],
+          "x-deserialize-default-on-error": true
         },
         "providers": {
           "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nProvider configuration capabilities supported by the agent.\n\nBy supplying `{}` it means that the agent supports provider configuration methods.",
@@ -3836,32 +3862,6 @@
         }
       },
       "required": ["id", "name"]
-    },
-    "Implementation": {
-      "description": "Metadata about the implementation of the client or agent.\nDescribes the name and version of an ACP implementation, with an optional\ntitle for UI representation.",
-      "type": "object",
-      "properties": {
-        "name": {
-          "description": "Intended for programmatic or logical use, but can be used as a display\nname fallback if title isn’t present.",
-          "type": "string"
-        },
-        "title": {
-          "description": "Intended for UI and end-user contexts — optimized to be human-readable\nand easily understood.\n\nIf not provided, the name should be used for display.",
-          "type": ["string", "null"],
-          "x-deserialize-default-on-error": true
-        },
-        "version": {
-          "description": "Version of the implementation. Can be displayed to the user or used\nfor debugging or metrics purposes. (e.g. \"1.0.0\").",
-          "type": "string"
-        },
-        "_meta": {
-          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
-          "type": ["object", "null"],
-          "x-deserialize-default-on-error": true,
-          "additionalProperties": true
-        }
-      },
-      "required": ["name", "version"]
     },
     "LoginAuthResponse": {
       "description": "Response to the `auth/login` method.",
@@ -5049,7 +5049,7 @@
         },
         {
           "title": "Request cancelled",
-          "description": "**Request cancelled**: **UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nExecution of the method was aborted either due to a cancellation request from the caller or\nbecause of resource constraints or shutdown.",
+          "description": "**Request cancelled**: Execution of the method was aborted either due to a cancellation request from the caller or\nbecause of resource constraints or shutdown.",
           "type": "integer",
           "format": "int32",
           "const": -32800
@@ -5098,11 +5098,11 @@
               "description": "All possible notifications that an agent can send to a client.\n\nThis enum is used internally for routing RPC notifications. You typically won't need\nto use this directly.\n\nNotifications do not expect a response.",
               "anyOf": [
                 {
-                  "title": "SessionNotification",
+                  "title": "UpdateSessionNotification",
                   "description": "Handles session update notifications from the agent.\n\nThis is a notification endpoint (no response expected) that receives\nreal-time updates about session progress, including message updates,\nmessage chunks, tool calls, and execution plans.\n\nNote: Clients SHOULD continue accepting tool call updates even after\nsending a `session/cancel` notification, as the agent may send final\nupdates before reporting an idle `state_update` with the cancelled\nstop reason.\n\nSee protocol docs: [Agent Reports Output](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#3-agent-reports-output)",
                   "allOf": [
                     {
-                      "$ref": "#/$defs/SessionNotification"
+                      "$ref": "#/$defs/UpdateSessionNotification"
                     }
                   ]
                 },
@@ -5144,7 +5144,7 @@
       "required": ["method"],
       "x-docs-ignore": true
     },
-    "SessionNotification": {
+    "UpdateSessionNotification": {
       "description": "Notification containing a session update from the agent.\n\nUsed to stream real-time progress and results during prompt processing.\n\nSee protocol docs: [Agent Reports Output](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#3-agent-reports-output)",
       "type": "object",
       "properties": {
@@ -5598,19 +5598,19 @@
       "description": "A streamed item of content",
       "type": "object",
       "properties": {
-        "content": {
-          "description": "A single item of content",
-          "allOf": [
-            {
-              "$ref": "#/$defs/ContentBlock"
-            }
-          ]
-        },
         "messageId": {
           "description": "A unique identifier for the message this chunk belongs to.\n\nAll chunks belonging to the same message share the same `messageId`.\nA change in `messageId` indicates a new message has started.",
           "allOf": [
             {
               "$ref": "#/$defs/MessageId"
+            }
+          ]
+        },
+        "content": {
+          "description": "A single item of content",
+          "allOf": [
+            {
+              "$ref": "#/$defs/ContentBlock"
             }
           ]
         },
@@ -5621,7 +5621,7 @@
           "additionalProperties": true
         }
       },
-      "required": ["content", "messageId"]
+      "required": ["messageId", "content"]
     },
     "UserMessage": {
       "description": "A user message upsert.\n\nOnly [`UserMessage::message_id`] is required. Other fields have patch\nsemantics: omitted fields leave the existing message value unchanged, `null`\nclears or unsets the value, and concrete values replace the previous value.\nFor a new `messageId`, omitted fields use client defaults. `content` is\nreplaced as a whole array; send `[]` or `null` to clear it.\n\nMessage updates and chunks are applied in the order they are received. When\na `user_message` update includes `content`, that array replaces any content\npreviously accumulated for the message, including content from earlier\nchunks. Later chunks with the same `messageId` append to the current\ncontent.",
@@ -6802,23 +6802,21 @@
             }
           ]
         },
-        "capabilities": {
-          "description": "Capabilities supported by the client.",
-          "x-deserialize-default-on-error": true,
-          "default": {
-            "auth": {}
-          },
-          "allOf": [
-            {
-              "$ref": "#/$defs/ClientCapabilities"
-            }
-          ]
-        },
         "info": {
           "description": "Information about the implementation sending this initialize request.",
           "allOf": [
             {
               "$ref": "#/$defs/Implementation"
+            }
+          ]
+        },
+        "capabilities": {
+          "description": "Capabilities supported by the client.",
+          "x-deserialize-default-on-error": true,
+          "default": {},
+          "allOf": [
+            {
+              "$ref": "#/$defs/ClientCapabilities"
             }
           ]
         },
@@ -6839,13 +6837,15 @@
       "properties": {
         "auth": {
           "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nAuthentication capabilities supported by the client.\nDetermines which authentication method types the agent may include\nin its `InitializeResponse`.",
-          "x-deserialize-default-on-error": true,
-          "default": {},
-          "allOf": [
+          "anyOf": [
             {
               "$ref": "#/$defs/AuthCapabilities"
+            },
+            {
+              "type": "null"
             }
-          ]
+          ],
+          "x-deserialize-default-on-error": true
         },
         "elicitation": {
           "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nElicitation capabilities supported by the client.\nDetermines which elicitation modes the agent may use.",
@@ -7436,14 +7436,13 @@
       "description": "Request parameters for loading an existing session.\n\nOnly available if the Agent supports the `session.load` capability.\n\nSee protocol docs: [Loading Sessions](https://agentclientprotocol.com/protocol/v2/draft/session-setup#loading-sessions)",
       "type": "object",
       "properties": {
-        "mcpServers": {
-          "description": "List of MCP servers to connect to for this session.",
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/McpServer"
-          },
-          "x-deserialize-default-on-error": true,
-          "x-deserialize-skip-invalid-items": true
+        "sessionId": {
+          "description": "The ID of the session to load.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            }
+          ]
         },
         "cwd": {
           "description": "The working directory for this session.",
@@ -7458,13 +7457,14 @@
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
         },
-        "sessionId": {
-          "description": "The ID of the session to load.",
-          "allOf": [
-            {
-              "$ref": "#/$defs/SessionId"
-            }
-          ]
+        "mcpServers": {
+          "description": "List of MCP servers to connect to for this session.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/McpServer"
+          },
+          "x-deserialize-default-on-error": true,
+          "x-deserialize-skip-invalid-items": true
         },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
@@ -7473,7 +7473,7 @@
           "additionalProperties": true
         }
       },
-      "required": ["mcpServers", "cwd", "sessionId"],
+      "required": ["sessionId", "cwd", "mcpServers"],
       "x-side": "agent",
       "x-method": "session/load"
     },
@@ -8304,20 +8304,20 @@
                   ]
                 },
                 {
-                  "title": "ExtMethodResponse",
-                  "description": "Successful result returned by an extension method outside the core ACP method set.",
-                  "allOf": [
-                    {
-                      "$ref": "#/$defs/ExtResponse"
-                    }
-                  ]
-                },
-                {
                   "title": "MessageMcpResponse",
                   "description": "Successful result returned by an MCP-over-ACP `mcp/message` request.",
                   "allOf": [
                     {
                       "$ref": "#/$defs/MessageMcpResponse"
+                    }
+                  ]
+                },
+                {
+                  "title": "ExtMethodResponse",
+                  "description": "Successful result returned by an extension method outside the core ACP method set.",
+                  "allOf": [
+                    {
+                      "$ref": "#/$defs/ExtResponse"
                     }
                   ]
                 }
@@ -8590,11 +8590,11 @@
               "description": "All possible notifications that a client can send to an agent.\n\nThis enum is used internally for routing RPC notifications. You typically won't need\nto use this directly.\n\nNotifications do not expect a response.",
               "anyOf": [
                 {
-                  "title": "CancelNotification",
+                  "title": "CancelSessionNotification",
                   "description": "Cancels ongoing operations for a session.\n\nThis is a notification sent by the client to cancel active work in a\nsession.\n\nUpon receiving this notification, the Agent SHOULD:\n- Stop all language model requests as soon as possible\n- Abort all tool call invocations in progress\n- Send any pending `session/update` notifications\n- Report an idle `state_update` with `StopReason::Cancelled` after\n  cancellation succeeds\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#cancellation)",
                   "allOf": [
                     {
-                      "$ref": "#/$defs/CancelNotification"
+                      "$ref": "#/$defs/CancelSessionNotification"
                     }
                   ]
                 },
@@ -8690,7 +8690,7 @@
       "required": ["method"],
       "x-docs-ignore": true
     },
-    "CancelNotification": {
+    "CancelSessionNotification": {
       "description": "Notification to cancel ongoing operations for a session.\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#cancellation)",
       "type": "object",
       "properties": {
@@ -9037,7 +9037,7 @@
               "anyOf": [
                 {
                   "title": "CancelRequestNotification",
-                  "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or\nchanged at any point.\n\nCancels an ongoing request.\n\nThis is a notification sent by the side that sent a request to cancel that request.\n\nUpon receiving this notification, the receiver:\n\n1. MUST cancel the corresponding request activity and all nested activities\n2. MAY send any pending notifications.\n3. MUST send one of these responses for the original request:\n  - Valid response with appropriate data (partial results or cancellation marker)\n  - Error response with code `-32800` (Cancelled)\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/cancellation)",
+                  "description": "Cancels an ongoing request.\n\nThis is a notification sent by the side that sent a request to cancel that request.\n\nUpon receiving this notification, the receiver:\n\n1. MAY cancel the corresponding request activity and all nested activities\n2. MAY send any pending notifications.\n3. MUST send one of these responses for the original request:\n  - Valid response with appropriate data (partial results or cancellation marker)\n  - Error response with code `-32800` (Cancelled)\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/cancellation)",
                   "allOf": [
                     {
                       "$ref": "#/$defs/CancelRequestNotification"
@@ -9056,7 +9056,7 @@
       "x-docs-ignore": true
     },
     "CancelRequestNotification": {
-      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nNotification to cancel an ongoing request.\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/cancellation)",
+      "description": "Notification to cancel an ongoing request.\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/cancellation)",
       "type": "object",
       "properties": {
         "requestId": {
