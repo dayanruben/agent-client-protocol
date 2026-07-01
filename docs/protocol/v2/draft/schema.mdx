@@ -1684,6 +1684,31 @@ URL-based elicitation where the client directs the user to a URL.
 </Expandable>
 </ResponseField>
 
+<ResponseField name="other" type="object">
+Custom or future elicitation mode.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+Clients that do not understand this mode should preserve the raw payload
+when storing, replaying, proxying, or forwarding elicitation requests.
+They MUST NOT render it as a known elicitation mode.
+
+<Expandable title="Properties">
+
+<ResponseField name="mode" type={"string"} required>
+  Custom or future elicitation mode.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
 #### <span class="font-mono">CreateElicitationResponse</span>
 
 **UNSTABLE**
@@ -1741,6 +1766,31 @@ The elicitation was cancelled.
 
 <ResponseField name="action" type={"string"} required>
   The discriminator value. Must be `"cancel"`.
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="other" type="object">
+Custom or future elicitation action.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+Agents that do not understand this action should preserve the raw
+payload when storing, replaying, proxying, or forwarding elicitation
+responses. They MUST NOT treat it as a known elicitation action.
+
+<Expandable title="Properties">
+
+<ResponseField name="action" type={"string"} required>
+  Custom or future elicitation action.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
 </ResponseField>
 
 </Expandable>
@@ -2687,7 +2737,7 @@ The input specification for a command.
 
 **Type:** Union
 
-<ResponseField name="unstructured">
+<ResponseField name="text" type="object">
 All text that was typed after the command name is provided as input.
 
 <Expandable title="Properties">
@@ -2702,6 +2752,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="hint" type={"string"} required>
   A hint to display when the input hasn't been provided yet
+</ResponseField>
+<ResponseField name="type" type={"string"} required>
+  The discriminator value. Must be `"text"`.
 </ResponseField>
 
 </Expandable>
@@ -3614,6 +3667,31 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </Expandable>
 </ResponseField>
 
+<ResponseField name="other" type="object">
+Custom or future elicitation property schema.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+Clients that do not understand this property schema type should preserve
+the raw schema when storing, replaying, proxying, or forwarding
+elicitation requests. They MUST NOT render it as a known input control.
+
+<Expandable title="Properties">
+
+<ResponseField name="type" type={"string"} required>
+  Custom or future elicitation property schema type.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
 ## <span class="font-mono">ElicitationRequestScope</span>
 
 **UNSTABLE**
@@ -3721,16 +3799,6 @@ during a tool call and needs to redirect it to the user.
   }
 >
   Optional tool call within the session.
-</ResponseField>
-
-## <span class="font-mono">ElicitationStringType</span>
-
-Items definition for untitled multi-select enum properties.
-
-**Type:** Union
-
-<ResponseField name="string" type="string">
-  String schema type.
 </ResponseField>
 
 ## <span class="font-mono">ElicitationUrlCapabilities</span>
@@ -4627,8 +4695,8 @@ Items for a multi-select (array) property schema.
 
 **Type:** Union
 
-<ResponseField name="Untitled">
-Untitled multi-select items with plain string values.
+<ResponseField name="string" type="object">
+Multi-select string items with plain string values.
 
 <Expandable title="Properties">
 
@@ -4643,14 +4711,31 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="enum" type={<><span>"string"</span><span>[]</span></>} required>
   Allowed enum values.
 </ResponseField>
-<ResponseField name="type" type={<a href="#elicitationstringtype">ElicitationStringType</a>} required>
-  Item type discriminator. Must be `"string"`.
+<ResponseField name="type" type={"string"} required>
+  The discriminator value. Must be `"string"`.
 </ResponseField>
 
 </Expandable>
 </ResponseField>
 
-<ResponseField name="Titled">
+<ResponseField name="other" type="object">
+Custom or future typed multi-select items.
+
+<Expandable title="Properties">
+
+<ResponseField name="type" type={"string"} required>
+  Custom or future multi-select item type.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="titled">
 Titled multi-select items with human-readable labels.
 
 <Expandable title="Properties">
@@ -6550,6 +6635,32 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </Expandable>
 </ResponseField>
 
+<ResponseField name="other" type="object">
+Custom or future permission outcome.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+Agents that do not understand this outcome MUST NOT treat it as approval.
+They should preserve the raw payload when storing, replaying, proxying, or
+forwarding permission responses, and otherwise fail or decline the
+permission request according to policy.
+
+<Expandable title="Properties">
+
+<ResponseField name="outcome" type={"string"} required>
+  Custom or future permission outcome.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
 ## <span class="font-mono">RequiresActionStateUpdate</span>
 
 The agent is waiting on user action before it can continue.
@@ -7888,6 +7999,26 @@ format should treat it as an annotation rather than rejecting the schema.
 
 </ResponseField>
 
+## <span class="font-mono">StringMultiSelectItems</span>
+
+String item schema for multi-select enum properties.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
+</ResponseField>
+<ResponseField name="enum" type={<><span>"string"</span><span>[]</span></>} required>
+  Allowed enum values.
+</ResponseField>
+
 ## <span class="font-mono">StringPropertySchema</span>
 
 Schema for string properties in an elicitation form.
@@ -7962,6 +8093,26 @@ these keys.
 
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
+</ResponseField>
+
+## <span class="font-mono">TextCommandInput</span>
+
+All text that was typed after the command name is provided as input.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
+</ResponseField>
+<ResponseField name="hint" type={"string"} required>
+  A hint to display when the input hasn't been provided yet
 </ResponseField>
 
 ## <span class="font-mono">TextContent</span>
@@ -8376,49 +8527,6 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-</ResponseField>
-
-## <span class="font-mono">UnstructuredCommandInput</span>
-
-All text that was typed after the command name is provided as input.
-
-**Type:** Object
-
-**Properties:**
-
-<ResponseField name="_meta" type={"object | null"} >
-  The _meta property is reserved by ACP to allow clients and agents to attach additional
-metadata to their interactions. Implementations MUST NOT make assumptions about values at
-these keys.
-
-See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
-
-</ResponseField>
-<ResponseField name="hint" type={"string"} required>
-  A hint to display when the input hasn't been provided yet
-</ResponseField>
-
-## <span class="font-mono">UntitledMultiSelectItems</span>
-
-Items definition for untitled multi-select enum properties.
-
-**Type:** Object
-
-**Properties:**
-
-<ResponseField name="_meta" type={"object | null"} >
-  The _meta property is reserved by ACP to allow clients and agents to attach additional
-metadata to their interactions. Implementations MUST NOT make assumptions about values at
-these keys.
-
-See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
-
-</ResponseField>
-<ResponseField name="enum" type={<><span>"string"</span><span>[]</span></>} required>
-  Allowed enum values.
-</ResponseField>
-<ResponseField name="type" type={<a href="#elicitationstringtype">ElicitationStringType</a>} required>
-  Item type discriminator. Must be `"string"`.
 </ResponseField>
 
 ## <span class="font-mono">Usage</span>

@@ -198,6 +198,8 @@ This distinction is reflected in the client capabilities model, allowing clients
 - For URL mode, the `url` parameter MUST contain a valid URL.
 - Agents MUST NOT return the `URLElicitationRequiredError` (code `-32042`) except when URL mode elicitation is required.
 
+Unknown elicitation `mode` values are reserved for future ACP variants or implementation-specific extensions. Implementation-specific modes MUST begin with `_`. Clients that do not understand a mode should preserve the raw payload when storing, replaying, proxying, or forwarding elicitation requests, but MUST NOT render it as `form` or `url` or otherwise treat it as supported.
+
 ### Restricted JSON Schema
 
 Aligning with [MCP's draft elicitation specification](https://modelcontextprotocol.io/specification/draft/client/elicitation), form mode elicitation uses a restricted subset of JSON Schema. Schemas are limited to flat objects with primitive properties only—the client decides how to render appropriate input UI based on the schema.
@@ -314,6 +316,8 @@ Multi-select enum (with titles):
 }
 ```
 
+Unknown multi-select `items.type` values are reserved for future ACP variants or implementation-specific extensions. Implementation-specific values MUST begin with `_`. Clients that do not understand a multi-select item type should preserve the raw `items` schema when storing, replaying, proxying, or forwarding elicitation requests, but MUST NOT render it as string multi-select items.
+
 **Request schema structure:**
 
 ```json
@@ -340,6 +344,8 @@ Multi-select enum (with titles):
 - Complex nested objects/arrays (beyond enum arrays)
 - Conditional validation
 - Custom formats beyond the supported list
+
+Unknown property schema `type` values are reserved for future ACP variants or implementation-specific extensions. Implementation-specific values MUST begin with `_`. Clients that do not understand a property schema type should preserve the raw schema when storing, replaying, proxying, or forwarding elicitation requests, but MUST NOT render it as a known input control.
 
 Clients use this schema to generate appropriate input forms, validate user input before sending, and provide better guidance to users. All primitive types support optional default values; clients SHOULD pre-populate form fields with these values.
 
@@ -473,6 +479,8 @@ Elicitation responses use a three-action model (following MCP) to clearly distin
   }
 }
 ```
+
+Unknown elicitation `action` values are reserved for future ACP variants or implementation-specific extensions. Implementation-specific actions MUST begin with `_`. Agents that do not understand an action should preserve the raw payload when storing, replaying, proxying, or forwarding elicitation responses, but MUST NOT treat it as `accept`, `decline`, or `cancel`.
 
 For URL mode elicitation, the response with `action: "accept"` indicates that the user consented to the interaction. It does not mean the interaction is complete—the interaction occurs out-of-band and the client is not aware of the outcome until the agent sends a completion notification.
 
