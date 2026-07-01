@@ -615,7 +615,7 @@ impl IntoV1 for super::PlanUpdate {
         Ok(match plan {
             super::PlanUpdateContent::Items(items) => {
                 let super::PlanItems {
-                    id: _,
+                    plan_id: _,
                     entries,
                     meta: items_meta,
                 } = items;
@@ -709,9 +709,13 @@ impl IntoV1 for super::PlanItems {
     type Output = crate::v1::PlanItems;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { id, entries, meta } = self;
+        let Self {
+            plan_id,
+            entries,
+            meta,
+        } = self;
         Ok(crate::v1::PlanItems {
-            id: id.into_v1()?,
+            plan_id: plan_id.into_v1()?,
             entries: into_v1_vec_skip_errors(entries),
             meta: meta.into_v1()?,
         })
@@ -723,9 +727,13 @@ impl IntoV2 for crate::v1::PlanItems {
     type Output = super::PlanItems;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { id, entries, meta } = self;
+        let Self {
+            plan_id,
+            entries,
+            meta,
+        } = self;
         Ok(super::PlanItems {
-            id: id.into_v2()?,
+            plan_id: plan_id.into_v2()?,
             entries: into_v2_vec_skip_errors(entries),
             meta: meta.into_v2()?,
         })
@@ -737,9 +745,9 @@ impl IntoV1 for super::PlanFile {
     type Output = crate::v1::PlanFile;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { id, uri, meta } = self;
+        let Self { plan_id, uri, meta } = self;
         Ok(crate::v1::PlanFile {
-            id: id.into_v1()?,
+            plan_id: plan_id.into_v1()?,
             uri: uri.into_v1()?,
             meta: meta.into_v1()?,
         })
@@ -751,9 +759,9 @@ impl IntoV2 for crate::v1::PlanFile {
     type Output = super::PlanFile;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { id, uri, meta } = self;
+        let Self { plan_id, uri, meta } = self;
         Ok(super::PlanFile {
-            id: id.into_v2()?,
+            plan_id: plan_id.into_v2()?,
             uri: uri.into_v2()?,
             meta: meta.into_v2()?,
         })
@@ -765,9 +773,13 @@ impl IntoV1 for super::PlanMarkdown {
     type Output = crate::v1::PlanMarkdown;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { id, content, meta } = self;
+        let Self {
+            plan_id,
+            content,
+            meta,
+        } = self;
         Ok(crate::v1::PlanMarkdown {
-            id: id.into_v1()?,
+            plan_id: plan_id.into_v1()?,
             content: content.into_v1()?,
             meta: meta.into_v1()?,
         })
@@ -779,9 +791,13 @@ impl IntoV2 for crate::v1::PlanMarkdown {
     type Output = super::PlanMarkdown;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { id, content, meta } = self;
+        let Self {
+            plan_id,
+            content,
+            meta,
+        } = self;
         Ok(super::PlanMarkdown {
-            id: id.into_v2()?,
+            plan_id: plan_id.into_v2()?,
             content: content.into_v2()?,
             meta: meta.into_v2()?,
         })
@@ -793,9 +809,9 @@ impl IntoV1 for super::PlanRemoved {
     type Output = crate::v1::PlanRemoved;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { id, meta } = self;
+        let Self { plan_id, meta } = self;
         Ok(crate::v1::PlanRemoved {
-            id: id.into_v1()?,
+            plan_id: plan_id.into_v1()?,
             meta: meta.into_v1()?,
         })
     }
@@ -806,9 +822,9 @@ impl IntoV2 for crate::v1::PlanRemoved {
     type Output = super::PlanRemoved;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { id, meta } = self;
+        let Self { plan_id, meta } = self;
         Ok(super::PlanRemoved {
-            id: id.into_v2()?,
+            plan_id: plan_id.into_v2()?,
             meta: meta.into_v2()?,
         })
     }
@@ -1673,9 +1689,9 @@ impl IntoV1 for super::ConnectMcpRequest {
     type Output = crate::v1::ConnectMcpRequest;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { acp_id, meta } = self;
+        let Self { server_id, meta } = self;
         Ok(crate::v1::ConnectMcpRequest {
-            acp_id: acp_id.into_v1()?,
+            server_id: server_id.into_v1()?,
             meta: meta.into_v1()?,
         })
     }
@@ -1686,9 +1702,9 @@ impl IntoV2 for crate::v1::ConnectMcpRequest {
     type Output = super::ConnectMcpRequest;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { acp_id, meta } = self;
+        let Self { server_id, meta } = self;
         Ok(super::ConnectMcpRequest {
-            acp_id: acp_id.into_v2()?,
+            server_id: server_id.into_v2()?,
             meta: meta.into_v2()?,
         })
     }
@@ -2994,13 +3010,13 @@ impl IntoV1 for super::AuthMethodAgent {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            id,
+            method_id,
             name,
             description,
             meta,
         } = self;
         Ok(crate::v1::AuthMethodAgent {
-            id: id.into_v1()?,
+            id: method_id.into_v1()?,
             name: name.into_v1()?,
             description: description.into_v1()?,
             meta: meta.into_v1()?,
@@ -3019,7 +3035,7 @@ impl IntoV2 for crate::v1::AuthMethodAgent {
             meta,
         } = self;
         Ok(super::AuthMethodAgent {
-            id: id.into_v2()?,
+            method_id: id.into_v2()?,
             name: name.into_v2()?,
             description: description.into_v2()?,
             meta: meta.into_v2()?,
@@ -3033,7 +3049,7 @@ impl IntoV1 for super::AuthMethodEnvVar {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            id,
+            method_id,
             name,
             description,
             vars,
@@ -3041,7 +3057,7 @@ impl IntoV1 for super::AuthMethodEnvVar {
             meta,
         } = self;
         Ok(crate::v1::AuthMethodEnvVar {
-            id: id.into_v1()?,
+            id: method_id.into_v1()?,
             name: name.into_v1()?,
             description: description.into_v1()?,
             vars: vars.into_v1()?,
@@ -3065,7 +3081,7 @@ impl IntoV2 for crate::v1::AuthMethodEnvVar {
             meta,
         } = self;
         Ok(super::AuthMethodEnvVar {
-            id: id.into_v2()?,
+            method_id: id.into_v2()?,
             name: name.into_v2()?,
             description: description.into_v2()?,
             vars: vars.into_v2()?,
@@ -3125,7 +3141,7 @@ impl IntoV1 for super::AuthMethodTerminal {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            id,
+            method_id,
             name,
             description,
             args,
@@ -3153,7 +3169,7 @@ impl IntoV1 for super::AuthMethodTerminal {
                 Ok(env)
             })?;
         Ok(crate::v1::AuthMethodTerminal {
-            id: id.into_v1()?,
+            id: method_id.into_v1()?,
             name: name.into_v1()?,
             description: description.into_v1()?,
             args: args.into_v1()?,
@@ -3182,7 +3198,7 @@ impl IntoV2 for crate::v1::AuthMethodTerminal {
             .collect::<Result<Vec<_>>>()?;
         env.sort_by(|left, right| left.name.cmp(&right.name));
         Ok(super::AuthMethodTerminal {
-            id: id.into_v2()?,
+            method_id: id.into_v2()?,
             name: name.into_v2()?,
             description: description.into_v2()?,
             args: args.into_v2()?,
@@ -3785,13 +3801,13 @@ impl IntoV1 for super::SessionConfigSelectGroup {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            group,
+            group_id,
             name,
             options,
             meta,
         } = self;
         Ok(crate::v1::SessionConfigSelectGroup {
-            group: group.into_v1()?,
+            group: group_id.into_v1()?,
             name: name.into_v1()?,
             options: options.into_v1()?,
             meta: meta.into_v1()?,
@@ -3810,7 +3826,7 @@ impl IntoV2 for crate::v1::SessionConfigSelectGroup {
             meta,
         } = self;
         Ok(super::SessionConfigSelectGroup {
-            group: group.into_v2()?,
+            group_id: group.into_v2()?,
             name: name.into_v2()?,
             options: options.into_v2()?,
             meta: meta.into_v2()?,
@@ -3960,7 +3976,7 @@ impl IntoV1 for super::SessionConfigOption {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            id,
+            config_id,
             name,
             description,
             category,
@@ -3968,7 +3984,7 @@ impl IntoV1 for super::SessionConfigOption {
             meta,
         } = self;
         Ok(crate::v1::SessionConfigOption {
-            id: id.into_v1()?,
+            id: config_id.into_v1()?,
             name: name.into_v1()?,
             description: description.into_v1()?,
             category: into_v1_default_on_error(category),
@@ -3991,7 +4007,7 @@ impl IntoV2 for crate::v1::SessionConfigOption {
             meta,
         } = self;
         Ok(super::SessionConfigOption {
-            id: id.into_v2()?,
+            config_id: id.into_v2()?,
             name: name.into_v2()?,
             description: description.into_v2()?,
             category: into_v2_default_on_error(category),
@@ -4214,10 +4230,14 @@ impl IntoV1 for super::McpServerAcp {
     type Output = crate::v1::McpServerAcp;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { name, id, meta } = self;
+        let Self {
+            name,
+            server_id,
+            meta,
+        } = self;
         Ok(crate::v1::McpServerAcp {
             name: name.into_v1()?,
-            id: id.into_v1()?,
+            server_id: server_id.into_v1()?,
             meta: meta.into_v1()?,
         })
     }
@@ -4228,10 +4248,14 @@ impl IntoV2 for crate::v1::McpServerAcp {
     type Output = super::McpServerAcp;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { name, id, meta } = self;
+        let Self {
+            name,
+            server_id,
+            meta,
+        } = self;
         Ok(super::McpServerAcp {
             name: name.into_v2()?,
-            id: id.into_v2()?,
+            server_id: server_id.into_v2()?,
             meta: meta.into_v2()?,
         })
     }
@@ -4535,19 +4559,37 @@ impl IntoV2 for crate::v1::ProviderCurrentConfig {
 }
 
 #[cfg(feature = "unstable_llm_providers")]
+impl IntoV1 for super::ProviderId {
+    type Output = crate::v1::ProviderId;
+
+    fn into_v1(self) -> Result<Self::Output> {
+        Ok(crate::v1::ProviderId(self.0.into_v1()?))
+    }
+}
+
+#[cfg(feature = "unstable_llm_providers")]
+impl IntoV2 for crate::v1::ProviderId {
+    type Output = super::ProviderId;
+
+    fn into_v2(self) -> Result<Self::Output> {
+        Ok(super::ProviderId(self.0.into_v2()?))
+    }
+}
+
+#[cfg(feature = "unstable_llm_providers")]
 impl IntoV1 for super::ProviderInfo {
     type Output = crate::v1::ProviderInfo;
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            id,
+            provider_id,
             supported,
             required,
             current,
             meta,
         } = self;
         Ok(crate::v1::ProviderInfo {
-            id: id.into_v1()?,
+            provider_id: provider_id.into_v1()?,
             supported: into_v1_vec_skip_errors(supported),
             required: required.into_v1()?,
             current: current.into_v1()?,
@@ -4562,14 +4604,14 @@ impl IntoV2 for crate::v1::ProviderInfo {
 
     fn into_v2(self) -> Result<Self::Output> {
         let Self {
-            id,
+            provider_id,
             supported,
             required,
             current,
             meta,
         } = self;
         Ok(super::ProviderInfo {
-            id: id.into_v2()?,
+            provider_id: provider_id.into_v2()?,
             supported: into_v2_vec_skip_errors(supported),
             required: required.into_v2()?,
             current: current.into_v2()?,
@@ -4634,14 +4676,14 @@ impl IntoV1 for super::SetProviderRequest {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            id,
+            provider_id,
             api_type,
             base_url,
             headers,
             meta,
         } = self;
         Ok(crate::v1::SetProviderRequest {
-            id: id.into_v1()?,
+            provider_id: provider_id.into_v1()?,
             api_type: api_type.into_v1()?,
             base_url: base_url.into_v1()?,
             headers: headers.into_v1()?,
@@ -4656,14 +4698,14 @@ impl IntoV2 for crate::v1::SetProviderRequest {
 
     fn into_v2(self) -> Result<Self::Output> {
         let Self {
-            id,
+            provider_id,
             api_type,
             base_url,
             headers,
             meta,
         } = self;
         Ok(super::SetProviderRequest {
-            id: id.into_v2()?,
+            provider_id: provider_id.into_v2()?,
             api_type: api_type.into_v2()?,
             base_url: base_url.into_v2()?,
             headers: headers.into_v2()?,
@@ -4701,9 +4743,9 @@ impl IntoV1 for super::DisableProviderRequest {
     type Output = crate::v1::DisableProviderRequest;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self { id, meta } = self;
+        let Self { provider_id, meta } = self;
         Ok(crate::v1::DisableProviderRequest {
-            id: id.into_v1()?,
+            provider_id: provider_id.into_v1()?,
             meta: meta.into_v1()?,
         })
     }
@@ -4714,9 +4756,9 @@ impl IntoV2 for crate::v1::DisableProviderRequest {
     type Output = super::DisableProviderRequest;
 
     fn into_v2(self) -> Result<Self::Output> {
-        let Self { id, meta } = self;
+        let Self { provider_id, meta } = self;
         Ok(super::DisableProviderRequest {
-            id: id.into_v2()?,
+            provider_id: provider_id.into_v2()?,
             meta: meta.into_v2()?,
         })
     }
@@ -7178,19 +7220,37 @@ impl IntoV2 for crate::v1::NesSuggestion {
 }
 
 #[cfg(feature = "unstable_nes")]
+impl IntoV1 for super::NesSuggestionId {
+    type Output = crate::v1::NesSuggestionId;
+
+    fn into_v1(self) -> Result<Self::Output> {
+        Ok(crate::v1::NesSuggestionId(self.0.into_v1()?))
+    }
+}
+
+#[cfg(feature = "unstable_nes")]
+impl IntoV2 for crate::v1::NesSuggestionId {
+    type Output = super::NesSuggestionId;
+
+    fn into_v2(self) -> Result<Self::Output> {
+        Ok(super::NesSuggestionId(self.0.into_v2()?))
+    }
+}
+
+#[cfg(feature = "unstable_nes")]
 impl IntoV1 for super::NesEditSuggestion {
     type Output = crate::v1::NesEditSuggestion;
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            id,
+            suggestion_id,
             uri,
             edits,
             cursor_position,
             meta,
         } = self;
         Ok(crate::v1::NesEditSuggestion {
-            id: id.into_v1()?,
+            id: suggestion_id.into_v1()?,
             uri: uri.into_v1()?,
             edits: edits.into_v1()?,
             cursor_position: into_v1_default_on_error(cursor_position),
@@ -7212,7 +7272,7 @@ impl IntoV2 for crate::v1::NesEditSuggestion {
             meta,
         } = self;
         Ok(super::NesEditSuggestion {
-            id: id.into_v2()?,
+            suggestion_id: id.into_v2()?,
             uri: uri.into_v2()?,
             edits: edits.into_v2()?,
             cursor_position: into_v2_default_on_error(cursor_position),
@@ -7263,13 +7323,13 @@ impl IntoV1 for super::NesJumpSuggestion {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            id,
+            suggestion_id,
             uri,
             position,
             meta,
         } = self;
         Ok(crate::v1::NesJumpSuggestion {
-            id: id.into_v1()?,
+            id: suggestion_id.into_v1()?,
             uri: uri.into_v1()?,
             position: position.into_v1()?,
             meta: meta.into_v1()?,
@@ -7289,7 +7349,7 @@ impl IntoV2 for crate::v1::NesJumpSuggestion {
             meta,
         } = self;
         Ok(super::NesJumpSuggestion {
-            id: id.into_v2()?,
+            suggestion_id: id.into_v2()?,
             uri: uri.into_v2()?,
             position: position.into_v2()?,
             meta: meta.into_v2()?,
@@ -7303,14 +7363,14 @@ impl IntoV1 for super::NesRenameSuggestion {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            id,
+            suggestion_id,
             uri,
             position,
             new_name,
             meta,
         } = self;
         Ok(crate::v1::NesRenameSuggestion {
-            id: id.into_v1()?,
+            id: suggestion_id.into_v1()?,
             uri: uri.into_v1()?,
             position: position.into_v1()?,
             new_name: new_name.into_v1()?,
@@ -7332,7 +7392,7 @@ impl IntoV2 for crate::v1::NesRenameSuggestion {
             meta,
         } = self;
         Ok(super::NesRenameSuggestion {
-            id: id.into_v2()?,
+            suggestion_id: id.into_v2()?,
             uri: uri.into_v2()?,
             position: position.into_v2()?,
             new_name: new_name.into_v2()?,
@@ -7347,7 +7407,7 @@ impl IntoV1 for super::NesSearchAndReplaceSuggestion {
 
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
-            id,
+            suggestion_id,
             uri,
             search,
             replace,
@@ -7355,7 +7415,7 @@ impl IntoV1 for super::NesSearchAndReplaceSuggestion {
             meta,
         } = self;
         Ok(crate::v1::NesSearchAndReplaceSuggestion {
-            id: id.into_v1()?,
+            id: suggestion_id.into_v1()?,
             uri: uri.into_v1()?,
             search: search.into_v1()?,
             replace: replace.into_v1()?,
@@ -7379,7 +7439,7 @@ impl IntoV2 for crate::v1::NesSearchAndReplaceSuggestion {
             meta,
         } = self;
         Ok(super::NesSearchAndReplaceSuggestion {
-            id: id.into_v2()?,
+            suggestion_id: id.into_v2()?,
             uri: uri.into_v2()?,
             search: search.into_v2()?,
             replace: replace.into_v2()?,
@@ -7396,12 +7456,12 @@ impl IntoV1 for super::AcceptNesNotification {
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
             session_id,
-            id,
+            suggestion_id,
             meta,
         } = self;
         Ok(crate::v1::AcceptNesNotification {
             session_id: session_id.into_v1()?,
-            id: id.into_v1()?,
+            id: suggestion_id.into_v1()?,
             meta: meta.into_v1()?,
         })
     }
@@ -7419,7 +7479,7 @@ impl IntoV2 for crate::v1::AcceptNesNotification {
         } = self;
         Ok(super::AcceptNesNotification {
             session_id: session_id.into_v2()?,
-            id: id.into_v2()?,
+            suggestion_id: id.into_v2()?,
             meta: meta.into_v2()?,
         })
     }
@@ -7432,13 +7492,13 @@ impl IntoV1 for super::RejectNesNotification {
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
             session_id,
-            id,
+            suggestion_id,
             reason,
             meta,
         } = self;
         Ok(crate::v1::RejectNesNotification {
             session_id: session_id.into_v1()?,
-            id: id.into_v1()?,
+            id: suggestion_id.into_v1()?,
             reason: into_v1_default_on_error(reason),
             meta: meta.into_v1()?,
         })
@@ -7458,7 +7518,7 @@ impl IntoV2 for crate::v1::RejectNesNotification {
         } = self;
         Ok(super::RejectNesNotification {
             session_id: session_id.into_v2()?,
-            id: id.into_v2()?,
+            suggestion_id: id.into_v2()?,
             reason: into_v2_default_on_error(reason),
             meta: meta.into_v2()?,
         })
@@ -9645,13 +9705,6 @@ mod tests {
             v1::SessionUpdate::UserMessageChunk(content_chunk("u", "msg_user")),
             v1::SessionUpdate::AgentMessageChunk(content_chunk("a", "msg_agent")),
             v1::SessionUpdate::AgentThoughtChunk(content_chunk("t", "msg_thought")),
-            #[cfg(feature = "unstable_plan_operations")]
-            v1::SessionUpdate::PlanUpdate(v1::PlanUpdate::new(v1::PlanUpdateContent::markdown(
-                "plan-1",
-                "## Steps\n- [ ] Test conversion",
-            ))),
-            #[cfg(feature = "unstable_plan_operations")]
-            v1::SessionUpdate::PlanRemoved(v1::PlanRemoved::new("plan-1")),
             v1::SessionUpdate::SessionInfoUpdate(v1::SessionInfoUpdate::new().title("hi")),
             v1::SessionUpdate::UsageUpdate(
                 v1::UsageUpdate::new(53_000, 200_000).cost(v1::Cost::new(0.045, "USD")),
@@ -9944,7 +9997,7 @@ mod tests {
                 "sessionUpdate": "plan_update",
                 "plan": {
                     "type": "items",
-                    "id": LEGACY_V1_PLAN_ID,
+                    "planId": LEGACY_V1_PLAN_ID,
                     "entries": [
                         {
                             "content": "step",
@@ -10263,6 +10316,7 @@ mod tests {
         assert_v2_to_v1_error(
             v2::NesSuggestion::Other(v2::OtherNesSuggestion::new(
                 "_preview",
+                "preview-1",
                 std::collections::BTreeMap::new(),
             )),
             "v2 NesSuggestion variant `_preview` cannot be represented in v1",
