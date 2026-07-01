@@ -4058,8 +4058,8 @@
           ]
         },
         "configOptions": {
-          "description": "Initial session configuration options if supported by the Agent.",
-          "type": ["array", "null"],
+          "description": "Initial session configuration options.",
+          "type": "array",
           "items": {
             "$ref": "#/$defs/SessionConfigOption"
           },
@@ -4359,8 +4359,8 @@
       "type": "object",
       "properties": {
         "configOptions": {
-          "description": "Initial session configuration options if supported by the Agent.",
-          "type": ["array", "null"],
+          "description": "Initial session configuration options.",
+          "type": "array",
           "items": {
             "$ref": "#/$defs/SessionConfigOption"
           },
@@ -4477,8 +4477,8 @@
           ]
         },
         "configOptions": {
-          "description": "Initial session configuration options if supported by the Agent.",
-          "type": ["array", "null"],
+          "description": "Initial session configuration options.",
+          "type": "array",
           "items": {
             "$ref": "#/$defs/SessionConfigOption"
           },
@@ -4501,8 +4501,8 @@
       "type": "object",
       "properties": {
         "configOptions": {
-          "description": "Initial session configuration options if supported by the Agent.",
-          "type": ["array", "null"],
+          "description": "Initial session configuration options.",
+          "type": "array",
           "items": {
             "$ref": "#/$defs/SessionConfigOption"
           },
@@ -7473,7 +7473,7 @@
           "additionalProperties": true
         }
       },
-      "required": ["sessionId", "cwd", "mcpServers"],
+      "required": ["sessionId", "cwd"],
       "x-side": "agent",
       "x-method": "session/load"
     },
@@ -7667,6 +7667,25 @@
       "required": ["sessionId", "configId"],
       "anyOf": [
         {
+          "description": "A [`SessionConfigValueId`] string value (`type: \"id\"`).",
+          "type": "object",
+          "properties": {
+            "value": {
+              "description": "The value ID.",
+              "allOf": [
+                {
+                  "$ref": "#/$defs/SessionConfigValueId"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "id"
+            }
+          },
+          "required": ["type", "value"]
+        },
+        {
           "description": "A boolean value (`type: \"boolean\"`).",
           "type": "object",
           "properties": {
@@ -7682,22 +7701,49 @@
           "required": ["type", "value"]
         },
         {
-          "title": "value_id",
-          "description": "A [`SessionConfigValueId`] string value.\n\nThis is the default when `type` is absent on the wire. Unknown `type`\nvalues with string payloads also gracefully deserialize into this\nvariant.",
+          "title": "other",
+          "description": "Custom or future session configuration option value payload.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
           "type": "object",
           "properties": {
+            "type": {
+              "description": "Custom or future session configuration option value type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
+              "type": "string"
+            },
             "value": {
-              "description": "The value ID.",
-              "allOf": [
-                {
-                  "$ref": "#/$defs/SessionConfigValueId"
-                }
-              ]
+              "description": "Raw value payload for the custom or future value type."
             }
           },
-          "required": ["value"]
+          "required": ["type", "value"],
+          "not": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "id"
+                  }
+                },
+                "required": ["type"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "boolean"
+                  }
+                },
+                "required": ["type"]
+              }
+            ]
+          },
+          "additionalProperties": true
         }
       ],
+      "discriminator": {
+        "propertyName": "type"
+      },
       "x-side": "agent",
       "x-method": "session/set_config_option"
     },

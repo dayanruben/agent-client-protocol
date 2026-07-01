@@ -1167,11 +1167,11 @@ pub struct NewSessionResponse {
     ///
     /// Used in all subsequent requests for this conversation.
     pub session_id: SessionId,
-    /// Initial session configuration options if supported by the Agent.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
+    /// Initial session configuration options.
+    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
     #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
-    #[serde(default)]
-    pub config_options: Option<Vec<SessionConfigOption>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub config_options: Vec<SessionConfigOption>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
@@ -1190,18 +1190,15 @@ impl NewSessionResponse {
     pub fn new(session_id: impl Into<SessionId>) -> Self {
         Self {
             session_id: session_id.into(),
-            config_options: None,
+            config_options: Vec::new(),
             meta: None,
         }
     }
 
-    /// Initial session configuration options if supported by the Agent.
+    /// Initial session configuration options.
     #[must_use]
-    pub fn config_options(
-        mut self,
-        config_options: impl IntoOption<Vec<SessionConfigOption>>,
-    ) -> Self {
-        self.config_options = config_options.into_option();
+    pub fn config_options(mut self, config_options: Vec<SessionConfigOption>) -> Self {
+        self.config_options = config_options;
         self
     }
 
@@ -1248,6 +1245,7 @@ pub struct LoadSessionRequest {
     /// List of MCP servers to connect to for this session.
     #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
     #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mcp_servers: Vec<McpServer>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
@@ -1308,11 +1306,11 @@ impl LoadSessionRequest {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct LoadSessionResponse {
-    /// Initial session configuration options if supported by the Agent.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
+    /// Initial session configuration options.
+    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
     #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
-    #[serde(default)]
-    pub config_options: Option<Vec<SessionConfigOption>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub config_options: Vec<SessionConfigOption>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
@@ -1332,13 +1330,10 @@ impl LoadSessionResponse {
         Self::default()
     }
 
-    /// Initial session configuration options if supported by the Agent.
+    /// Initial session configuration options.
     #[must_use]
-    pub fn config_options(
-        mut self,
-        config_options: impl IntoOption<Vec<SessionConfigOption>>,
-    ) -> Self {
-        self.config_options = config_options.into_option();
+    pub fn config_options(mut self, config_options: Vec<SessionConfigOption>) -> Self {
+        self.config_options = config_options;
         self
     }
 
@@ -1459,11 +1454,11 @@ impl ForkSessionRequest {
 pub struct ForkSessionResponse {
     /// Unique identifier for the newly created forked session.
     pub session_id: SessionId,
-    /// Initial session configuration options if supported by the Agent.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
+    /// Initial session configuration options.
+    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
     #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
-    #[serde(default)]
-    pub config_options: Option<Vec<SessionConfigOption>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub config_options: Vec<SessionConfigOption>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
@@ -1483,18 +1478,15 @@ impl ForkSessionResponse {
     pub fn new(session_id: impl Into<SessionId>) -> Self {
         Self {
             session_id: session_id.into(),
-            config_options: None,
+            config_options: Vec::new(),
             meta: None,
         }
     }
 
-    /// Initial session configuration options if supported by the Agent.
+    /// Initial session configuration options.
     #[must_use]
-    pub fn config_options(
-        mut self,
-        config_options: impl IntoOption<Vec<SessionConfigOption>>,
-    ) -> Self {
-        self.config_options = config_options.into_option();
+    pub fn config_options(mut self, config_options: Vec<SessionConfigOption>) -> Self {
+        self.config_options = config_options;
         self
     }
 
@@ -1603,11 +1595,11 @@ impl ResumeSessionRequest {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ResumeSessionResponse {
-    /// Initial session configuration options if supported by the Agent.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
+    /// Initial session configuration options.
+    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
     #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
-    #[serde(default)]
-    pub config_options: Option<Vec<SessionConfigOption>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub config_options: Vec<SessionConfigOption>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
@@ -1627,13 +1619,10 @@ impl ResumeSessionResponse {
         Self::default()
     }
 
-    /// Initial session configuration options if supported by the Agent.
+    /// Initial session configuration options.
     #[must_use]
-    pub fn config_options(
-        mut self,
-        config_options: impl IntoOption<Vec<SessionConfigOption>>,
-    ) -> Self {
-        self.config_options = config_options.into_option();
+    pub fn config_options(mut self, config_options: Vec<SessionConfigOption>) -> Self {
+        self.config_options = config_options;
         self
     }
 
@@ -2531,41 +2520,170 @@ impl SessionConfigOption {
 /// The value to set for a session configuration option.
 ///
 /// The `type` field acts as the discriminator in the serialized JSON form.
-/// When no `type` is present, the value is treated as a [`SessionConfigValueId`]
-/// via the [`ValueId`](Self::ValueId) fallback variant.
 ///
 /// The `type` discriminator describes the *shape* of the value, not the option
 /// kind. For example every option kind that picks from a list of ids
-/// (`select`, `radio`, …) would use [`ValueId`](Self::ValueId), while a
-/// future freeform text option would get its own variant.
+/// (`select`, `radio`, …) would use [`Id`](Self::Id), while a future freeform
+/// text option would get its own variant.
 #[cfg(feature = "unstable_boolean_config")]
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[schemars(extend("discriminator" = {"propertyName": "type"}))]
 #[non_exhaustive]
 pub enum SessionConfigOptionValue {
+    /// A [`SessionConfigValueId`] string value (`type: "id"`).
+    Id {
+        /// The value ID.
+        value: SessionConfigValueId,
+    },
     /// A boolean value (`type: "boolean"`).
     Boolean {
         /// The boolean value.
         value: bool,
     },
-    /// A [`SessionConfigValueId`] string value.
+    /// Custom or future session configuration option value payload.
     ///
-    /// This is the default when `type` is absent on the wire. Unknown `type`
-    /// values with string payloads also gracefully deserialize into this
-    /// variant.
+    /// Values beginning with `_` are reserved for implementation-specific
+    /// extensions. Unknown values that do not begin with `_` are reserved for
+    /// future ACP variants.
     #[serde(untagged)]
-    ValueId {
-        /// The value ID.
-        value: SessionConfigValueId,
-    },
+    Other(OtherSessionConfigOptionValue),
+}
+
+/// Custom or future session configuration option value payload.
+#[cfg(feature = "unstable_boolean_config")]
+#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq, Eq)]
+#[schemars(inline)]
+#[schemars(transform = other_session_config_option_value_schema)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct OtherSessionConfigOptionValue {
+    /// Custom or future session configuration option value type.
+    ///
+    /// Values beginning with `_` are reserved for implementation-specific
+    /// extensions. Unknown values that do not begin with `_` are reserved for
+    /// future ACP variants.
+    #[serde(rename = "type")]
+    pub type_: String,
+    /// Raw value payload for the custom or future value type.
+    pub value: serde_json::Value,
+    /// Additional fields from the unknown session configuration option value payload.
+    #[serde(flatten)]
+    pub fields: BTreeMap<String, serde_json::Value>,
+}
+
+#[cfg(feature = "unstable_boolean_config")]
+impl OtherSessionConfigOptionValue {
+    /// Builds [`OtherSessionConfigOptionValue`] from an unknown discriminator and preserves the remaining extension fields.
+    #[must_use]
+    pub fn new(
+        type_: impl Into<String>,
+        value: serde_json::Value,
+        mut fields: BTreeMap<String, serde_json::Value>,
+    ) -> Self {
+        fields.remove("type");
+        fields.remove("value");
+        fields.remove("_meta");
+        Self {
+            type_: type_.into(),
+            value,
+            fields,
+        }
+    }
+}
+
+#[cfg(feature = "unstable_boolean_config")]
+impl<'de> Deserialize<'de> for OtherSessionConfigOptionValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let type_ = fields
+            .remove("type")
+            .ok_or_else(|| serde::de::Error::missing_field("type"))?;
+        let serde_json::Value::String(type_) = type_ else {
+            return Err(serde::de::Error::custom("`type` must be a string"));
+        };
+
+        if is_known_session_config_option_value_type(&type_) {
+            return Err(serde::de::Error::custom(format!(
+                "known session configuration option value `{type_}` did not match its schema"
+            )));
+        }
+
+        let value = fields
+            .remove("value")
+            .ok_or_else(|| serde::de::Error::missing_field("value"))?;
+
+        Ok(Self {
+            type_,
+            value,
+            fields,
+        })
+    }
+}
+
+#[cfg(feature = "unstable_boolean_config")]
+impl<'de> Deserialize<'de> for SessionConfigOptionValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let type_ = fields.remove("type");
+        let value = fields
+            .remove("value")
+            .ok_or_else(|| serde::de::Error::missing_field("value"))?;
+
+        let type_ = type_.ok_or_else(|| serde::de::Error::missing_field("type"))?;
+
+        let serde_json::Value::String(type_) = type_ else {
+            return Err(serde::de::Error::custom("`type` must be a string"));
+        };
+
+        match type_.as_str() {
+            "id" => {
+                let value = serde_json::from_value(value).map_err(|error| {
+                    serde::de::Error::custom(format!(
+                        "`value` must be a string for `type: id`: {error}"
+                    ))
+                })?;
+                Ok(Self::Id { value })
+            }
+            "boolean" => {
+                let value = serde_json::from_value(value).map_err(|error| {
+                    serde::de::Error::custom(format!(
+                        "`value` must be a boolean for `type: boolean`: {error}"
+                    ))
+                })?;
+                Ok(Self::Boolean { value })
+            }
+            _ => Ok(Self::Other(OtherSessionConfigOptionValue {
+                type_,
+                value,
+                fields,
+            })),
+        }
+    }
+}
+
+#[cfg(feature = "unstable_boolean_config")]
+fn is_known_session_config_option_value_type(type_: &str) -> bool {
+    matches!(type_, "id" | "boolean")
+}
+
+#[cfg(feature = "unstable_boolean_config")]
+fn other_session_config_option_value_schema(schema: &mut Schema) {
+    super::schema_util::reject_known_string_discriminators(schema, "type", &["id", "boolean"]);
 }
 
 #[cfg(feature = "unstable_boolean_config")]
 impl SessionConfigOptionValue {
-    /// Create a value-id option value (used by `select` and other id-based option types).
+    /// Create an id option value (used by `select` and other id-based option types).
     #[must_use]
-    pub fn value_id(id: impl Into<SessionConfigValueId>) -> Self {
-        Self::ValueId { value: id.into() }
+    pub fn id(id: impl Into<SessionConfigValueId>) -> Self {
+        Self::Id { value: id.into() }
     }
 
     /// Create a boolean option value.
@@ -2575,11 +2693,11 @@ impl SessionConfigOptionValue {
     }
 
     /// Return the inner [`SessionConfigValueId`] if this is a
-    /// [`ValueId`](Self::ValueId) value.
+    /// [`Id`](Self::Id) value.
     #[must_use]
-    pub fn as_value_id(&self) -> Option<&SessionConfigValueId> {
+    pub fn as_id(&self) -> Option<&SessionConfigValueId> {
         match self {
-            Self::ValueId { value } => Some(value),
+            Self::Id { value } => Some(value),
             _ => None,
         }
     }
@@ -2597,7 +2715,7 @@ impl SessionConfigOptionValue {
 #[cfg(feature = "unstable_boolean_config")]
 impl From<SessionConfigValueId> for SessionConfigOptionValue {
     fn from(value: SessionConfigValueId) -> Self {
-        Self::ValueId { value }
+        Self::Id { value }
     }
 }
 
@@ -2611,7 +2729,7 @@ impl From<bool> for SessionConfigOptionValue {
 #[cfg(feature = "unstable_boolean_config")]
 impl From<&str> for SessionConfigOptionValue {
     fn from(value: &str) -> Self {
-        Self::ValueId {
+        Self::Id {
             value: SessionConfigValueId::new(value),
         }
     }
@@ -2631,8 +2749,7 @@ pub struct SetSessionConfigOptionRequest {
     pub config_id: SessionConfigId,
     /// The value to set, including a `type` discriminator and the raw `value`.
     ///
-    /// When `type` is absent on the wire, defaults to treating the value as a
-    /// [`SessionConfigValueId`] for `select` options.
+    /// Payloads must send `type: "id"` for id-based options.
     #[cfg(feature = "unstable_boolean_config")]
     #[serde(flatten)]
     pub value: SessionConfigOptionValue,
@@ -5240,14 +5357,14 @@ pub enum ClientRequest {
     /// `new_session` without receiving an `auth_required` error.
     ///
     /// See protocol docs: [Initialization](https://agentclientprotocol.com/protocol/initialization)
-    LoginAuthRequest(LoginAuthRequest),
+    LoginAuthRequest(Box<LoginAuthRequest>),
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
     ///
     /// Lists providers that can be configured by the client.
     #[cfg(feature = "unstable_llm_providers")]
-    ListProvidersRequest(ListProvidersRequest),
+    ListProvidersRequest(Box<ListProvidersRequest>),
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
@@ -5261,12 +5378,12 @@ pub enum ClientRequest {
     ///
     /// Disables a provider.
     #[cfg(feature = "unstable_llm_providers")]
-    DisableProviderRequest(DisableProviderRequest),
+    DisableProviderRequest(Box<DisableProviderRequest>),
     /// Logs out of the current authenticated state.
     ///
     /// After a successful logout, all new sessions will require authentication.
     /// There is no guarantee about the behavior of already running sessions.
-    LogoutAuthRequest(LogoutAuthRequest),
+    LogoutAuthRequest(Box<LogoutAuthRequest>),
     /// Creates a new conversation session with the agent.
     ///
     /// Sessions represent independent conversation contexts with their own history and state.
@@ -5279,7 +5396,7 @@ pub enum ClientRequest {
     /// May return an `auth_required` error if the agent requires authentication.
     ///
     /// See protocol docs: [Session Setup](https://agentclientprotocol.com/protocol/session-setup)
-    NewSessionRequest(NewSessionRequest),
+    NewSessionRequest(Box<NewSessionRequest>),
     /// Loads an existing session to resume a previous conversation.
     ///
     /// This method is only available if the agent advertises the `session.load` capability.
@@ -5290,17 +5407,17 @@ pub enum ClientRequest {
     /// - Stream the entire conversation history back to the client via notifications
     ///
     /// See protocol docs: [Loading Sessions](https://agentclientprotocol.com/protocol/session-setup#loading-sessions)
-    LoadSessionRequest(LoadSessionRequest),
+    LoadSessionRequest(Box<LoadSessionRequest>),
     /// Lists existing sessions known to the agent.
     ///
     /// This method is only available if the agent advertises the `session.list` capability.
     ///
     /// The agent should return metadata about sessions with optional filtering and pagination support.
-    ListSessionsRequest(ListSessionsRequest),
+    ListSessionsRequest(Box<ListSessionsRequest>),
     /// Deletes an existing session from `session/list`.
     ///
     /// This method is only available if the agent advertises the `session.delete` capability.
-    DeleteSessionRequest(DeleteSessionRequest),
+    DeleteSessionRequest(Box<DeleteSessionRequest>),
     #[cfg(feature = "unstable_session_fork")]
     /// **UNSTABLE**
     ///
@@ -5313,23 +5430,23 @@ pub enum ClientRequest {
     /// The agent should create a new session with the same conversation context as the
     /// original, allowing operations like generating summaries without affecting the
     /// original session's history.
-    ForkSessionRequest(ForkSessionRequest),
+    ForkSessionRequest(Box<ForkSessionRequest>),
     /// Resumes an existing session without returning previous messages.
     ///
     /// This method is only available if the agent advertises the `session.resume` capability.
     ///
     /// The agent should resume the session context, allowing the conversation to continue
     /// without replaying the message history (unlike `session/load`).
-    ResumeSessionRequest(ResumeSessionRequest),
+    ResumeSessionRequest(Box<ResumeSessionRequest>),
     /// Closes an active session and frees up any resources associated with it.
     ///
     /// This method is only available if the agent advertises the `session.close` capability.
     ///
     /// The agent must cancel any ongoing work (as if `session/cancel` was called)
     /// and then free up any resources associated with the session.
-    CloseSessionRequest(CloseSessionRequest),
+    CloseSessionRequest(Box<CloseSessionRequest>),
     /// Sets the current value for a session configuration option.
-    SetSessionConfigOptionRequest(SetSessionConfigOptionRequest),
+    SetSessionConfigOptionRequest(Box<SetSessionConfigOptionRequest>),
     /// Processes a user prompt within a session.
     ///
     /// This request accepts the prompt:
@@ -5341,7 +5458,7 @@ pub enum ClientRequest {
     /// `session/update` notifications.
     ///
     /// See protocol docs: [Prompt Lifecycle](https://agentclientprotocol.com/protocol/prompt-lifecycle)
-    PromptRequest(PromptRequest),
+    PromptRequest(Box<PromptRequest>),
     #[cfg(feature = "unstable_nes")]
     /// **UNSTABLE**
     ///
@@ -5365,21 +5482,21 @@ pub enum ClientRequest {
     ///
     /// The agent must cancel any ongoing work and then free up any resources
     /// associated with the NES session.
-    CloseNesRequest(CloseNesRequest),
+    CloseNesRequest(Box<CloseNesRequest>),
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
     ///
     /// Exchanges an MCP-over-ACP message.
     #[cfg(feature = "unstable_mcp_over_acp")]
-    MessageMcpRequest(MessageMcpRequest),
+    MessageMcpRequest(Box<MessageMcpRequest>),
     /// Handles extension method requests from the client.
     ///
     /// Extension methods provide a way to add custom functionality while maintaining
     /// protocol compatibility.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-    ExtMethodRequest(ExtRequest),
+    ExtMethodRequest(Box<ExtRequest>),
 }
 
 impl ClientRequest {
@@ -5433,51 +5550,51 @@ pub enum AgentResponse {
     /// Successful result returned for a `initialize` request.
     InitializeResponse(Box<InitializeResponse>),
     /// Successful result returned for an `auth/login` request.
-    LoginAuthResponse(#[serde(default)] LoginAuthResponse),
+    LoginAuthResponse(#[serde(default)] Box<LoginAuthResponse>),
     /// Successful result returned for a `providers/list` request.
     #[cfg(feature = "unstable_llm_providers")]
-    ListProvidersResponse(ListProvidersResponse),
+    ListProvidersResponse(Box<ListProvidersResponse>),
     /// Successful result returned for a `providers/set` request.
     #[cfg(feature = "unstable_llm_providers")]
-    SetProviderResponse(#[serde(default)] SetProviderResponse),
+    SetProviderResponse(#[serde(default)] Box<SetProviderResponse>),
     /// Successful result returned for a `providers/disable` request.
     #[cfg(feature = "unstable_llm_providers")]
-    DisableProviderResponse(#[serde(default)] DisableProviderResponse),
+    DisableProviderResponse(#[serde(default)] Box<DisableProviderResponse>),
     /// Successful result returned for an `auth/logout` request.
-    LogoutAuthResponse(#[serde(default)] LogoutAuthResponse),
+    LogoutAuthResponse(#[serde(default)] Box<LogoutAuthResponse>),
     /// Successful result returned for a `session/new` request.
-    NewSessionResponse(NewSessionResponse),
+    NewSessionResponse(Box<NewSessionResponse>),
     /// Successful result returned for a `session/load` request.
-    LoadSessionResponse(#[serde(default)] LoadSessionResponse),
+    LoadSessionResponse(#[serde(default)] Box<LoadSessionResponse>),
     /// Successful result returned for a `session/list` request.
-    ListSessionsResponse(ListSessionsResponse),
+    ListSessionsResponse(Box<ListSessionsResponse>),
     /// Successful result returned for a `session/delete` request.
-    DeleteSessionResponse(#[serde(default)] DeleteSessionResponse),
+    DeleteSessionResponse(#[serde(default)] Box<DeleteSessionResponse>),
     /// Successful result returned for a `session/fork` request.
     #[cfg(feature = "unstable_session_fork")]
-    ForkSessionResponse(ForkSessionResponse),
+    ForkSessionResponse(Box<ForkSessionResponse>),
     /// Successful result returned for a `session/resume` request.
-    ResumeSessionResponse(#[serde(default)] ResumeSessionResponse),
+    ResumeSessionResponse(#[serde(default)] Box<ResumeSessionResponse>),
     /// Successful result returned for a `session/close` request.
-    CloseSessionResponse(#[serde(default)] CloseSessionResponse),
+    CloseSessionResponse(#[serde(default)] Box<CloseSessionResponse>),
     /// Successful result returned for a `session/set_config_option` request.
-    SetSessionConfigOptionResponse(SetSessionConfigOptionResponse),
+    SetSessionConfigOptionResponse(Box<SetSessionConfigOptionResponse>),
     /// Successful result returned for a `session/prompt` request.
-    PromptResponse(PromptResponse),
+    PromptResponse(Box<PromptResponse>),
     /// Successful result returned for a `nes/start` request.
     #[cfg(feature = "unstable_nes")]
-    StartNesResponse(StartNesResponse),
+    StartNesResponse(Box<StartNesResponse>),
     /// Successful result returned for a `nes/suggest` request.
     #[cfg(feature = "unstable_nes")]
-    SuggestNesResponse(SuggestNesResponse),
+    SuggestNesResponse(Box<SuggestNesResponse>),
     /// Successful result returned for a `nes/close` request.
     #[cfg(feature = "unstable_nes")]
-    CloseNesResponse(#[serde(default)] CloseNesResponse),
+    CloseNesResponse(#[serde(default)] Box<CloseNesResponse>),
     /// Successful result returned by an extension method outside the core ACP method set.
-    ExtMethodResponse(ExtResponse),
+    ExtMethodResponse(Box<ExtResponse>),
     /// Successful result returned by an MCP-over-ACP `mcp/message` request.
     #[cfg(feature = "unstable_mcp_over_acp")]
-    MessageMcpResponse(MessageMcpResponse),
+    MessageMcpResponse(Box<MessageMcpResponse>),
 }
 
 /// All possible notifications that a client can send to an agent.
@@ -5504,27 +5621,27 @@ pub enum ClientNotification {
     ///   cancellation succeeds
     ///
     /// See protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/prompt-lifecycle#cancellation)
-    CancelSessionNotification(CancelSessionNotification),
+    CancelSessionNotification(Box<CancelSessionNotification>),
     #[cfg(feature = "unstable_nes")]
     /// **UNSTABLE**
     ///
     /// Notification sent when a file is opened in the editor.
-    DidOpenDocumentNotification(DidOpenDocumentNotification),
+    DidOpenDocumentNotification(Box<DidOpenDocumentNotification>),
     #[cfg(feature = "unstable_nes")]
     /// **UNSTABLE**
     ///
     /// Notification sent when a file is edited.
-    DidChangeDocumentNotification(DidChangeDocumentNotification),
+    DidChangeDocumentNotification(Box<DidChangeDocumentNotification>),
     #[cfg(feature = "unstable_nes")]
     /// **UNSTABLE**
     ///
     /// Notification sent when a file is closed.
-    DidCloseDocumentNotification(DidCloseDocumentNotification),
+    DidCloseDocumentNotification(Box<DidCloseDocumentNotification>),
     #[cfg(feature = "unstable_nes")]
     /// **UNSTABLE**
     ///
     /// Notification sent when a file is saved.
-    DidSaveDocumentNotification(DidSaveDocumentNotification),
+    DidSaveDocumentNotification(Box<DidSaveDocumentNotification>),
     #[cfg(feature = "unstable_nes")]
     /// **UNSTABLE**
     ///
@@ -5534,26 +5651,26 @@ pub enum ClientNotification {
     /// **UNSTABLE**
     ///
     /// Notification sent when a suggestion is accepted.
-    AcceptNesNotification(AcceptNesNotification),
+    AcceptNesNotification(Box<AcceptNesNotification>),
     #[cfg(feature = "unstable_nes")]
     /// **UNSTABLE**
     ///
     /// Notification sent when a suggestion is rejected.
-    RejectNesNotification(RejectNesNotification),
+    RejectNesNotification(Box<RejectNesNotification>),
     /// **UNSTABLE**
     ///
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
     ///
     /// Sends an MCP-over-ACP notification.
     #[cfg(feature = "unstable_mcp_over_acp")]
-    MessageMcpNotification(MessageMcpNotification),
+    MessageMcpNotification(Box<MessageMcpNotification>),
     /// Handles extension notifications from the client.
     ///
     /// Extension notifications provide a way to send one-way messages for custom functionality
     /// while maintaining protocol compatibility.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
-    ExtNotification(ExtNotification),
+    ExtNotification(Box<ExtNotification>),
 }
 
 impl ClientNotification {
@@ -5781,15 +5898,18 @@ mod test_serialization {
         assert_eq!(AGENT_METHOD_NAMES.mcp_message, "mcp/message");
 
         assert_eq!(
-            ClientRequest::MessageMcpRequest(MessageMcpRequest::new("conn-1", "tools/list"))
-                .method(),
+            ClientRequest::MessageMcpRequest(Box::new(MessageMcpRequest::new(
+                "conn-1",
+                "tools/list"
+            )))
+            .method(),
             "mcp/message"
         );
         assert_eq!(
-            ClientNotification::MessageMcpNotification(MessageMcpNotification::new(
+            ClientNotification::MessageMcpNotification(Box::new(MessageMcpNotification::new(
                 "conn-1",
                 "notifications/progress"
-            ))
+            )))
             .method(),
             "mcp/message"
         );
@@ -5801,11 +5921,12 @@ mod test_serialization {
         assert_eq!(AGENT_METHOD_NAMES.auth_logout, "auth/logout");
 
         assert_eq!(
-            ClientRequest::LoginAuthRequest(LoginAuthRequest::new("agent-login")).method(),
+            ClientRequest::LoginAuthRequest(Box::new(LoginAuthRequest::new("agent-login")))
+                .method(),
             "auth/login"
         );
         assert_eq!(
-            ClientRequest::LogoutAuthRequest(LogoutAuthRequest::new()).method(),
+            ClientRequest::LogoutAuthRequest(Box::new(LogoutAuthRequest::new())).method(),
             "auth/logout"
         );
     }
@@ -5884,6 +6005,82 @@ mod test_serialization {
             deserialized,
             SessionConfigOptionCategory::Other("_my_custom_category".to_string()),
         );
+    }
+
+    fn test_config_option() -> SessionConfigOption {
+        SessionConfigOption::select(
+            "mode",
+            "Mode",
+            "ask",
+            vec![SessionConfigSelectOption::new("ask", "Ask")],
+        )
+    }
+
+    #[test]
+    fn test_session_response_config_options_default_empty_and_skip_serializing() {
+        assert_eq!(
+            serde_json::to_value(NewSessionResponse::new("sess")).unwrap(),
+            json!({ "sessionId": "sess" })
+        );
+        assert_eq!(
+            serde_json::to_value(LoadSessionResponse::new()).unwrap(),
+            json!({})
+        );
+        assert_eq!(
+            serde_json::to_value(ResumeSessionResponse::new()).unwrap(),
+            json!({})
+        );
+        #[cfg(feature = "unstable_session_fork")]
+        assert_eq!(
+            serde_json::to_value(ForkSessionResponse::new("fork")).unwrap(),
+            json!({ "sessionId": "fork" })
+        );
+
+        let json = serde_json::to_value(
+            NewSessionResponse::new("sess").config_options(vec![test_config_option()]),
+        )
+        .unwrap();
+        assert_eq!(json["configOptions"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_session_response_config_options_deserialize_missing_null_and_invalid() {
+        let missing: NewSessionResponse =
+            serde_json::from_value(json!({ "sessionId": "sess" })).unwrap();
+        assert!(missing.config_options.is_empty());
+
+        let null: NewSessionResponse = serde_json::from_value(json!({
+            "sessionId": "sess",
+            "configOptions": null
+        }))
+        .unwrap();
+        assert!(null.config_options.is_empty());
+
+        let wrong_shape: NewSessionResponse = serde_json::from_value(json!({
+            "sessionId": "sess",
+            "configOptions": "oops"
+        }))
+        .unwrap();
+        assert!(wrong_shape.config_options.is_empty());
+
+        let valid_option = serde_json::to_value(test_config_option()).unwrap();
+        let mixed: NewSessionResponse = serde_json::from_value(json!({
+            "sessionId": "sess",
+            "configOptions": ["oops", valid_option]
+        }))
+        .unwrap();
+        assert_eq!(mixed.config_options.len(), 1);
+
+        let load: LoadSessionResponse = serde_json::from_value(json!({})).unwrap();
+        assert!(load.config_options.is_empty());
+        let resume: ResumeSessionResponse = serde_json::from_value(json!({})).unwrap();
+        assert!(resume.config_options.is_empty());
+        #[cfg(feature = "unstable_session_fork")]
+        {
+            let fork: ForkSessionResponse =
+                serde_json::from_value(json!({ "sessionId": "fork" })).unwrap();
+            assert!(fork.config_options.is_empty());
+        }
     }
 
     #[test]
@@ -6007,7 +6204,8 @@ mod test_serialization {
     fn test_session_delete_serialization() {
         assert_eq!(AGENT_METHOD_NAMES.session_delete, "session/delete");
         assert_eq!(
-            ClientRequest::DeleteSessionRequest(DeleteSessionRequest::new("sess_abc123")).method(),
+            ClientRequest::DeleteSessionRequest(Box::new(DeleteSessionRequest::new("sess_abc123")))
+                .method(),
             "session/delete"
         );
         assert_eq!(
@@ -6053,6 +6251,33 @@ mod test_serialization {
                     "/home/user/product-docs"
                 ],
             })
+        );
+        assert_eq!(
+            serde_json::to_value(LoadSessionRequest::new("sess_abc123", "/home/user/project"))
+                .unwrap(),
+            json!({
+                "sessionId": "sess_abc123",
+                "cwd": "/home/user/project",
+            })
+        );
+        assert_eq!(
+            serde_json::from_value::<LoadSessionRequest>(json!({
+                "sessionId": "sess_abc123",
+                "cwd": "/home/user/project"
+            }))
+            .unwrap()
+            .mcp_servers,
+            Vec::<McpServer>::new()
+        );
+        assert_eq!(
+            serde_json::from_value::<LoadSessionRequest>(json!({
+                "sessionId": "sess_abc123",
+                "cwd": "/home/user/project",
+                "mcpServers": null
+            }))
+            .unwrap()
+            .mcp_servers,
+            Vec::<McpServer>::new()
         );
         assert_eq!(
             serde_json::to_value(SessionInfo::new("sess_abc123", "/home/user/project")).unwrap(),
@@ -6314,12 +6539,10 @@ mod test_serialization {
 
     #[cfg(feature = "unstable_boolean_config")]
     #[test]
-    fn test_session_config_option_value_id_serialize() {
-        let val = SessionConfigOptionValue::value_id("model-1");
+    fn test_session_config_option_id_serialize() {
+        let val = SessionConfigOptionValue::id("model-1");
         let json = serde_json::to_value(&val).unwrap();
-        // ValueId omits the "type" field (it's the default)
-        assert_eq!(json, json!({ "value": "model-1" }));
-        assert!(!json.as_object().unwrap().contains_key("type"));
+        assert_eq!(json, json!({ "type": "id", "value": "model-1" }));
     }
 
     #[cfg(feature = "unstable_boolean_config")]
@@ -6332,12 +6555,19 @@ mod test_serialization {
 
     #[cfg(feature = "unstable_boolean_config")]
     #[test]
-    fn test_session_config_option_value_deserialize_no_type() {
-        // Missing "type" should default to ValueId
-        let json = json!({ "value": "model-1" });
+    fn test_session_config_option_value_deserialize_id() {
+        let json = json!({ "type": "id", "value": "model-1" });
         let val: SessionConfigOptionValue = serde_json::from_value(json).unwrap();
-        assert_eq!(val, SessionConfigOptionValue::value_id("model-1"));
-        assert_eq!(val.as_value_id().unwrap().to_string(), "model-1");
+        assert_eq!(val, SessionConfigOptionValue::id("model-1"));
+        assert_eq!(val.as_id().unwrap().to_string(), "model-1");
+    }
+
+    #[cfg(feature = "unstable_boolean_config")]
+    #[test]
+    fn test_session_config_option_value_deserialize_requires_type() {
+        let json = json!({ "value": "model-1" });
+        let result = serde_json::from_value::<SessionConfigOptionValue>(json);
+        assert!(result.is_err());
     }
 
     #[cfg(feature = "unstable_boolean_config")]
@@ -6361,16 +6591,39 @@ mod test_serialization {
     #[cfg(feature = "unstable_boolean_config")]
     #[test]
     fn test_session_config_option_value_deserialize_unknown_type_with_string_value() {
-        // Unknown type with a string value gracefully falls back to ValueId
-        let json = json!({ "type": "text", "value": "freeform input" });
+        let json = json!({
+            "type": "text",
+            "value": "freeform input",
+            "maxLength": 200
+        });
         let val: SessionConfigOptionValue = serde_json::from_value(json).unwrap();
-        assert_eq!(val.as_value_id().unwrap().to_string(), "freeform input");
+        let SessionConfigOptionValue::Other(unknown) = val else {
+            panic!("Expected Other variant");
+        };
+        assert_eq!(unknown.type_, "text");
+        assert_eq!(unknown.value, json!("freeform input"));
+        assert_eq!(unknown.fields["maxLength"], json!(200));
     }
 
     #[cfg(feature = "unstable_boolean_config")]
     #[test]
-    fn test_session_config_option_value_roundtrip_value_id() {
-        let original = SessionConfigOptionValue::value_id("option-a");
+    fn test_session_config_option_value_deserialize_unknown_type_with_object_value() {
+        let json = json!({
+            "type": "range",
+            "value": { "min": 1, "max": 5 }
+        });
+        let val: SessionConfigOptionValue = serde_json::from_value(json).unwrap();
+        let SessionConfigOptionValue::Other(unknown) = val else {
+            panic!("Expected Other variant");
+        };
+        assert_eq!(unknown.type_, "range");
+        assert_eq!(unknown.value, json!({ "min": 1, "max": 5 }));
+    }
+
+    #[cfg(feature = "unstable_boolean_config")]
+    #[test]
+    fn test_session_config_option_value_roundtrip_id() {
+        let original = SessionConfigOptionValue::id("option-a");
         let json = serde_json::to_value(&original).unwrap();
         let roundtripped: SessionConfigOptionValue = serde_json::from_value(json).unwrap();
         assert_eq!(original, roundtripped);
@@ -6387,26 +6640,35 @@ mod test_serialization {
 
     #[cfg(feature = "unstable_boolean_config")]
     #[test]
+    fn test_session_config_option_value_roundtrip_other() {
+        let mut fields = BTreeMap::new();
+        fields.insert("maxLength".to_string(), json!(200));
+        let original = SessionConfigOptionValue::Other(OtherSessionConfigOptionValue::new(
+            "text",
+            json!("freeform input"),
+            fields,
+        ));
+        let json = serde_json::to_value(&original).unwrap();
+        let roundtripped: SessionConfigOptionValue = serde_json::from_value(json).unwrap();
+        assert_eq!(original, roundtripped);
+    }
+
+    #[cfg(feature = "unstable_boolean_config")]
+    #[test]
     fn test_session_config_option_value_type_mismatch_boolean_with_string() {
-        // type says "boolean" but value is a string — falls to untagged ValueId
         let json = json!({ "type": "boolean", "value": "not a bool" });
         let result = serde_json::from_value::<SessionConfigOptionValue>(json);
-        // serde tries Boolean first (fails), then falls to untagged ValueId (succeeds)
-        assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap().as_value_id().unwrap().to_string(),
-            "not a bool"
-        );
+        assert!(result.is_err());
     }
 
     #[cfg(feature = "unstable_boolean_config")]
     #[test]
     fn test_session_config_option_value_from_impls() {
         let from_str: SessionConfigOptionValue = "model-1".into();
-        assert_eq!(from_str.as_value_id().unwrap().to_string(), "model-1");
+        assert_eq!(from_str.as_id().unwrap().to_string(), "model-1");
 
         let from_id: SessionConfigOptionValue = SessionConfigValueId::new("model-2").into();
-        assert_eq!(from_id.as_value_id().unwrap().to_string(), "model-2");
+        assert_eq!(from_id.as_id().unwrap().to_string(), "model-2");
 
         let from_bool: SessionConfigOptionValue = true.into();
         assert_eq!(from_bool.as_bool(), Some(true));
@@ -6414,7 +6676,7 @@ mod test_serialization {
 
     #[cfg(feature = "unstable_boolean_config")]
     #[test]
-    fn test_set_session_config_option_request_value_id() {
+    fn test_set_session_config_option_request_id() {
         let req = SetSessionConfigOptionRequest::new("sess_1", "model", "model-1");
         let json = serde_json::to_value(&req).unwrap();
         assert_eq!(
@@ -6422,11 +6684,10 @@ mod test_serialization {
             json!({
                 "sessionId": "sess_1",
                 "configId": "model",
+                "type": "id",
                 "value": "model-1"
             })
         );
-        // No "type" field for value_id
-        assert!(!json.as_object().unwrap().contains_key("type"));
     }
 
     #[cfg(feature = "unstable_boolean_config")]
@@ -6447,17 +6708,14 @@ mod test_serialization {
 
     #[cfg(feature = "unstable_boolean_config")]
     #[test]
-    fn test_set_session_config_option_request_deserialize_no_type() {
-        // Backwards-compatible: no "type" field → value_id
+    fn test_set_session_config_option_request_deserialize_requires_type() {
         let json = json!({
             "sessionId": "sess_1",
             "configId": "model",
             "value": "model-1"
         });
-        let req: SetSessionConfigOptionRequest = serde_json::from_value(json).unwrap();
-        assert_eq!(req.session_id.to_string(), "sess_1");
-        assert_eq!(req.config_id.to_string(), "model");
-        assert_eq!(req.value.as_value_id().unwrap().to_string(), "model-1");
+        let result = serde_json::from_value::<SetSessionConfigOptionRequest>(json);
+        assert!(result.is_err());
     }
 
     #[cfg(feature = "unstable_boolean_config")]
@@ -6475,7 +6733,7 @@ mod test_serialization {
 
     #[cfg(feature = "unstable_boolean_config")]
     #[test]
-    fn test_set_session_config_option_request_roundtrip_value_id() {
+    fn test_set_session_config_option_request_roundtrip_id() {
         let original = SetSessionConfigOptionRequest::new("s", "c", "v");
         let json = serde_json::to_value(&original).unwrap();
         let roundtripped: SetSessionConfigOptionRequest = serde_json::from_value(json).unwrap();
