@@ -759,7 +759,7 @@ and control access to resources.
 <a id="session-request_permission"></a>
 ### <span class="font-mono">session/request_permission</span>
 
-Requests permission from the user for a tool call operation.
+Requests permission from the user for an operation.
 
 Called by the agent when it needs user authorization before executing
 a potentially sensitive operation. The client should present the options
@@ -772,7 +772,7 @@ See protocol docs: [Requesting Permission](https://agentclientprotocol.com/proto
 
 #### <span class="font-mono">RequestPermissionRequest</span>
 
-Request for user permission to execute a tool call.
+Request for user permission to proceed with an operation.
 
 Sent when the agent needs authorization before performing a sensitive operation.
 
@@ -790,14 +790,32 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
 
 </ResponseField>
+<ResponseField name="description" type={"string | null"} >
+  Optional human-readable explanation of why permission is needed.
+
+This text is specific to the permission prompt and does not update any
+subject's displayed content. Omitted or `null` both mean no separate
+permission description was provided.
+
+</ResponseField>
 <ResponseField name="options" type={<a href="#permissionoption">PermissionOption[]</a>} required>
   Available permission options for the user to choose from.
 </ResponseField>
 <ResponseField name="sessionId" type={<a href="#sessionid">SessionId</a>} required>
   The session ID for this request.
 </ResponseField>
-<ResponseField name="toolCall" type={<a href="#toolcallupdate">ToolCallUpdate</a>} required>
-  Details about the tool call requiring permission.
+<ResponseField name="subject" type={<><span><a href="#requestpermissionsubject">RequestPermissionSubject</a></span><span> | null</span></>} >
+  Optional structured context about the operation requiring permission.
+
+Omitted or `null` both mean no structured subject was provided.
+
+</ResponseField>
+<ResponseField name="title" type={"string"} required>
+  Human-readable title for the permission prompt.
+
+This title is specific to the permission prompt and does not update any
+subject's displayed title.
+
 </ResponseField>
 
 #### <span class="font-mono">RequestPermissionResponse</span>
@@ -2806,6 +2824,57 @@ future ACP variants.
 </Expandable>
 </ResponseField>
 
+## <span class="font-mono">RequestPermissionSubject</span>
+
+The operation requiring permission.
+
+**Type:** Union
+
+<ResponseField name="tool_call" type="object">
+Permission is requested before executing a tool call.
+
+<Expandable title="Properties">
+
+<ResponseField
+  name="toolCall"
+  type={<a href="#toolcallupdate">ToolCallUpdate</a>}
+  required
+>
+  Details about the tool call requiring permission.
+</ResponseField>
+<ResponseField name="type" type={"string"} required>
+  The discriminator value. Must be `"tool_call"`.
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="other" type="object">
+Custom or future permission subject.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+Clients that do not understand this subject type should preserve the raw
+payload when storing, replaying, proxying, or forwarding permission
+requests, and otherwise display a generic permission prompt or decline it
+according to policy.
+
+<Expandable title="Properties">
+
+<ResponseField name="type" type={"string"} required>
+  Custom or future permission subject type.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
 ## <span class="font-mono">RequiresActionStateUpdate</span>
 
 The agent is waiting on user action before it can continue.
@@ -4232,6 +4301,22 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 </ResponseField>
 <ResponseField name="path" type={"string"} required>
   The absolute file path being accessed or modified.
+</ResponseField>
+
+## <span class="font-mono">ToolCallPermissionSubject</span>
+
+Permission request details for a tool call.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField
+  name="toolCall"
+  type={<a href="#toolcallupdate">ToolCallUpdate</a>}
+  required
+>
+  Details about the tool call requiring permission.
 </ResponseField>
 
 ## <span class="font-mono">ToolCallStatus</span>
