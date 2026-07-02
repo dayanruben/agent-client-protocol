@@ -182,9 +182,6 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 </ResponseField>
 <ResponseField name="authMethods" type={<a href="#authmethod">AuthMethod[]</a>} >
   Authentication methods supported by the agent.
-
-    - Default: `[]`
-
 </ResponseField>
 <ResponseField name="capabilities" type={<a href="#agentcapabilities">AgentCapabilities</a>} >
   Capabilities supported by the agent.
@@ -397,7 +394,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 to fetch the next page. If absent, there are no more results.
 </ResponseField>
 <ResponseField name="sessions" type={<a href="#sessioninfo">SessionInfo[]</a>} required>
-  Array of session information objects
+  Array of session information objects.
 </ResponseField>
 
 <a id="session-load"></a>
@@ -445,7 +442,7 @@ the request `cwd` matches the session's `cwd`.
 
 </ResponseField>
 <ResponseField name="cwd" type={"string"} required>
-  The working directory for this session.
+  The working directory for this session. Must be an absolute path.
 </ResponseField>
 <ResponseField name="mcpServers" type={<a href="#mcpserver">McpServer[]</a>} >
   List of MCP servers to connect to for this session.
@@ -671,7 +668,7 @@ the request `cwd` matches the session's `cwd`.
 
 </ResponseField>
 <ResponseField name="cwd" type={"string"} required>
-  The working directory for this session.
+  The working directory for this session. Must be an absolute path.
 </ResponseField>
 <ResponseField name="mcpServers" type={<a href="#mcpserver">McpServer[]</a>} >
   List of MCP servers to connect to for this session.
@@ -957,6 +954,10 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 </ResponseField>
 <ResponseField name="auth" type={<><span><a href="#agentauthcapabilities">AgentAuthCapabilities</a></span><span> | null</span></>} >
   Authentication-related capabilities supported by the agent.
+
+Optional. Omitted or `null` both mean the agent does not advertise any
+authentication-related extensions.
+
 </ResponseField>
 <ResponseField name="session" type={<><span><a href="#sessioncapabilities">SessionCapabilities</a></span><span> | null</span></>} >
   Session capabilities supported by the agent.
@@ -1116,7 +1117,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 <ResponseField name="description" type={"string | null"} >
   Optional description providing more details about this authentication method.
 </ResponseField>
-<ResponseField name="id" type={<a href="#authmethodid">AuthMethodId</a>} required>
+<ResponseField name="methodId" type={<a href="#authmethodid">AuthMethodId</a>} required>
   Unique identifier for this authentication method.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
@@ -1153,7 +1154,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 <ResponseField name="description" type={"string | null"} >
   Optional description providing more details about this authentication method.
 </ResponseField>
-<ResponseField name="id" type={<a href="#authmethodid">AuthMethodId</a>} required>
+<ResponseField name="methodId" type={<a href="#authmethodid">AuthMethodId</a>} required>
   Unique identifier for this authentication method.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
@@ -1192,7 +1193,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 <ResponseField name="description" type={"string | null"} >
   Optional description providing more details about this authentication method.
 </ResponseField>
-<ResponseField name="id" type={<a href="#authmethodid">AuthMethodId</a>} required>
+<ResponseField name="methodId" type={<a href="#authmethodid">AuthMethodId</a>} required>
   Unique identifier for this authentication method.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
@@ -1237,7 +1238,7 @@ The input specification for a command.
 
 **Type:** Union
 
-<ResponseField name="unstructured">
+<ResponseField name="text" type="object">
 All text that was typed after the command name is provided as input.
 
 <Expandable title="Properties">
@@ -1252,6 +1253,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 </ResponseField>
 <ResponseField name="hint" type={"string"} required>
   A hint to display when the input hasn't been provided yet
+</ResponseField>
+<ResponseField name="type" type={"string"} required>
+  The discriminator value. Must be `"text"`.
 </ResponseField>
 
 </Expandable>
@@ -1300,7 +1304,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 </ResponseField>
 <ResponseField name="availableCommands" type={<a href="#availablecommand">AvailableCommand[]</a>} required>
-  Commands the agent can execute
+  Commands the agent can execute.
 </ResponseField>
 
 ## <span class="font-mono">BlobResourceContents</span>
@@ -1681,7 +1685,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
   The original content (None for new files).
 </ResponseField>
 <ResponseField name="path" type={"string"} required>
-  The file path being modified.
+  The absolute file path being modified.
 </ResponseField>
 
 ## <span class="font-mono">EmbeddedResource</span>
@@ -2075,7 +2079,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
 
 </ResponseField>
-<ResponseField name="headers" type={<a href="#httpheader">HttpHeader[]</a>} required>
+<ResponseField name="headers" type={<a href="#httpheader">HttpHeader[]</a>} >
   HTTP headers to set when making requests to the MCP server.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
@@ -2106,13 +2110,13 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
 
 </ResponseField>
-<ResponseField name="args" type={<><span>"string"</span><span>[]</span></>} required>
+<ResponseField name="args" type={<><span>"string"</span><span>[]</span></>} >
   Command-line arguments to pass to the MCP server.
 </ResponseField>
 <ResponseField name="command" type={"string"} required>
-  Path to the MCP server executable.
+  Absolute path to the MCP server executable.
 </ResponseField>
-<ResponseField name="env" type={<a href="#envvariable">EnvVariable[]</a>} required>
+<ResponseField name="env" type={<a href="#envvariable">EnvVariable[]</a>} >
   Environment variables to set when launching the MCP server.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
@@ -2166,7 +2170,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
 
 </ResponseField>
-<ResponseField name="headers" type={<a href="#httpheader">HttpHeader[]</a>} required>
+<ResponseField name="headers" type={<a href="#httpheader">HttpHeader[]</a>} >
   HTTP headers to set when making requests to the MCP server.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
@@ -2192,13 +2196,13 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
 
 </ResponseField>
-<ResponseField name="args" type={<><span>"string"</span><span>[]</span></>} required>
+<ResponseField name="args" type={<><span>"string"</span><span>[]</span></>} >
   Command-line arguments to pass to the MCP server.
 </ResponseField>
 <ResponseField name="command" type={"string"} required>
-  Path to the MCP server executable.
+  Absolute path to the MCP server executable.
 </ResponseField>
-<ResponseField name="env" type={<a href="#envvariable">EnvVariable[]</a>} required>
+<ResponseField name="env" type={<a href="#envvariable">EnvVariable[]</a>} >
   Environment variables to set when launching the MCP server.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
@@ -2416,7 +2420,7 @@ When updating an item-based plan, the agent must send a complete list of all ent
 with their current status. The client replaces that plan with each update.
 
 </ResponseField>
-<ResponseField name="id" type={<a href="#planid">PlanId</a>} required>
+<ResponseField name="planId" type={<a href="#planid">PlanId</a>} required>
   The plan ID to update.
 </ResponseField>
 
@@ -2466,7 +2470,7 @@ When updating an item-based plan, the agent must send a complete list of all ent
 with their current status. The client replaces that plan with each update.
 
 </ResponseField>
-<ResponseField name="id" type={<a href="#planid">PlanId</a>} required>
+<ResponseField name="planId" type={<a href="#planid">PlanId</a>} required>
   The plan ID to update.
 </ResponseField>
 <ResponseField name="type" type={"string"} required>
@@ -2489,7 +2493,7 @@ otherwise ignore it or display it generically.
 
 <Expandable title="Properties">
 
-<ResponseField name="id" type={<a href="#planid">PlanId</a>} required>
+<ResponseField name="planId" type={<a href="#planid">PlanId</a>} required>
   The plan ID to update.
 </ResponseField>
 <ResponseField name="type" type={"string"} required>
@@ -2700,6 +2704,32 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 </Expandable>
 </ResponseField>
 
+<ResponseField name="other" type="object">
+Custom or future permission outcome.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+Agents that do not understand this outcome MUST NOT treat it as approval.
+They should preserve the raw payload when storing, replaying, proxying, or
+forwarding permission responses, and otherwise fail or decline the
+permission request according to policy.
+
+<Expandable title="Properties">
+
+<ResponseField name="outcome" type={"string"} required>
+  Custom or future permission outcome.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
 ## <span class="font-mono">RequiresActionStateUpdate</span>
 
 The agent is waiting on user action before it can continue.
@@ -2819,8 +2849,8 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 Capabilities for additional session directories support.
 
-By supplying `\{\}` it means that the agent supports the `additionalDirectories`
-field on supported session lifecycle requests. Agents that also support
+Supplying `\{\}` means the agent supports the `additionalDirectories` field on
+supported session lifecycle requests. Agents that also support
 `session/list` may return `SessionInfo.additionalDirectories` to report the
 complete ordered additional-root list associated with a listed session.
 
@@ -2865,6 +2895,10 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 <ResponseField name="additionalDirectories" type={<><span><a href="#sessionadditionaldirectoriescapabilities">SessionAdditionalDirectoriesCapabilities</a></span><span> | null</span></>} >
   Whether the agent supports `additionalDirectories` on supported session lifecycle requests.
 
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports `additionalDirectories` on
+supported session lifecycle requests.
+
 Agents that also support `session/list` may return
 `SessionInfo.additionalDirectories` to report the complete ordered
 additional-root list associated with a listed session.
@@ -2872,6 +2906,10 @@ additional-root list associated with a listed session.
 </ResponseField>
 <ResponseField name="close" type={<><span><a href="#sessionclosecapabilities">SessionCloseCapabilities</a></span><span> | null</span></>} >
   Whether the agent supports `session/close`.
+
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports closing sessions.
+
 </ResponseField>
 <ResponseField name="delete" type={<><span><a href="#sessiondeletecapabilities">SessionDeleteCapabilities</a></span><span> | null</span></>} >
   Whether the agent supports `session/delete`.
@@ -2882,6 +2920,10 @@ Supplying `\{\}` means the agent supports deleting sessions from `session/list`.
 </ResponseField>
 <ResponseField name="list" type={<><span><a href="#sessionlistcapabilities">SessionListCapabilities</a></span><span> | null</span></>} >
   Whether the agent supports `session/list`.
+
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports listing sessions.
+
 </ResponseField>
 <ResponseField name="load" type={<><span><a href="#sessionloadcapabilities">SessionLoadCapabilities</a></span><span> | null</span></>} >
   Whether the agent supports `session/load`.
@@ -2907,13 +2949,17 @@ required by `session/prompt`.
 </ResponseField>
 <ResponseField name="resume" type={<><span><a href="#sessionresumecapabilities">SessionResumeCapabilities</a></span><span> | null</span></>} >
   Whether the agent supports `session/resume`.
+
+Optional. Omitted or `null` both mean the agent does not advertise support.
+Supplying `\{\}` means the agent supports resuming sessions.
+
 </ResponseField>
 
 ## <span class="font-mono">SessionCloseCapabilities</span>
 
 Capabilities for the `session/close` method.
 
-By supplying `\{\}` it means that the agent supports closing of sessions.
+Supplying `\{\}` means the agent supports closing sessions.
 
 **Type:** Object
 
@@ -2959,11 +3005,11 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 <ResponseField name="category" type={<><span><a href="#sessionconfigoptioncategory">SessionConfigOptionCategory</a></span><span> | null</span></>} >
   Optional semantic category for this option (UX only).
 </ResponseField>
+<ResponseField name="configId" type={<a href="#sessionconfigid">SessionConfigId</a>} required>
+  Unique identifier for the configuration option.
+</ResponseField>
 <ResponseField name="description" type={"string | null"} >
   Optional description for the Client to display to the user.
-</ResponseField>
-<ResponseField name="id" type={<a href="#sessionconfigid">SessionConfigId</a>} required>
-  Unique identifier for the configuration option.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
   Human-readable label for the option.
@@ -3100,7 +3146,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
 
 </ResponseField>
-<ResponseField name="group" type={<a href="#sessionconfiggroupid">SessionConfigGroupId</a>} required>
+<ResponseField name="groupId" type={<a href="#sessionconfiggroupid">SessionConfigGroupId</a>} required>
   Unique identifier for this group.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
@@ -3253,7 +3299,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 Capabilities for the `session/list` method.
 
-By supplying `\{\}` it means that the agent supports listing of sessions.
+Supplying `\{\}` means the agent supports listing sessions.
 
 **Type:** Object
 
@@ -3291,7 +3337,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 Capabilities for the `session/resume` method.
 
-By supplying `\{\}` it means that the agent supports resuming of sessions.
+Supplying `\{\}` means the agent supports resuming sessions.
 
 **Type:** Object
 
@@ -3623,7 +3669,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 </ResponseField>
 <ResponseField name="availableCommands" type={<a href="#availablecommand">AvailableCommand[]</a>} required>
-  Commands the agent can execute
+  Commands the agent can execute.
 </ResponseField>
 <ResponseField name="sessionUpdate" type={"string"} required>
   The discriminator value. Must be `"available_commands_update"`.
@@ -3885,6 +3931,26 @@ future ACP variants.
 
 </ResponseField>
 
+## <span class="font-mono">TextCommandInput</span>
+
+All text that was typed after the command name is provided as input.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+
+</ResponseField>
+<ResponseField name="hint" type={"string"} required>
+  A hint to display when the input hasn't been provided yet
+</ResponseField>
+
 ## <span class="font-mono">TextContent</span>
 
 Text provided to or from an LLM.
@@ -3988,7 +4054,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
   The original content (None for new files).
 </ResponseField>
 <ResponseField name="path" type={"string"} required>
-  The file path being modified.
+  The absolute file path being modified.
 </ResponseField>
 <ResponseField name="type" type={"string"} required>
   The discriminator value. Must be `"diff"`.
@@ -4085,7 +4151,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 </ResponseField>
 <ResponseField name="path" type={"string"} required>
-  The file path being accessed or modified.
+  The absolute file path being accessed or modified.
 </ResponseField>
 
 ## <span class="font-mono">ToolCallStatus</span>
@@ -4237,26 +4303,6 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-</ResponseField>
-
-## <span class="font-mono">UnstructuredCommandInput</span>
-
-All text that was typed after the command name is provided as input.
-
-**Type:** Object
-
-**Properties:**
-
-<ResponseField name="_meta" type={"object | null"} >
-  The _meta property is reserved by ACP to allow clients and agents to attach additional
-metadata to their interactions. Implementations MUST NOT make assumptions about values at
-these keys.
-
-See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
-
-</ResponseField>
-<ResponseField name="hint" type={"string"} required>
-  A hint to display when the input hasn't been provided yet
 </ResponseField>
 
 ## <span class="font-mono">UsageUpdate</span>

@@ -1020,7 +1020,7 @@ impl MessageId {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct AvailableCommandsUpdate {
-    /// Commands the agent can execute
+    /// Commands the agent can execute.
     #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
     #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     pub available_commands: Vec<AvailableCommand>,
@@ -1119,11 +1119,13 @@ impl AvailableCommand {
 
 /// The input specification for a command.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(untagged, rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[schemars(extend("discriminator" = {"propertyName": "type"}))]
 #[non_exhaustive]
 pub enum AvailableCommandInput {
     /// All text that was typed after the command name is provided as input.
-    Unstructured(UnstructuredCommandInput),
+    #[serde(rename = "text")]
+    Text(TextCommandInput),
     /// Custom or future command input specification.
     ///
     /// Values beginning with `_` are reserved for implementation-specific
@@ -1134,12 +1136,14 @@ pub enum AvailableCommandInput {
     /// payload when storing, replaying, proxying, or forwarding command
     /// metadata, and otherwise ignore the input specification or display the
     /// command without structured input.
+    #[serde(untagged)]
     Other(OtherAvailableCommandInput),
 }
 
 /// Custom or future command input specification.
 #[derive(Debug, Clone, Serialize, JsonSchema, PartialEq, Eq)]
 #[schemars(inline)]
+#[schemars(transform = other_available_command_input_schema)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct OtherAvailableCommandInput {
@@ -1180,18 +1184,37 @@ impl<'de> Deserialize<'de> for OtherAvailableCommandInput {
             return Err(serde::de::Error::custom("`type` must be a string"));
         };
 
+        if is_known_available_command_input_type(&type_) {
+            return Err(serde::de::Error::custom(format!(
+                "known available command input type `{type_}` did not match its schema"
+            )));
+        }
+
         Ok(Self { type_, fields })
     }
+}
+
+const KNOWN_AVAILABLE_COMMAND_INPUT_TYPES: &[&str] = &["text"];
+
+fn is_known_available_command_input_type(type_: &str) -> bool {
+    KNOWN_AVAILABLE_COMMAND_INPUT_TYPES.contains(&type_)
+}
+
+fn other_available_command_input_schema(schema: &mut Schema) {
+    super::schema_util::reject_known_string_discriminators(
+        schema,
+        "type",
+        KNOWN_AVAILABLE_COMMAND_INPUT_TYPES,
+    );
 }
 
 /// All text that was typed after the command name is provided as input.
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq, Eq)]
-#[schemars(transform = unstructured_command_input_schema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
-pub struct UnstructuredCommandInput {
+pub struct TextCommandInput {
     /// A hint to display when the input hasn't been provided yet
     pub hint: String,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -1206,8 +1229,8 @@ pub struct UnstructuredCommandInput {
     pub meta: Option<Meta>,
 }
 
-impl UnstructuredCommandInput {
-    /// Builds [`UnstructuredCommandInput`] with the required fields set; optional fields start unset or empty.
+impl TextCommandInput {
+    /// Builds [`TextCommandInput`] with the required fields set; optional fields start unset or empty.
     #[must_use]
     pub fn new(hint: impl Into<String>) -> Self {
         Self {
@@ -1226,39 +1249,6 @@ impl UnstructuredCommandInput {
         self.meta = meta.into_option();
         self
     }
-}
-
-impl<'de> Deserialize<'de> for UnstructuredCommandInput {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct RawUnstructuredCommandInput {
-            hint: String,
-            #[serde(rename = "_meta")]
-            meta: Option<Meta>,
-            #[serde(flatten)]
-            fields: BTreeMap<String, serde_json::Value>,
-        }
-
-        let raw = RawUnstructuredCommandInput::deserialize(deserializer)?;
-        if raw.fields.contains_key("type") {
-            return Err(serde::de::Error::custom(
-                "unstructured command input cannot include a `type` field",
-            ));
-        }
-
-        Ok(Self {
-            hint: raw.hint,
-            meta: raw.meta,
-        })
-    }
-}
-
-fn unstructured_command_input_schema(schema: &mut Schema) {
-    super::schema_util::reject_property(schema, "type");
 }
 
 // Permission
@@ -1476,6 +1466,90 @@ pub enum RequestPermissionOutcome {
     /// The user selected one of the provided options.
     #[serde(rename_all = "camelCase")]
     Selected(SelectedPermissionOutcome),
+    /// Custom or future permission outcome.
+    ///
+    /// Values beginning with `_` are reserved for implementation-specific
+    /// extensions. Unknown values that do not begin with `_` are reserved for
+    /// future ACP variants.
+    ///
+    /// Agents that do not understand this outcome MUST NOT treat it as approval.
+    /// They should preserve the raw payload when storing, replaying, proxying, or
+    /// forwarding permission responses, and otherwise fail or decline the
+    /// permission request according to policy.
+    #[serde(untagged)]
+    Other(OtherRequestPermissionOutcome),
+}
+
+/// Custom or future permission outcome payload.
+///
+/// This preserves the unknown `outcome` discriminator and the rest of the
+/// outcome object for agents that store, replay, proxy, or forward permission
+/// responses.
+#[derive(Debug, Clone, Serialize, JsonSchema, PartialEq, Eq)]
+#[schemars(inline)]
+#[schemars(transform = other_request_permission_outcome_schema)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct OtherRequestPermissionOutcome {
+    /// Custom or future permission outcome.
+    ///
+    /// Values beginning with `_` are reserved for implementation-specific
+    /// extensions. Unknown values that do not begin with `_` are reserved for
+    /// future ACP variants.
+    pub outcome: String,
+    /// Additional fields from the unknown permission outcome payload.
+    #[serde(flatten)]
+    pub fields: BTreeMap<String, serde_json::Value>,
+}
+
+impl OtherRequestPermissionOutcome {
+    /// Builds [`OtherRequestPermissionOutcome`] from an unknown discriminator and preserves the remaining extension fields.
+    #[must_use]
+    pub fn new(
+        outcome: impl Into<String>,
+        mut fields: BTreeMap<String, serde_json::Value>,
+    ) -> Self {
+        fields.remove("outcome");
+        Self {
+            outcome: outcome.into(),
+            fields,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for OtherRequestPermissionOutcome {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let outcome = fields
+            .remove("outcome")
+            .ok_or_else(|| serde::de::Error::missing_field("outcome"))?;
+        let serde_json::Value::String(outcome) = outcome else {
+            return Err(serde::de::Error::custom("`outcome` must be a string"));
+        };
+
+        if is_known_request_permission_outcome(&outcome) {
+            return Err(serde::de::Error::custom(format!(
+                "known request permission outcome `{outcome}` did not match its schema"
+            )));
+        }
+
+        Ok(Self { outcome, fields })
+    }
+}
+
+fn is_known_request_permission_outcome(outcome: &str) -> bool {
+    matches!(outcome, "cancelled" | "selected")
+}
+
+fn other_request_permission_outcome_schema(schema: &mut Schema) {
+    super::schema_util::reject_known_string_discriminators(
+        schema,
+        "outcome",
+        &["cancelled", "selected"],
+    );
 }
 
 /// The user selected one of the provided options.
@@ -1542,6 +1616,9 @@ pub struct ClientCapabilities {
     /// Authentication capabilities supported by the client.
     /// Determines which authentication method types the agent may include
     /// in its `InitializeResponse`.
+    ///
+    /// Optional. Omitted or `null` both mean the client does not advertise any
+    /// authentication-method extensions.
     #[cfg(feature = "unstable_auth_methods")]
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[schemars(extend("x-deserialize-default-on-error" = true))]
@@ -1553,6 +1630,9 @@ pub struct ClientCapabilities {
     ///
     /// Elicitation capabilities supported by the client.
     /// Determines which elicitation modes the agent may use.
+    ///
+    /// Optional. Omitted or `null` both mean the client does not advertise
+    /// elicitation support.
     #[cfg(feature = "unstable_elicitation")]
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[schemars(extend("x-deserialize-default-on-error" = true))]
@@ -1563,6 +1643,9 @@ pub struct ClientCapabilities {
     /// This capability is not part of the spec yet, and may be removed or changed at any point.
     ///
     /// NES (Next Edit Suggestions) capabilities supported by the client.
+    ///
+    /// Optional. Omitted or `null` both mean the client does not advertise any
+    /// NES suggestion-kind extensions.
     #[cfg(feature = "unstable_nes")]
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[schemars(extend("x-deserialize-default-on-error" = true))]
@@ -2447,7 +2530,7 @@ mod tests {
                 "sessionUpdate": "plan_update",
                 "plan": {
                     "type": "items",
-                    "id": "plan-1",
+                    "planId": "plan-1",
                     "entries": [
                         {
                             "content": "Step 1",
@@ -2469,7 +2552,7 @@ mod tests {
             serde_json::to_value(SessionUpdate::PlanRemoved(PlanRemoved::new("plan-1"))).unwrap(),
             json!({
                 "sessionUpdate": "plan_removed",
-                "id": "plan-1"
+                "planId": "plan-1"
             })
         );
     }
@@ -2506,13 +2589,91 @@ mod tests {
     }
 
     #[test]
-    fn available_command_input_unknown_does_not_hide_malformed_unstructured_variant() {
+    fn available_command_input_text_uses_type_discriminator() {
+        use serde_json::json;
+
+        let input = AvailableCommandInput::Text(TextCommandInput::new("Describe changes"));
+
+        let json = serde_json::to_value(&input).unwrap();
+        assert_eq!(
+            json,
+            json!({
+                "type": "text",
+                "hint": "Describe changes"
+            })
+        );
+
+        let roundtripped: AvailableCommandInput = serde_json::from_value(json).unwrap();
+        assert!(matches!(roundtripped, AvailableCommandInput::Text(_)));
+    }
+
+    #[test]
+    fn request_permission_outcome_preserves_unknown_variant() {
+        use serde_json::json;
+
+        let outcome: RequestPermissionOutcome = serde_json::from_value(json!({
+            "outcome": "_defer",
+            "reason": "needs-review",
+            "retryAfterSeconds": 30
+        }))
+        .unwrap();
+
+        let RequestPermissionOutcome::Other(unknown) = outcome else {
+            panic!("expected unknown permission outcome");
+        };
+
+        assert_eq!(unknown.outcome, "_defer");
+        assert_eq!(unknown.fields.get("reason"), Some(&json!("needs-review")));
+        assert_eq!(unknown.fields.get("retryAfterSeconds"), Some(&json!(30)));
+        assert_eq!(
+            serde_json::to_value(RequestPermissionOutcome::Other(unknown)).unwrap(),
+            json!({
+                "outcome": "_defer",
+                "reason": "needs-review",
+                "retryAfterSeconds": 30
+            })
+        );
+    }
+
+    #[test]
+    fn request_permission_outcome_unknown_does_not_hide_malformed_known_variant() {
+        use serde_json::json;
+
+        assert!(
+            serde_json::from_value::<RequestPermissionOutcome>(json!({
+                "outcome": "selected"
+            }))
+            .is_err()
+        );
+        assert!(
+            serde_json::from_value::<RequestPermissionOutcome>(json!({
+                "outcome": 1
+            }))
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn available_command_input_unknown_does_not_hide_malformed_text_variant() {
         use serde_json::json;
 
         assert!(serde_json::from_value::<AvailableCommandInput>(json!({})).is_err());
         assert!(
             serde_json::from_value::<AvailableCommandInput>(json!({
+                "hint": "Pick one"
+            }))
+            .is_err()
+        );
+        assert!(
+            serde_json::from_value::<AvailableCommandInput>(json!({
                 "type": 1,
+                "hint": "Pick one"
+            }))
+            .is_err()
+        );
+        assert!(
+            serde_json::from_value::<OtherAvailableCommandInput>(json!({
+                "type": "text",
                 "hint": "Pick one"
             }))
             .is_err()
@@ -2573,7 +2734,7 @@ mod tests {
 
         assert_eq!(
             serde_json::to_value(ConnectMcpRequest::new("server-1")).unwrap(),
-            json!({ "acpId": "server-1" })
+            json!({ "serverId": "server-1" })
         );
         assert_eq!(
             serde_json::to_value(ConnectMcpResponse::new("conn-1")).unwrap(),
