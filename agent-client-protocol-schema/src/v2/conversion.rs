@@ -8,7 +8,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     fmt,
     hash::{BuildHasher, Hash},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -1235,7 +1235,7 @@ impl IntoV1 for super::SessionInfoUpdate {
         Ok(crate::v1::SessionInfoUpdate {
             title: title.into_v1()?,
             updated_at: updated_at.into_v1()?,
-            meta: meta.into_v1()?,
+            meta: maybe_undefined_meta_into_v1_option("SessionInfoUpdate", meta)?,
         })
     }
 }
@@ -1252,7 +1252,7 @@ impl IntoV2 for crate::v1::SessionInfoUpdate {
         Ok(super::SessionInfoUpdate {
             title: title.into_v2()?,
             updated_at: updated_at.into_v2()?,
-            meta: meta.into_v2()?,
+            meta: option_into_v2_maybe_undefined(meta)?,
         })
     }
 }
@@ -1493,10 +1493,29 @@ impl IntoV1 for super::RequestPermissionRequest {
     fn into_v1(self) -> Result<Self::Output> {
         let Self {
             session_id,
-            tool_call,
+            title: _,
+            description: _,
+            subject,
             options,
             meta,
         } = self;
+        let Some(subject) = subject else {
+            return Err(ProtocolConversionError::new(
+                "v2 RequestPermissionRequest without `subject` cannot be represented in v1",
+            ));
+        };
+        let tool_call = match subject {
+            super::RequestPermissionSubject::ToolCall(subject) => {
+                let super::ToolCallPermissionSubject { tool_call } = *subject;
+                tool_call
+            }
+            super::RequestPermissionSubject::Other(subject) => {
+                return Err(unknown_v2_enum_variant(
+                    "RequestPermissionSubject",
+                    &subject.type_,
+                ));
+            }
+        };
         Ok(crate::v1::RequestPermissionRequest {
             session_id: session_id.into_v1()?,
             tool_call: tool_call.into_v1()?,
@@ -1516,9 +1535,17 @@ impl IntoV2 for crate::v1::RequestPermissionRequest {
             options,
             meta,
         } = self;
+        let title = tool_call
+            .fields
+            .title
+            .clone()
+            .filter(|title| !title.is_empty())
+            .unwrap_or_else(|| "Permission requested".to_string());
         Ok(super::RequestPermissionRequest {
             session_id: session_id.into_v2()?,
-            tool_call: tool_call.into_v2()?,
+            title,
+            description: None,
+            subject: Some(super::RequestPermissionSubject::from(tool_call.into_v2()?)),
             options: options.into_v2()?,
             meta: meta.into_v2()?,
         })
@@ -2380,6 +2407,19 @@ where
     }
 }
 
+fn maybe_undefined_meta_into_v1_option(
+    context: &str,
+    value: crate::MaybeUndefined<super::Meta>,
+) -> Result<Option<crate::v1::Meta>> {
+    match value {
+        crate::MaybeUndefined::Value(value) => Ok(Some(value.into_v1()?)),
+        crate::MaybeUndefined::Null => Err(ProtocolConversionError::new(format!(
+            "v2 {context} with null _meta cannot be represented in v1"
+        ))),
+        crate::MaybeUndefined::Undefined => Ok(None),
+    }
+}
+
 fn option_into_v2_maybe_undefined<T>(value: Option<T>) -> Result<crate::MaybeUndefined<T::Output>>
 where
     T: IntoV2,
@@ -2441,7 +2481,7 @@ impl IntoV1 for super::ToolCallUpdate {
                 raw_input: maybe_undefined_value_into_v1_option(raw_input),
                 raw_output: maybe_undefined_value_into_v1_option(raw_output),
             },
-            meta: meta.into_v1()?,
+            meta: maybe_undefined_meta_into_v1_option("ToolCallUpdate", meta)?,
         })
     }
 }
@@ -2478,7 +2518,7 @@ impl IntoV2 for crate::v1::ToolCall {
             locations: vec_into_v2_maybe_undefined_skip_errors(locations),
             raw_input: option_into_v2_maybe_undefined(raw_input)?,
             raw_output: option_into_v2_maybe_undefined(raw_output)?,
-            meta: meta.into_v2()?,
+            meta: option_into_v2_maybe_undefined(meta)?,
         })
     }
 }
@@ -2510,7 +2550,7 @@ impl IntoV2 for crate::v1::ToolCallUpdate {
             locations: option_vec_into_v2_maybe_undefined_skip_errors(locations),
             raw_input: option_into_v2_maybe_undefined(raw_input)?,
             raw_output: option_into_v2_maybe_undefined(raw_output)?,
-            meta: meta.into_v2()?,
+            meta: option_into_v2_maybe_undefined(meta)?,
         })
     }
 }
@@ -2653,18 +2693,9 @@ impl IntoV1 for super::Diff {
     type Output = crate::v1::Diff;
 
     fn into_v1(self) -> Result<Self::Output> {
-        let Self {
-            path,
-            old_text,
-            new_text,
-            meta,
-        } = self;
-        Ok(crate::v1::Diff {
-            path: path.into_v1()?,
-            old_text: old_text.into_v1()?,
-            new_text: new_text.into_v1()?,
-            meta: meta.into_v1()?,
-        })
+        Err(ProtocolConversionError::new(
+            "v2 Diff cannot be represented in v1 because v1 requires oldText/newText while v2 carries standard patch text and structured changes",
+        ))
     }
 }
 
@@ -2678,13 +2709,40 @@ impl IntoV2 for crate::v1::Diff {
             new_text,
             meta,
         } = self;
-        Ok(super::Diff {
-            path: path.into_v2()?,
-            old_text: old_text.into_v2()?,
-            new_text: new_text.into_v2()?,
-            meta: meta.into_v2()?,
-        })
+        let path = path.into_v2()?;
+        let old_text = old_text.into_v2()?;
+        let new_text = new_text.into_v2()?;
+        let change = if old_text.is_some() {
+            super::DiffChange::modify(path.clone()).file_type(super::DiffFileType::Text)
+        } else {
+            super::DiffChange::add(path.clone()).file_type(super::DiffFileType::Text)
+        };
+        let diff = full_file_git_patch(&path, old_text.as_deref(), &new_text);
+
+        Ok(super::Diff::patch(diff, vec![change]).meta(meta.into_v2()?))
     }
+}
+
+fn full_file_git_patch(path: &Path, old_text: Option<&str>, new_text: &str) -> String {
+    let path = path.to_string_lossy();
+    let old = old_text.unwrap_or_default();
+    let original_filename = if old_text.is_some() {
+        path.to_string()
+    } else {
+        "/dev/null".to_string()
+    };
+
+    let mut options = diffy::DiffOptions::new();
+    options
+        .set_original_filename(original_filename)
+        .set_modified_filename(path.to_string());
+
+    let mut diff = format!("diff --git {path} {path}\n");
+    if old_text.is_none() {
+        diff.push_str("new file mode 100644\n");
+    }
+    diff.push_str(&options.create_patch(old, new_text).to_string());
+    diff
 }
 
 impl IntoV1 for super::ToolCallLocation {
@@ -3284,29 +3342,8 @@ impl IntoV2 for crate::v1::NewSessionResponse {
     }
 }
 
-impl IntoV1 for super::LoadSessionRequest {
-    type Output = crate::v1::LoadSessionRequest;
-
-    fn into_v1(self) -> Result<Self::Output> {
-        let Self {
-            mcp_servers,
-            cwd,
-            additional_directories,
-            session_id,
-            meta,
-        } = self;
-        Ok(crate::v1::LoadSessionRequest {
-            mcp_servers: mcp_servers.into_v1()?,
-            cwd: cwd.into_v1()?,
-            additional_directories: additional_directories.into_v1()?,
-            session_id: session_id.into_v1()?,
-            meta: meta.into_v1()?,
-        })
-    }
-}
-
 impl IntoV2 for crate::v1::LoadSessionRequest {
-    type Output = super::LoadSessionRequest;
+    type Output = super::ResumeSessionRequest;
 
     fn into_v2(self) -> Result<Self::Output> {
         let Self {
@@ -3316,34 +3353,19 @@ impl IntoV2 for crate::v1::LoadSessionRequest {
             session_id,
             meta,
         } = self;
-        Ok(super::LoadSessionRequest {
+        Ok(super::ResumeSessionRequest {
             mcp_servers: mcp_servers.into_v2()?,
             cwd: cwd.into_v2()?,
             additional_directories: additional_directories.into_v2()?,
             session_id: session_id.into_v2()?,
+            replay_from: Some(super::ReplayFrom::Start(super::ReplayFromStart::new())),
             meta: meta.into_v2()?,
         })
     }
 }
 
-impl IntoV1 for super::LoadSessionResponse {
-    type Output = crate::v1::LoadSessionResponse;
-
-    fn into_v1(self) -> Result<Self::Output> {
-        let Self {
-            config_options,
-            meta,
-        } = self;
-        Ok(crate::v1::LoadSessionResponse {
-            modes: None,
-            config_options: Some(into_v1_vec_skip_errors(config_options)),
-            meta: meta.into_v1()?,
-        })
-    }
-}
-
 impl IntoV2 for crate::v1::LoadSessionResponse {
-    type Output = super::LoadSessionResponse;
+    type Output = super::ResumeSessionResponse;
 
     fn into_v2(self) -> Result<Self::Output> {
         let Self {
@@ -3351,10 +3373,57 @@ impl IntoV2 for crate::v1::LoadSessionResponse {
             config_options,
             meta,
         } = self;
-        Ok(super::LoadSessionResponse {
+        Ok(super::ResumeSessionResponse {
             config_options: option_vec_into_v2_default_skip_errors(config_options),
             meta: meta.into_v2()?,
         })
+    }
+}
+
+fn v2_resume_session_request_into_v1_load(
+    request: super::ResumeSessionRequest,
+) -> Result<crate::v1::LoadSessionRequest> {
+    let super::ResumeSessionRequest {
+        session_id,
+        cwd,
+        additional_directories,
+        mcp_servers,
+        replay_from: _,
+        meta,
+    } = request;
+    Ok(crate::v1::LoadSessionRequest {
+        mcp_servers: mcp_servers.into_v1()?,
+        cwd: cwd.into_v1()?,
+        additional_directories: additional_directories.into_v1()?,
+        session_id: session_id.into_v1()?,
+        meta: meta.into_v1()?,
+    })
+}
+
+fn unsupported_replay_from_for_v1_resume(
+    replay_from: super::ReplayFrom,
+) -> ProtocolConversionError {
+    match replay_from {
+        super::ReplayFrom::Start(_) => ProtocolConversionError::new(
+            "v2 ResumeSessionRequest `replayFrom: start` maps to v1 session/load, not v1 session/resume",
+        ),
+        super::ReplayFrom::Other(other) => unknown_v2_enum_variant("ReplayFrom", &other.type_),
+    }
+}
+
+fn v2_resume_session_request_into_v1_client_request(
+    request: super::ResumeSessionRequest,
+) -> Result<crate::v1::ClientRequest> {
+    match request.replay_from.clone() {
+        None => Ok(crate::v1::ClientRequest::ResumeSessionRequest(
+            request.into_v1()?,
+        )),
+        Some(super::ReplayFrom::Start(_)) => Ok(crate::v1::ClientRequest::LoadSessionRequest(
+            v2_resume_session_request_into_v1_load(request)?,
+        )),
+        Some(super::ReplayFrom::Other(other)) => {
+            Err(unknown_v2_enum_variant("ReplayFrom", &other.type_))
+        }
     }
 }
 
@@ -3449,8 +3518,12 @@ impl IntoV1 for super::ResumeSessionRequest {
             cwd,
             additional_directories,
             mcp_servers,
+            replay_from,
             meta,
         } = self;
+        if let Some(replay_from) = replay_from {
+            return Err(unsupported_replay_from_for_v1_resume(replay_from));
+        }
         Ok(crate::v1::ResumeSessionRequest {
             session_id: session_id.into_v1()?,
             cwd: cwd.into_v1()?,
@@ -3477,6 +3550,7 @@ impl IntoV2 for crate::v1::ResumeSessionRequest {
             cwd: cwd.into_v2()?,
             additional_directories: additional_directories.into_v2()?,
             mcp_servers: mcp_servers.into_v2()?,
+            replay_from: None,
             meta: meta.into_v2()?,
         })
     }
@@ -4923,30 +4997,26 @@ impl super::SessionCapabilities {
         let Self {
             prompt,
             mcp,
-            load,
-            list,
             delete,
             additional_directories,
             #[cfg(feature = "unstable_session_fork")]
             fork,
-            resume,
-            close,
             meta,
         } = self;
 
         Ok(V1SessionCapabilityParts {
             session_capabilities: crate::v1::SessionCapabilities {
-                list: into_v1_default_on_error(list),
+                list: Some(crate::v1::SessionListCapabilities::new()),
                 delete: into_v1_default_on_error(delete),
                 additional_directories: into_v1_default_on_error(additional_directories),
                 #[cfg(feature = "unstable_session_fork")]
                 fork: into_v1_default_on_error(fork),
-                resume: into_v1_default_on_error(resume),
-                close: into_v1_default_on_error(close),
+                resume: Some(crate::v1::SessionResumeCapabilities::new()),
+                close: Some(crate::v1::SessionCloseCapabilities::new()),
                 meta: meta.into_v1()?,
             },
             prompt_capabilities: prompt.unwrap_or_default().into_v1()?,
-            load_session: load.is_some(),
+            load_session: true,
             mcp_capabilities: mcp.unwrap_or_default().into_v1()?,
         })
     }
@@ -4961,53 +5031,27 @@ impl super::SessionCapabilities {
     pub fn from_v1(
         session_capabilities: crate::v1::SessionCapabilities,
         prompt_capabilities: crate::v1::PromptCapabilities,
-        load_session: bool,
+        _load_session: bool,
         mcp_capabilities: crate::v1::McpCapabilities,
     ) -> Result<Self> {
         let crate::v1::SessionCapabilities {
-            list,
+            list: _,
             delete,
             additional_directories,
             #[cfg(feature = "unstable_session_fork")]
             fork,
-            resume,
-            close,
+            resume: _,
+            close: _,
             meta,
         } = session_capabilities;
 
         Ok(super::SessionCapabilities {
             prompt: Some(prompt_capabilities.into_v2()?),
             mcp: Some(mcp_capabilities.into_v2()?),
-            load: load_session.then(super::SessionLoadCapabilities::new),
-            list: into_v2_default_on_error(list),
             delete: into_v2_default_on_error(delete),
             additional_directories: into_v2_default_on_error(additional_directories),
             #[cfg(feature = "unstable_session_fork")]
             fork: into_v2_default_on_error(fork),
-            resume: into_v2_default_on_error(resume),
-            close: into_v2_default_on_error(close),
-            meta: meta.into_v2()?,
-        })
-    }
-}
-
-impl IntoV1 for super::SessionListCapabilities {
-    type Output = crate::v1::SessionListCapabilities;
-
-    fn into_v1(self) -> Result<Self::Output> {
-        let Self { meta } = self;
-        Ok(crate::v1::SessionListCapabilities {
-            meta: meta.into_v1()?,
-        })
-    }
-}
-
-impl IntoV2 for crate::v1::SessionListCapabilities {
-    type Output = super::SessionListCapabilities;
-
-    fn into_v2(self) -> Result<Self::Output> {
-        let Self { meta } = self;
-        Ok(super::SessionListCapabilities {
             meta: meta.into_v2()?,
         })
     }
@@ -5075,50 +5119,6 @@ impl IntoV2 for crate::v1::SessionForkCapabilities {
     fn into_v2(self) -> Result<Self::Output> {
         let Self { meta } = self;
         Ok(super::SessionForkCapabilities {
-            meta: meta.into_v2()?,
-        })
-    }
-}
-
-impl IntoV1 for super::SessionResumeCapabilities {
-    type Output = crate::v1::SessionResumeCapabilities;
-
-    fn into_v1(self) -> Result<Self::Output> {
-        let Self { meta } = self;
-        Ok(crate::v1::SessionResumeCapabilities {
-            meta: meta.into_v1()?,
-        })
-    }
-}
-
-impl IntoV2 for crate::v1::SessionResumeCapabilities {
-    type Output = super::SessionResumeCapabilities;
-
-    fn into_v2(self) -> Result<Self::Output> {
-        let Self { meta } = self;
-        Ok(super::SessionResumeCapabilities {
-            meta: meta.into_v2()?,
-        })
-    }
-}
-
-impl IntoV1 for super::SessionCloseCapabilities {
-    type Output = crate::v1::SessionCloseCapabilities;
-
-    fn into_v1(self) -> Result<Self::Output> {
-        let Self { meta } = self;
-        Ok(crate::v1::SessionCloseCapabilities {
-            meta: meta.into_v1()?,
-        })
-    }
-}
-
-impl IntoV2 for crate::v1::SessionCloseCapabilities {
-    type Output = super::SessionCloseCapabilities;
-
-    fn into_v2(self) -> Result<Self::Output> {
-        let Self { meta } = self;
-        Ok(super::SessionCloseCapabilities {
             meta: meta.into_v2()?,
         })
     }
@@ -5233,9 +5233,6 @@ impl IntoV1 for super::ClientRequest {
             Self::NewSessionRequest(value) => {
                 crate::v1::ClientRequest::NewSessionRequest(value.into_v1()?)
             }
-            Self::LoadSessionRequest(value) => {
-                crate::v1::ClientRequest::LoadSessionRequest(value.into_v1()?)
-            }
             Self::ListSessionsRequest(value) => {
                 crate::v1::ClientRequest::ListSessionsRequest(value.into_v1()?)
             }
@@ -5247,7 +5244,7 @@ impl IntoV1 for super::ClientRequest {
                 crate::v1::ClientRequest::ForkSessionRequest(value.into_v1()?)
             }
             Self::ResumeSessionRequest(value) => {
-                crate::v1::ClientRequest::ResumeSessionRequest(value.into_v1()?)
+                v2_resume_session_request_into_v1_client_request(*value)?
             }
             Self::CloseSessionRequest(value) => {
                 crate::v1::ClientRequest::CloseSessionRequest(value.into_v1()?)
@@ -5309,7 +5306,7 @@ impl IntoV2 for crate::v1::ClientRequest {
                 super::ClientRequest::NewSessionRequest(Box::new(value.into_v2()?))
             }
             Self::LoadSessionRequest(value) => {
-                super::ClientRequest::LoadSessionRequest(Box::new(value.into_v2()?))
+                super::ClientRequest::ResumeSessionRequest(Box::new(value.into_v2()?))
             }
             Self::ListSessionsRequest(value) => {
                 super::ClientRequest::ListSessionsRequest(Box::new(value.into_v2()?))
@@ -5388,9 +5385,6 @@ impl IntoV1 for super::AgentResponse {
             Self::NewSessionResponse(value) => {
                 crate::v1::AgentResponse::NewSessionResponse(value.into_v1()?)
             }
-            Self::LoadSessionResponse(value) => {
-                crate::v1::AgentResponse::LoadSessionResponse(value.into_v1()?)
-            }
             Self::ListSessionsResponse(value) => {
                 crate::v1::AgentResponse::ListSessionsResponse(value.into_v1()?)
             }
@@ -5466,7 +5460,7 @@ impl IntoV2 for crate::v1::AgentResponse {
                 super::AgentResponse::NewSessionResponse(Box::new(value.into_v2()?))
             }
             Self::LoadSessionResponse(value) => {
-                super::AgentResponse::LoadSessionResponse(Box::new(value.into_v2()?))
+                super::AgentResponse::ResumeSessionResponse(Box::new(value.into_v2()?))
             }
             Self::ListSessionsResponse(value) => {
                 super::AgentResponse::ListSessionsResponse(Box::new(value.into_v2()?))
@@ -8607,92 +8601,6 @@ impl IntoV2 for crate::v1::CompleteElicitationNotification {
     }
 }
 
-#[cfg(feature = "unstable_elicitation")]
-impl IntoV1 for super::UrlElicitationRequiredData {
-    type Output = crate::v1::UrlElicitationRequiredData;
-
-    fn into_v1(self) -> Result<Self::Output> {
-        let Self { elicitations } = self;
-        Ok(crate::v1::UrlElicitationRequiredData {
-            elicitations: elicitations.into_v1()?,
-        })
-    }
-}
-
-#[cfg(feature = "unstable_elicitation")]
-impl IntoV2 for crate::v1::UrlElicitationRequiredData {
-    type Output = super::UrlElicitationRequiredData;
-
-    fn into_v2(self) -> Result<Self::Output> {
-        let Self { elicitations } = self;
-        Ok(super::UrlElicitationRequiredData {
-            elicitations: elicitations.into_v2()?,
-        })
-    }
-}
-
-#[cfg(feature = "unstable_elicitation")]
-impl IntoV1 for super::UrlElicitationRequiredItem {
-    type Output = crate::v1::UrlElicitationRequiredItem;
-
-    fn into_v1(self) -> Result<Self::Output> {
-        let Self {
-            mode,
-            elicitation_id,
-            url,
-            message,
-        } = self;
-        Ok(crate::v1::UrlElicitationRequiredItem {
-            mode: mode.into_v1()?,
-            elicitation_id: elicitation_id.into_v1()?,
-            url: url.into_v1()?,
-            message: message.into_v1()?,
-        })
-    }
-}
-
-#[cfg(feature = "unstable_elicitation")]
-impl IntoV2 for crate::v1::UrlElicitationRequiredItem {
-    type Output = super::UrlElicitationRequiredItem;
-
-    fn into_v2(self) -> Result<Self::Output> {
-        let Self {
-            mode,
-            elicitation_id,
-            url,
-            message,
-        } = self;
-        Ok(super::UrlElicitationRequiredItem {
-            mode: mode.into_v2()?,
-            elicitation_id: elicitation_id.into_v2()?,
-            url: url.into_v2()?,
-            message: message.into_v2()?,
-        })
-    }
-}
-
-#[cfg(feature = "unstable_elicitation")]
-impl IntoV1 for super::ElicitationUrlOnlyMode {
-    type Output = crate::v1::ElicitationUrlOnlyMode;
-
-    fn into_v1(self) -> Result<Self::Output> {
-        Ok(match self {
-            Self::Url => crate::v1::ElicitationUrlOnlyMode::Url,
-        })
-    }
-}
-
-#[cfg(feature = "unstable_elicitation")]
-impl IntoV2 for crate::v1::ElicitationUrlOnlyMode {
-    type Output = super::ElicitationUrlOnlyMode;
-
-    fn into_v2(self) -> Result<Self::Output> {
-        Ok(match self {
-            Self::Url => super::ElicitationUrlOnlyMode::Url,
-        })
-    }
-}
-
 impl IntoV1 for super::ContentBlock {
     type Output = crate::v1::ContentBlock;
 
@@ -8985,6 +8893,7 @@ impl IntoV1 for super::ResourceLink {
         let Self {
             annotations,
             description,
+            icons,
             mime_type,
             name,
             size,
@@ -8992,6 +8901,13 @@ impl IntoV1 for super::ResourceLink {
             uri,
             meta,
         } = self;
+
+        if matches!(icons.as_ref(), Some(icons) if !icons.is_empty()) {
+            return Err(ProtocolConversionError::new(
+                "v2 ResourceLink.icons cannot be represented in v1",
+            ));
+        }
+
         Ok(crate::v1::ResourceLink {
             annotations: into_v1_default_on_error(annotations),
             description: description.into_v1()?,
@@ -9022,6 +8938,7 @@ impl IntoV2 for crate::v1::ResourceLink {
         Ok(super::ResourceLink {
             annotations: into_v2_default_on_error(annotations),
             description: description.into_v2()?,
+            icons: None,
             mime_type: mime_type.into_v2()?,
             name: name.into_v2()?,
             size: size.into_v2()?,
@@ -9281,16 +9198,16 @@ mod tests {
 
     #[test]
     fn round_trips_initialize_request() {
-        let mut client_capabilities = v1::ClientCapabilities::new();
+        let client_capabilities = v1::ClientCapabilities::new();
         #[cfg(feature = "unstable_boolean_config")]
-        {
-            client_capabilities = client_capabilities.session(
+        let client_capabilities = {
+            client_capabilities.session(
                 v1::ClientSessionCapabilities::new().config_options(
                     v1::SessionConfigOptionsCapabilities::new()
                         .boolean(v1::BooleanConfigOptionCapabilities::new()),
                 ),
-            );
-        }
+            )
+        };
 
         let request = v1::InitializeRequest::new(ProtocolVersion::V1)
             .client_capabilities(client_capabilities)
@@ -9311,9 +9228,15 @@ mod tests {
 
     #[test]
     fn round_trips_initialize_response() {
+        let session_capabilities = v1::SessionCapabilities::new()
+            .list(v1::SessionListCapabilities::new())
+            .resume(v1::SessionResumeCapabilities::new())
+            .close(v1::SessionCloseCapabilities::new());
         let response = v1::InitializeResponse::new(ProtocolVersion::V1)
             .agent_capabilities(
                 v1::AgentCapabilities::new()
+                    .load_session(true)
+                    .session_capabilities(session_capabilities)
                     .auth(v1::AgentAuthCapabilities::new().logout(v1::LogoutCapabilities::new())),
             )
             .agent_info(v1::Implementation::new("test-agent", "2.0.0").title("Test Agent"));
@@ -9330,7 +9253,7 @@ mod tests {
     }
 
     #[test]
-    fn agent_load_session_capability_moves_between_v1_and_v2() {
+    fn required_v2_session_methods_convert_to_v1_capability_markers() {
         let v1_capabilities = v1::AgentCapabilities::new().load_session(true);
 
         let v2_capabilities: v2::AgentCapabilities =
@@ -9339,17 +9262,20 @@ mod tests {
             .session
             .as_ref()
             .expect("v1 capabilities imply v2 session support");
-        assert!(session.load.is_some());
+        assert!(session.delete.is_none());
         let v2_json = serde_json::to_value(&v2_capabilities).expect("v2 serialize");
         assert_eq!(v2_json.get("loadSession"), None);
-        assert_eq!(
-            v2_json.pointer("/session/load"),
-            Some(&serde_json::json!({}))
-        );
+        assert_eq!(v2_json.pointer("/session/load"), None);
+        assert_eq!(v2_json.pointer("/session/list"), None);
+        assert_eq!(v2_json.pointer("/session/resume"), None);
+        assert_eq!(v2_json.pointer("/session/close"), None);
 
         let v1_after: v1::AgentCapabilities =
             v2_to_v1(v2_capabilities).expect("v2 -> v1 conversion");
         assert!(v1_after.load_session);
+        assert!(v1_after.session_capabilities.list.is_some());
+        assert!(v1_after.session_capabilities.resume.is_some());
+        assert!(v1_after.session_capabilities.close.is_some());
     }
 
     #[test]
@@ -9380,14 +9306,14 @@ mod tests {
     #[test]
     fn v2_session_capabilities_convert_to_v1_agent_capability_parts() {
         let parts = v2::SessionCapabilities::new()
-            .load(v2::SessionLoadCapabilities::new())
             .prompt(v2::PromptCapabilities::new().image(v2::PromptImageCapabilities::new()))
             .mcp(v2::McpCapabilities::new().http(v2::McpHttpCapabilities::new()))
-            .list(v2::SessionListCapabilities::new())
             .into_v1()
             .expect("v2 session capabilities -> v1 parts");
 
         assert!(parts.session_capabilities.list.is_some());
+        assert!(parts.session_capabilities.resume.is_some());
+        assert!(parts.session_capabilities.close.is_some());
         assert!(parts.prompt_capabilities.image);
         assert!(parts.load_session);
         assert!(parts.mcp_capabilities.http);
@@ -9867,9 +9793,17 @@ mod tests {
                 "content": [
                     {
                         "type": "diff",
-                        "path": "/path",
-                        "oldText": "old contents",
-                        "newText": "new contents"
+                        "changes": [
+                            {
+                                "operation": "modify",
+                                "path": "/path",
+                                "fileType": "text"
+                            }
+                        ],
+                        "patch": {
+                            "format": "git_patch",
+                            "diff": "diff --git /path /path\n--- /path\n+++ /path\n@@ -1 +1 @@\n-old contents\n\\ No newline at end of file\n+new contents\n\\ No newline at end of file\n"
+                        }
                     }
                 ],
                 "locations": [
@@ -9892,7 +9826,7 @@ mod tests {
         assert_eq!(back.fields.title.as_deref(), Some("editing files"));
         assert_eq!(back.fields.kind, Some(v1::ToolKind::Edit));
         assert_eq!(back.fields.status, Some(v1::ToolCallStatus::InProgress));
-        assert_eq!(back.fields.content.as_ref().map(Vec::len), Some(1));
+        assert_eq!(back.fields.content.as_ref().map(Vec::len), Some(0));
         assert_eq!(back.fields.locations.as_ref().map(Vec::len), Some(1));
         assert_eq!(
             back.fields.raw_input,
@@ -9915,6 +9849,18 @@ mod tests {
 
         assert_v1_round_trip::<v1::ToolCallUpdate, v2::ToolCallUpdate>(update.clone());
         assert_json_eq_after_v1_to_v2::<v1::ToolCallUpdate, v2::ToolCallUpdate>(update);
+    }
+
+    #[test]
+    fn v2_entity_meta_null_does_not_convert_to_v1() {
+        assert_v2_to_v1_error(
+            v2::SessionInfoUpdate::new().meta(None::<v2::Meta>),
+            "v2 SessionInfoUpdate with null _meta cannot be represented in v1",
+        );
+        assert_v2_to_v1_error(
+            v2::ToolCallUpdate::new("tc").meta(None::<v2::Meta>),
+            "v2 ToolCallUpdate with null _meta cannot be represented in v1",
+        );
     }
 
     #[test]
@@ -10304,7 +10250,7 @@ mod tests {
             v1_to_v2(v1::NewSessionResponse::new("sess")).unwrap();
         assert!(new_response.config_options.is_empty());
 
-        let load_response: v2::LoadSessionResponse =
+        let load_response: v2::ResumeSessionResponse =
             v1_to_v2(v1::LoadSessionResponse::new()).unwrap();
         assert!(load_response.config_options.is_empty());
 
@@ -10318,6 +10264,39 @@ mod tests {
                 v1_to_v2(v1::ForkSessionResponse::new("fork")).unwrap();
             assert!(fork_response.config_options.is_empty());
         }
+    }
+
+    #[test]
+    fn v2_resume_replay_from_start_maps_to_v1_load_request() {
+        let v1_load = v1::ClientRequest::LoadSessionRequest(v1::LoadSessionRequest::new(
+            "sess",
+            "/workspace/project",
+        ));
+        let v2_request: v2::ClientRequest = v1_to_v2(v1_load).unwrap();
+        let v2::ClientRequest::ResumeSessionRequest(resume) = v2_request else {
+            panic!("v1 session/load should convert to v2 session/resume");
+        };
+        assert!(matches!(resume.replay_from, Some(v2::ReplayFrom::Start(_))));
+
+        let v1_request: v1::ClientRequest =
+            v2_to_v1(v2::ClientRequest::ResumeSessionRequest(resume)).unwrap();
+        assert!(matches!(
+            v1_request,
+            v1::ClientRequest::LoadSessionRequest(_)
+        ));
+    }
+
+    #[test]
+    fn v2_resume_without_replay_maps_to_v1_resume_request() {
+        let v2_request = v2::ClientRequest::ResumeSessionRequest(Box::new(
+            v2::ResumeSessionRequest::new("sess", "/workspace/project"),
+        ));
+
+        let v1_request: v1::ClientRequest = v2_to_v1(v2_request).unwrap();
+        assert!(matches!(
+            v1_request,
+            v1::ClientRequest::ResumeSessionRequest(_)
+        ));
     }
 
     #[test]
@@ -10342,20 +10321,17 @@ mod tests {
                     "_chart",
                     BTreeMap::default(),
                 )),
-                v2::ToolCallContent::Diff(v2::Diff::new("/tmp/file.txt", "new")),
+                v2::ToolCallContent::Diff(v2::Diff::patch(
+                    "diff --git /tmp/file.txt /tmp/file.txt\n",
+                    vec![v2::DiffChange::modify("/tmp/file.txt")],
+                )),
             ]);
 
         let converted: v1::ToolCallUpdate = v2_to_v1(update).unwrap();
 
         assert_eq!(converted.fields.kind, None);
         assert_eq!(converted.fields.status, None);
-        assert_eq!(
-            converted.fields.content,
-            Some(vec![v1::ToolCallContent::Diff(v1::Diff::new(
-                "/tmp/file.txt",
-                "new"
-            ))])
-        );
+        assert_eq!(converted.fields.content, Some(vec![]));
     }
 
     #[test]
@@ -10504,10 +10480,19 @@ mod tests {
         let converted: v2::ToolCallUpdate = v1_to_v2(update).unwrap();
         assert_eq!(
             converted.content,
-            crate::MaybeUndefined::Value(vec![v2::ToolCallContent::Diff(v2::Diff::new(
-                "/tmp/file.txt",
-                "new"
+            crate::MaybeUndefined::Value(vec![v2::ToolCallContent::Diff(v2::Diff::patch(
+                full_file_git_patch(&PathBuf::from("/tmp/file.txt"), None, "new"),
+                vec![v2::DiffChange::add("/tmp/file.txt").file_type(v2::DiffFileType::Text)],
             ))])
+        );
+    }
+
+    #[test]
+    fn v2_resource_link_icons_do_not_convert_to_v1() {
+        assert_v2_to_v1_error(
+            v2::ResourceLink::new("file.txt", "file:///file.txt")
+                .icons(vec![v2::Icon::new("https://example.com/icon.png")]),
+            "v2 ResourceLink.icons cannot be represented in v1",
         );
     }
 
@@ -10533,6 +10518,20 @@ mod tests {
                 std::collections::BTreeMap::new(),
             )),
             "v2 AvailableCommandInput variant `_choices` cannot be represented in v1",
+        );
+        assert_v2_to_v1_error(
+            v2::RequestPermissionRequest::new("session-id", "Permission requested", Vec::new())
+                .subject(v2::RequestPermissionSubject::Other(
+                    v2::OtherRequestPermissionSubject::new(
+                        "_review",
+                        std::collections::BTreeMap::new(),
+                    ),
+                )),
+            "v2 RequestPermissionSubject variant `_review` cannot be represented in v1",
+        );
+        assert_v2_to_v1_error(
+            v2::RequestPermissionRequest::new("session-id", "Permission requested", Vec::new()),
+            "v2 RequestPermissionRequest without `subject` cannot be represented in v1",
         );
         assert_v2_to_v1_error(
             v2::RequestPermissionOutcome::Other(v2::OtherRequestPermissionOutcome::new(
@@ -10591,6 +10590,35 @@ mod tests {
         assert_v1_round_trip::<v1::RequestPermissionResponse, v2::RequestPermissionResponse>(
             selected,
         );
+    }
+
+    #[test]
+    fn converts_v1_request_permission_request_with_required_v2_title() {
+        let titled = v1::RequestPermissionRequest::new(
+            "session-id",
+            v1::ToolCallUpdate::new("call_1", v1::ToolCallUpdateFields::new().title("Read file")),
+            Vec::new(),
+        );
+
+        let converted: v2::RequestPermissionRequest = v1_to_v2(titled).unwrap();
+        assert_eq!(converted.title, "Read file");
+        let Some(v2::RequestPermissionSubject::ToolCall(subject)) = converted.subject else {
+            panic!("expected tool-call permission subject");
+        };
+        assert_eq!(subject.tool_call.tool_call_id.to_string(), "call_1");
+
+        let fallback = v1::RequestPermissionRequest::new(
+            "session-id",
+            v1::ToolCallUpdate::new("call_2", v1::ToolCallUpdateFields::new()),
+            Vec::new(),
+        );
+
+        let converted: v2::RequestPermissionRequest = v1_to_v2(fallback).unwrap();
+        assert_eq!(converted.title, "Permission requested");
+        let Some(v2::RequestPermissionSubject::ToolCall(subject)) = converted.subject else {
+            panic!("expected tool-call permission subject");
+        };
+        assert_eq!(subject.tool_call.tool_call_id.to_string(), "call_2");
     }
 
     #[test]

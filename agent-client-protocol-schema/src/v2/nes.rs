@@ -1028,6 +1028,7 @@ pub struct DidOpenDocumentNotification {
     /// The session ID for this notification.
     pub session_id: SessionId,
     /// The URI of the opened document.
+    #[schemars(url)]
     pub uri: String,
     /// The language identifier of the document (e.g., "rust", "python").
     pub language_id: String,
@@ -1090,6 +1091,7 @@ pub struct DidChangeDocumentNotification {
     /// The session ID for this notification.
     pub session_id: SessionId,
     /// The URI of the changed document.
+    #[schemars(url)]
     pub uri: String,
     /// The new version number of the document.
     pub version: i64,
@@ -1150,8 +1152,6 @@ impl DidChangeDocumentNotification {
 #[non_exhaustive]
 pub struct TextDocumentContentChangeEvent {
     /// The range of the document that changed. If `None`, the entire content is replaced.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub range: Option<Range>,
     /// The new text for the range, or the full document content if `range` is `None`.
@@ -1212,6 +1212,7 @@ pub struct DidCloseDocumentNotification {
     /// The session ID for this notification.
     pub session_id: SessionId,
     /// The URI of the closed document.
+    #[schemars(url)]
     pub uri: String,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
@@ -1259,6 +1260,7 @@ pub struct DidSaveDocumentNotification {
     /// The session ID for this notification.
     pub session_id: SessionId,
     /// The URI of the saved document.
+    #[schemars(url)]
     pub uri: String,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
@@ -1306,6 +1308,7 @@ pub struct DidFocusDocumentNotification {
     /// The session ID for this notification.
     pub session_id: SessionId,
     /// The URI of the focused document.
+    #[schemars(url)]
     pub uri: String,
     /// The version number of the document.
     pub version: i64,
@@ -1370,11 +1373,10 @@ pub struct StartNesRequest {
     /// The root URI of the workspace.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[schemars(extend("x-deserialize-default-on-error" = true))]
+    #[schemars(url)]
     #[serde(default)]
     pub workspace_uri: Option<String>,
     /// The workspace folders.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default)]
     pub workspace_folders: Option<Vec<WorkspaceFolder>>,
     /// Repository metadata, if the workspace is a git repository.
@@ -1456,6 +1458,7 @@ impl Default for StartNesRequest {
 #[non_exhaustive]
 pub struct WorkspaceFolder {
     /// The URI of the folder.
+    #[schemars(url)]
     pub uri: String,
     /// The display name of the folder.
     pub name: String,
@@ -1714,21 +1717,18 @@ pub struct SuggestNesRequest {
     /// The session ID for this request.
     pub session_id: SessionId,
     /// The URI of the document to suggest for.
+    #[schemars(url)]
     pub uri: String,
     /// The version number of the document.
     pub version: i64,
     /// The current cursor position.
     pub position: Position,
     /// The current text selection range, if any.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub selection: Option<Range>,
     /// What triggered this suggestion request.
     pub trigger_kind: NesTriggerKind,
     /// Context for the suggestion, included based on agent capabilities.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub context: Option<NesSuggestContext>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -1799,33 +1799,21 @@ impl SuggestNesRequest {
 #[non_exhaustive]
 pub struct NesSuggestContext {
     /// Recently accessed files.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default)]
     pub recent_files: Option<Vec<NesRecentFile>>,
     /// Related code snippets.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default)]
     pub related_snippets: Option<Vec<NesRelatedSnippet>>,
     /// Recent edit history.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default)]
     pub edit_history: Option<Vec<NesEditHistoryEntry>>,
     /// Recent user actions (typing, navigation, etc.).
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default)]
     pub user_actions: Option<Vec<NesUserAction>>,
     /// Currently open files in the editor.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default)]
     pub open_files: Option<Vec<NesOpenFile>>,
     /// Current diagnostics (errors, warnings).
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default)]
     pub diagnostics: Option<Vec<NesDiagnostic>>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -1912,6 +1900,7 @@ impl NesSuggestContext {
 #[non_exhaustive]
 pub struct NesRecentFile {
     /// The URI of the file.
+    #[schemars(url)]
     pub uri: String,
     /// The language identifier.
     pub language_id: String,
@@ -1965,10 +1954,9 @@ impl NesRecentFile {
 #[non_exhaustive]
 pub struct NesRelatedSnippet {
     /// The URI of the file containing the snippets.
+    #[schemars(url)]
     pub uri: String,
     /// The code excerpts.
-    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     pub excerpts: Vec<NesExcerpt>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
@@ -2062,6 +2050,7 @@ impl NesExcerpt {
 #[non_exhaustive]
 pub struct NesEditHistoryEntry {
     /// The URI of the edited file.
+    #[schemars(url)]
     pub uri: String,
     /// A diff representing the edit.
     pub diff: String,
@@ -2110,6 +2099,7 @@ pub struct NesUserAction {
     /// The kind of action (e.g., "insertChar", "cursorMovement").
     pub action: String,
     /// The URI of the file where the action occurred.
+    #[schemars(url)]
     pub uri: String,
     /// The position where the action occurred.
     pub position: Position,
@@ -2165,6 +2155,7 @@ impl NesUserAction {
 #[non_exhaustive]
 pub struct NesOpenFile {
     /// The URI of the file.
+    #[schemars(url)]
     pub uri: String,
     /// The language identifier.
     pub language_id: String,
@@ -2237,6 +2228,7 @@ impl NesOpenFile {
 #[non_exhaustive]
 pub struct NesDiagnostic {
     /// The URI of the file containing the diagnostic.
+    #[schemars(url)]
     pub uri: String,
     /// The range of the diagnostic.
     pub range: Range,
@@ -2322,8 +2314,6 @@ pub enum NesDiagnosticSeverity {
 #[non_exhaustive]
 pub struct SuggestNesResponse {
     /// The list of suggestions.
-    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     pub suggestions: Vec<NesSuggestion>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
@@ -2479,10 +2469,10 @@ pub struct NesEditSuggestion {
     /// Unique identifier for accept/reject tracking.
     pub suggestion_id: NesSuggestionId,
     /// The URI of the file to edit.
+    #[schemars(url)]
     pub uri: String,
-    /// The text edits to apply.
-    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
+    /// The text edits to apply. Must contain at least one edit.
+    #[schemars(length(min = 1))]
     pub edits: Vec<NesTextEdit>,
     /// Optional suggested cursor position after applying edits.
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -2593,6 +2583,7 @@ pub struct NesJumpSuggestion {
     /// Unique identifier for accept/reject tracking.
     pub suggestion_id: NesSuggestionId,
     /// The file to navigate to.
+    #[schemars(url)]
     pub uri: String,
     /// The target position within the file.
     pub position: Position,
@@ -2646,6 +2637,7 @@ pub struct NesRenameSuggestion {
     /// Unique identifier for accept/reject tracking.
     pub suggestion_id: NesSuggestionId,
     /// The file URI containing the symbol.
+    #[schemars(url)]
     pub uri: String,
     /// The position of the symbol to rename.
     pub position: Position,
@@ -2703,14 +2695,13 @@ pub struct NesSearchAndReplaceSuggestion {
     /// Unique identifier for accept/reject tracking.
     pub suggestion_id: NesSuggestionId,
     /// The file URI to search within.
+    #[schemars(url)]
     pub uri: String,
     /// The text or pattern to find.
     pub search: String,
     /// The replacement text.
     pub replace: String,
     /// Whether `search` is a regular expression. Defaults to `false`.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub is_regex: Option<bool>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional

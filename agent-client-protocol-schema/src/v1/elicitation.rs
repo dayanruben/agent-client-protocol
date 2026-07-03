@@ -131,23 +131,15 @@ pub struct StringPropertySchema {
     #[serde(default)]
     pub description: Option<String>,
     /// Minimum string length.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub min_length: Option<u32>,
     /// Maximum string length.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub max_length: Option<u32>,
     /// Pattern the string must match.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub pattern: Option<String>,
     /// String format.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub format: Option<StringFormat>,
     /// Default value.
@@ -156,14 +148,10 @@ pub struct StringPropertySchema {
     #[serde(default)]
     pub default: Option<String>,
     /// Enum values for untitled single-select enums.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default)]
     #[serde(rename = "enum")]
     pub enum_values: Option<Vec<String>>,
     /// Titled enum options for titled single-select enums.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default)]
     #[serde(rename = "oneOf")]
     pub one_of: Option<Vec<EnumOption>>,
@@ -315,13 +303,9 @@ pub struct NumberPropertySchema {
     #[serde(default)]
     pub description: Option<String>,
     /// Minimum value (inclusive).
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub minimum: Option<f64>,
     /// Maximum value (inclusive).
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub maximum: Option<f64>,
     /// Default value.
@@ -413,13 +397,9 @@ pub struct IntegerPropertySchema {
     #[serde(default)]
     pub description: Option<String>,
     /// Minimum value (inclusive).
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub minimum: Option<i64>,
     /// Maximum value (inclusive).
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub maximum: Option<i64>,
     /// Default value.
@@ -574,8 +554,6 @@ impl BooleanPropertySchema {
 #[non_exhaustive]
 pub struct StringMultiSelectItems {
     /// Allowed enum values.
-    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(rename = "enum")]
     pub values: Vec<String>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -616,8 +594,6 @@ impl StringMultiSelectItems {
 #[non_exhaustive]
 pub struct TitledMultiSelectItems {
     /// Titled enum options.
-    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(rename = "anyOf")]
     pub options: Vec<EnumOption>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -772,13 +748,9 @@ pub struct MultiSelectPropertySchema {
     #[serde(default)]
     pub description: Option<String>,
     /// Minimum number of items to select.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub min_items: Option<u64>,
     /// Maximum number of items to select.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub max_items: Option<u64>,
     /// The items definition describing allowed values.
@@ -1054,13 +1026,9 @@ pub struct ElicitationSchema {
     #[serde(default)]
     pub title: Option<String>,
     /// Property definitions (must be primitive types).
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub properties: BTreeMap<String, ElicitationPropertySchema>,
     /// List of required property names.
-    #[serde_as(deserialize_as = "DefaultOnError<Option<VecSkipError<_, SkipListener>>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
     #[serde(default)]
     pub required: Option<Vec<String>>,
     /// Optional description of what this schema represents.
@@ -1951,8 +1919,6 @@ impl From<OtherElicitationAction> for ElicitationAction {
 #[non_exhaustive]
 pub struct ElicitationAcceptAction {
     /// The user-provided content, if any, as an object matching the requested schema.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[schemars(extend("x-deserialize-default-on-error" = true))]
     #[serde(default)]
     pub content: Option<BTreeMap<String, ElicitationContentValue>>,
 }
@@ -2091,78 +2057,6 @@ impl CompleteElicitationNotification {
     pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
         self.meta = meta.into_option();
         self
-    }
-}
-
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
-/// Data payload for the `UrlElicitationRequired` error, describing the URL elicitations
-/// the user must complete.
-#[serde_as]
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct UrlElicitationRequiredData {
-    /// The URL elicitations the user must complete.
-    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_, SkipListener>>")]
-    #[schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true))]
-    pub elicitations: Vec<UrlElicitationRequiredItem>,
-}
-
-impl UrlElicitationRequiredData {
-    /// Builds [`UrlElicitationRequiredData`] with the required fields set; optional fields start unset or empty.
-    #[must_use]
-    pub fn new(elicitations: Vec<UrlElicitationRequiredItem>) -> Self {
-        Self { elicitations }
-    }
-}
-
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
-/// A single URL elicitation item within the `UrlElicitationRequired` error data.
-#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct UrlElicitationRequiredItem {
-    /// The elicitation mode (always `"url"` for this item type).
-    pub mode: ElicitationUrlOnlyMode,
-    /// The unique identifier for this elicitation.
-    pub elicitation_id: ElicitationId,
-    /// The URL the user should be directed to.
-    #[schemars(extend("format" = "uri"))]
-    pub url: String,
-    /// A human-readable message describing what input is needed.
-    pub message: String,
-}
-
-/// Type discriminator for URL-only elicitation error items.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Default)]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum ElicitationUrlOnlyMode {
-    /// URL elicitation mode.
-    #[default]
-    Url,
-}
-
-impl UrlElicitationRequiredItem {
-    /// Builds [`UrlElicitationRequiredItem`] with the required fields set; optional fields start unset or empty.
-    #[must_use]
-    pub fn new(
-        elicitation_id: impl Into<ElicitationId>,
-        url: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
-        Self {
-            mode: ElicitationUrlOnlyMode::Url,
-            elicitation_id: elicitation_id.into(),
-            url: url.into(),
-            message: message.into(),
-        }
     }
 }
 
@@ -2525,27 +2419,6 @@ mod tests {
     }
 
     #[test]
-    fn url_elicitation_required_data_serialization() {
-        let data = UrlElicitationRequiredData::new(vec![UrlElicitationRequiredItem::new(
-            "elic_1",
-            "https://example.com/auth",
-            "Please authenticate",
-        )]);
-
-        let json = serde_json::to_value(&data).unwrap();
-        assert_eq!(json["elicitations"][0]["mode"], "url");
-        assert_eq!(json["elicitations"][0]["elicitationId"], "elic_1");
-        assert_eq!(json["elicitations"][0]["url"], "https://example.com/auth");
-
-        let roundtripped: UrlElicitationRequiredData = serde_json::from_value(json).unwrap();
-        assert_eq!(roundtripped.elicitations.len(), 1);
-        assert_eq!(
-            roundtripped.elicitations[0].mode,
-            ElicitationUrlOnlyMode::Url
-        );
-    }
-
-    #[test]
     fn schema_default_sets_object_type() {
         let schema = ElicitationSchema::default();
 
@@ -2874,34 +2747,28 @@ mod tests {
     }
 
     #[test]
-    fn response_accept_defaults_non_object_content() {
-        let response = serde_json::from_value::<CreateElicitationResponse>(json!({
-            "action": "accept",
-            "content": "Alice"
-        }))
-        .unwrap();
-
-        assert_eq!(
-            response.action,
-            ElicitationAction::Accept(ElicitationAcceptAction::new())
+    fn response_accept_rejects_non_object_content() {
+        assert!(
+            serde_json::from_value::<CreateElicitationResponse>(json!({
+                "action": "accept",
+                "content": "Alice"
+            }))
+            .is_err()
         );
     }
 
     #[test]
-    fn response_accept_defaults_nested_object_content() {
-        let response = serde_json::from_value::<CreateElicitationResponse>(json!({
-            "action": "accept",
-            "content": {
-                "profile": {
-                    "name": "Alice"
+    fn response_accept_rejects_nested_object_content() {
+        assert!(
+            serde_json::from_value::<CreateElicitationResponse>(json!({
+                "action": "accept",
+                "content": {
+                    "profile": {
+                        "name": "Alice"
+                    }
                 }
-            }
-        }))
-        .unwrap();
-
-        assert_eq!(
-            response.action,
-            ElicitationAction::Accept(ElicitationAcceptAction::new())
+            }))
+            .is_err()
         );
     }
 

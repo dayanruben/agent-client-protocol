@@ -182,27 +182,35 @@
             "group": "Draft",
             "pages": [
               "rfds/session-fork",
-              "rfds/agent-telemetry-export",
               "rfds/proxy-chains",
               "rfds/mcp-over-acp",
               "rfds/end-turn-token-usage",
               "rfds/auth-methods",
               "rfds/diff-delete",
-              "rfds/elicitation",
               "rfds/next-edit-suggestions",
               "rfds/custom-llm-endpoint",
-              "rfds/plan-operations",
+              "rfds/plan-operations"
+            ]
+          },
+          {
+            "group": "Active",
+            "pages": [
+              "rfds/elicitation",
               "rfds/streamable-http-websocket-transport",
               {
-                "group": "v2 Draft",
+                "group": "v2 Active",
                 "expanded": true,
                 "root": "rfds/v2/overview",
                 "pages": [
                   "rfds/v2/prompt",
                   "rfds/v2/enum-variant-extension",
+                  "rfds/v2/required-session-methods",
+                  "rfds/v2/session-resume-replay",
                   "rfds/v2/client-filesystem-terminal-capabilities",
                   "rfds/v2/plan-variants",
                   "rfds/v2/tool-call-updates",
+                  "rfds/v2/diff-file-states",
+                  "rfds/v2/permission-requests",
                   "rfds/v2/message-updates"
                 ]
               }
