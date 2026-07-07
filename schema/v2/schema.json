@@ -625,10 +625,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "ToolCallUpdate": {
       "description": "Represents an upsert for a tool call that the language model has requested.\n\nTool calls are actions that the agent executes on behalf of the language model,\nsuch as reading files, executing code, or fetching data from external sources.\n\nOnly [`ToolCallUpdate::tool_call_id`] is required. Other fields have patch semantics:\nomitted fields leave the existing tool call value unchanged, `null` clears or\nunsets the value, and concrete values replace the previous value. For\ncollection fields, concrete arrays replace the previous collection, and both\n`null` and `[]` clear the collection. When a client receives a tool call ID it\nhas not seen before, omitted fields use client defaults.\n\nSee protocol docs: [Tool Calls](https://agentclientprotocol.com/protocol/v2/tool-calls)",
@@ -872,10 +869,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "ContentBlock": {
       "description": "Content blocks represent displayable information in the Agent Client Protocol.\n\nThey provide a structured way to handle various types of user-facing content—whether\nit's text from language models, images for analysis, or embedded resources for context.\n\nContent blocks appear in:\n- User prompts sent via `session/prompt`\n- Language model output reported through `session/update` notifications as\n  message updates or streamed chunks\n- Progress updates and results from tool calls\n\nThis structure is compatible with the Model Context Protocol (MCP), enabling\nagents to seamlessly forward content from MCP tool outputs without transformation.\n\nSee protocol docs: [Content](https://agentclientprotocol.com/protocol/v2/content)",
@@ -1027,10 +1021,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "Annotations": {
       "description": "Optional annotations for the client. The client can use annotations to inform how objects are used or displayed",
@@ -1620,10 +1611,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "operation"
-      }
+      ]
     },
     "DiffFileType": {
       "description": "Kind of file content represented by a diff change.",
@@ -2590,6 +2578,22 @@
           ]
         },
         {
+          "description": "Boolean on/off toggle.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "boolean"
+            }
+          },
+          "required": ["type"],
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionConfigBoolean"
+            }
+          ]
+        },
+        {
           "title": "other",
           "description": "Custom or future session configuration option payload.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this option type should preserve the raw\npayload when storing, replaying, proxying, or forwarding configuration\ndata, and otherwise ignore the option or display it generically.",
           "type": "object",
@@ -2611,15 +2615,22 @@
                   }
                 },
                 "required": ["type"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "boolean"
+                  }
+                },
+                "required": ["type"]
               }
             ]
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "SessionConfigId": {
       "description": "Unique identifier for a session configuration option.",
@@ -2770,6 +2781,17 @@
         }
       },
       "required": ["currentValue", "options"]
+    },
+    "SessionConfigBoolean": {
+      "description": "A boolean on/off toggle session configuration option payload.",
+      "type": "object",
+      "properties": {
+        "currentValue": {
+          "description": "The current value of the boolean option.",
+          "type": "boolean"
+        }
+      },
+      "required": ["currentValue"]
     },
     "ListSessionsResponse": {
       "description": "Response from listing sessions.",
@@ -3485,10 +3507,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "sessionUpdate"
-      }
+      ]
     },
     "MessageId": {
       "description": "Unique identifier for a message within a session.",
@@ -3794,10 +3813,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "state"
-      }
+      ]
     },
     "ToolCallContentChunk": {
       "description": "A streamed item of tool-call content.\n\nTool-call content chunks append one [`ToolCallContent`] item to the current\ncontent for the matching [`ToolCallId`]. Agents can use\n[`ToolCallUpdate::content`] when they need to replace the whole content\ncollection instead.",
@@ -3902,10 +3918,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "PlanId": {
       "description": "Unique identifier for a plan within a session.",
@@ -4124,10 +4137,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "TextCommandInput": {
       "description": "All text that was typed after the command name is provided as input.",
@@ -4607,10 +4617,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "HttpHeader": {
       "description": "An HTTP header to set when making requests to the MCP server.",
@@ -4872,10 +4879,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "type"
-      }
+      ]
     },
     "ReplayFromStart": {
       "description": "Inclusive replay cursor requesting replay from the start of the conversation.",
@@ -4932,14 +4936,6 @@
             }
           ]
         },
-        "value": {
-          "description": "The ID of the configuration option value to set.",
-          "allOf": [
-            {
-              "$ref": "#/$defs/SessionConfigValueId"
-            }
-          ]
-        },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)",
           "type": ["object", "null"],
@@ -4947,7 +4943,83 @@
           "additionalProperties": true
         }
       },
-      "required": ["sessionId", "configId", "value"],
+      "required": ["sessionId", "configId"],
+      "anyOf": [
+        {
+          "description": "A [`SessionConfigValueId`] string value (`type: \"id\"`).",
+          "type": "object",
+          "properties": {
+            "value": {
+              "description": "The value ID.",
+              "allOf": [
+                {
+                  "$ref": "#/$defs/SessionConfigValueId"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "id"
+            }
+          },
+          "required": ["type", "value"]
+        },
+        {
+          "description": "A boolean value (`type: \"boolean\"`).",
+          "type": "object",
+          "properties": {
+            "value": {
+              "description": "The boolean value.",
+              "type": "boolean"
+            },
+            "type": {
+              "type": "string",
+              "const": "boolean"
+            }
+          },
+          "required": ["type", "value"]
+        },
+        {
+          "title": "other",
+          "description": "Custom or future session configuration option value payload.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "description": "Custom or future session configuration option value type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
+              "type": "string"
+            },
+            "value": {
+              "description": "Raw value payload for the custom or future value type."
+            }
+          },
+          "required": ["type", "value"],
+          "not": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "id"
+                  }
+                },
+                "required": ["type"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "boolean"
+                  }
+                },
+                "required": ["type"]
+              }
+            ]
+          },
+          "additionalProperties": true
+        }
+      ],
       "x-side": "agent",
       "x-method": "session/set_config_option"
     },
@@ -5140,10 +5212,7 @@
           },
           "additionalProperties": true
         }
-      ],
-      "discriminator": {
-        "propertyName": "outcome"
-      }
+      ]
     },
     "SelectedPermissionOutcome": {
       "description": "The user selected one of the provided options.",

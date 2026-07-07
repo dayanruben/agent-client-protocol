@@ -4178,7 +4178,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 
 ## <span class="font-mono">EnumOption</span>
 
-A titled enum option with a const value and human-readable title.
+A titled enum option with a const value, human-readable title, and optional description.
 
 **Type:** Object
 
@@ -4194,6 +4194,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="const" type={"string"} required>
   The constant value for this option.
+</ResponseField>
+<ResponseField name="description" type={"string | null"} >
+  Human-readable description.
 </ResponseField>
 <ResponseField name="title" type={"string"} required>
   Human-readable title for this option.
@@ -7261,10 +7264,6 @@ required by `session/prompt`.
 
 ## <span class="font-mono">SessionConfigBoolean</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 A boolean on/off toggle session configuration option payload.
 
 **Type:** Object
@@ -7345,10 +7344,6 @@ Single-value selector (dropdown).
 </ResponseField>
 
 <ResponseField name="boolean" type="object">
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 Boolean on/off toggle.
 
 <Expandable title="Properties">

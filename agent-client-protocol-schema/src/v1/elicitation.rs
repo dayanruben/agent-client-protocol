@@ -64,7 +64,7 @@ pub enum ElicitationSchemaType {
     Object,
 }
 
-/// A titled enum option with a const value and human-readable title.
+/// A titled enum option with a const value, human-readable title, and optional description.
 #[serde_as]
 #[skip_serializing_none]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -75,6 +75,11 @@ pub struct EnumOption {
     pub value: String,
     /// Human-readable title for this option.
     pub title: String,
+    /// Human-readable description.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[schemars(extend("x-deserialize-default-on-error" = true))]
+    #[serde(default)]
+    pub description: Option<String>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
@@ -94,8 +99,16 @@ impl EnumOption {
         Self {
             value: value.into(),
             title: title.into(),
+            description: None,
             meta: None,
         }
+    }
+
+    /// Human-readable description.
+    #[must_use]
+    pub fn description(mut self, description: impl IntoOption<String>) -> Self {
+        self.description = description.into_option();
+        self
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -717,7 +730,6 @@ fn other_multi_select_items_schema(schema: &mut Schema) {
 /// Items for a multi-select (array) property schema.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[schemars(extend("discriminator" = {"propertyName": "type"}))]
 #[non_exhaustive]
 pub enum MultiSelectItems {
     /// Multi-select string items with plain string values.
@@ -855,7 +867,6 @@ impl MultiSelectPropertySchema {
 /// Multi-select enums use the `Array` variant.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "snake_case")]
-#[schemars(extend("discriminator" = {"propertyName": "type"}))]
 #[non_exhaustive]
 pub enum ElicitationPropertySchema {
     /// String property (or single-select enum when `enum`/`oneOf` is set).
@@ -1504,7 +1515,6 @@ impl CreateElicitationRequest {
 /// The mode of elicitation, determining how user input is collected.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(tag = "mode", rename_all = "snake_case")]
-#[schemars(extend("discriminator" = {"propertyName": "mode"}))]
 #[non_exhaustive]
 pub enum ElicitationMode {
     /// Form-based elicitation where the client renders a form from the provided schema.
@@ -1785,7 +1795,6 @@ impl CreateElicitationResponse {
 /// The user's action in response to an elicitation.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
 #[serde(tag = "action", rename_all = "snake_case")]
-#[schemars(extend("discriminator" = {"propertyName": "action"}))]
 #[non_exhaustive]
 pub enum ElicitationAction {
     /// The user accepted and provided content.
@@ -2615,7 +2624,7 @@ mod tests {
         let schema = ElicitationSchema::new().property(
             "country",
             StringPropertySchema::new().one_of(vec![
-                EnumOption::new("us", "United States"),
+                EnumOption::new("us", "United States").description("Use US English spelling."),
                 EnumOption::new("uk", "United Kingdom"),
             ]),
             true,
@@ -2627,12 +2636,20 @@ mod tests {
         assert_eq!(one_of.len(), 2);
         assert_eq!(one_of[0]["const"], "us");
         assert_eq!(one_of[0]["title"], "United States");
+        assert_eq!(one_of[0]["description"], "Use US English spelling.");
+        assert!(one_of[1].get("description").is_none());
 
         let roundtripped: ElicitationSchema = serde_json::from_value(json).unwrap();
         if let ElicitationPropertySchema::String(s) =
             roundtripped.properties.get("country").unwrap()
         {
-            assert_eq!(s.one_of.as_ref().unwrap().len(), 2);
+            let one_of = s.one_of.as_ref().unwrap();
+            assert_eq!(one_of.len(), 2);
+            assert_eq!(
+                one_of[0].description.as_deref(),
+                Some("Use US English spelling.")
+            );
+            assert!(one_of[1].description.is_none());
         } else {
             panic!("expected String variant");
         }
