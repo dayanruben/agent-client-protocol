@@ -21,6 +21,10 @@ requests from clients and execute tasks using language models and tools.
 
 Authenticates the client using the specified authentication method.
 
+Agents MUST support this method when their `initialize` response advertised
+at least one valid authentication method. Clients MUST NOT call this method
+when `authMethods` was omitted or empty.
+
 Called when the agent requires authentication before allowing session creation.
 The client provides the authentication method ID that was advertised during initialization.
 
@@ -34,6 +38,10 @@ See protocol docs: [Initialization](https://agentclientprotocol.com/protocol/v2/
 Request parameters for the `auth/login` method.
 
 Specifies which authentication method to use.
+
+Agents MUST support this method when their `initialize` response advertised
+at least one valid authentication method. Clients MUST NOT call this method
+when `authMethods` was omitted or empty.
 
 **Type:** Object
 
@@ -74,14 +82,23 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 
 Logs out of the current authenticated state.
 
-After a successful logout, all new sessions will require authentication.
-There is no guarantee about the behavior of already running sessions.
+Agents MUST support this method when their `initialize` response advertised
+at least one valid authentication method. Clients MUST NOT call this method
+when `authMethods` was omitted or empty.
+
+After a successful logout, authentication-gated requests require the client
+to authenticate again. There is no guarantee about the behavior of already
+running sessions.
 
 #### <span class="font-mono">LogoutAuthRequest</span>
 
 Request parameters for the `auth/logout` method.
 
 Terminates the current authenticated session.
+
+Agents MUST support this method when their `initialize` response advertised
+at least one valid authentication method. Clients MUST NOT call this method
+when `authMethods` was omitted or empty.
 
 **Type:** Object
 
@@ -144,6 +161,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the changed document.
+
+    - Format: `uri`
+
 </ResponseField>
 <ResponseField name="version" type={"int64"} required>
   The new version number of the document.
@@ -177,6 +197,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the closed document.
+
+    - Format: `uri`
+
 </ResponseField>
 
 <a id="document-didfocus"></a>
@@ -210,6 +233,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the focused document.
+
+    - Format: `uri`
+
 </ResponseField>
 <ResponseField name="version" type={"int64"} required>
   The version number of the document.
@@ -252,6 +278,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the opened document.
+
+    - Format: `uri`
+
 </ResponseField>
 <ResponseField name="version" type={"int64"} required>
   The version number of the document.
@@ -285,6 +314,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the saved document.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ### <span class="font-mono">initialize</span>
@@ -356,6 +388,11 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="authMethods" type={<a href="#authmethod">AuthMethod[]</a>} >
   Authentication methods supported by the agent.
+
+Optional. Omitted or empty means the agent does not advertise the
+authentication method surface. Supplying one or more valid methods means
+the agent MUST support both `auth/login` and `auth/logout`.
+
 </ResponseField>
 <ResponseField name="capabilities" type={<a href="#agentcapabilities">AgentCapabilities</a>} >
   Capabilities supported by the agent.
@@ -610,6 +647,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="workspaceUri" type={"string | null"} >
   The root URI of the workspace.
+
+    - Format: `uri`
+
 </ResponseField>
 
 #### <span class="font-mono">StartNesResponse</span>
@@ -674,6 +714,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the document to suggest for.
+
+    - Format: `uri`
+
 </ResponseField>
 <ResponseField name="version" type={"int64"} required>
   The version number of the document.
@@ -843,6 +886,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="baseUrl" type={"string"} required>
   Base URL for requests sent through this provider.
+
+    - Format: `uri`
+
 </ResponseField>
 <ResponseField name="headers" type={"object"} >
   Full headers map for this provider.
@@ -1048,7 +1094,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="additionalDirectories" type={<><span>"string"</span><span>[]</span></>} >
+<ResponseField name="additionalDirectories" type={<a href="#absolutepath">AbsolutePath[]</a>} >
   Additional workspace roots to activate for this session. Each path must be absolute.
 
 When omitted or empty, no additional roots are activated. When non-empty,
@@ -1056,7 +1102,7 @@ this is the complete resulting additional-root list for the forked
 session.
 
 </ResponseField>
-<ResponseField name="cwd" type={"string"} required>
+<ResponseField name="cwd" type={<a href="#absolutepath">AbsolutePath</a>} required>
   The working directory for this session. Must be an absolute path.
 </ResponseField>
 <ResponseField name="mcpServers" type={<a href="#mcpserver">McpServer[]</a>} >
@@ -1116,10 +1162,10 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="cursor" type={"string | null"} >
+<ResponseField name="cursor" type={<><span><a href="#sessionlistcursor">SessionListCursor</a></span><span> | null</span></>} >
   Opaque cursor token from a previous response's nextCursor field for cursor-based pagination
 </ResponseField>
-<ResponseField name="cwd" type={"string | null"} >
+<ResponseField name="cwd" type={<><span><a href="#absolutepath">AbsolutePath</a></span><span> | null</span></>} >
   Filter sessions by working directory. Must be an absolute path.
 </ResponseField>
 
@@ -1139,7 +1185,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="nextCursor" type={"string | null"} >
+<ResponseField name="nextCursor" type={<><span><a href="#sessionlistcursor">SessionListCursor</a></span><span> | null</span></>} >
   Opaque cursor token. If present, pass this in the next request's cursor parameter
 to fetch the next page. If absent, there are no more results.
 </ResponseField>
@@ -1182,7 +1228,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="additionalDirectories" type={<><span>"string"</span><span>[]</span></>} >
+<ResponseField name="additionalDirectories" type={<a href="#absolutepath">AbsolutePath[]</a>} >
   Additional workspace roots for this session. Each path must be absolute.
 
 These expand the session's workspace scope without changing `cwd`, which
@@ -1190,7 +1236,7 @@ remains the base for relative paths. When omitted or empty, no
 additional roots are activated for the new session.
 
 </ResponseField>
-<ResponseField name="cwd" type={"string"} required>
+<ResponseField name="cwd" type={<a href="#absolutepath">AbsolutePath</a>} required>
   The working directory for this session. Must be an absolute path.
 </ResponseField>
 <ResponseField name="mcpServers" type={<a href="#mcpserver">McpServer[]</a>} >
@@ -1286,7 +1332,7 @@ pieces of context from sources the agent may not have access to.
 Response acknowledging that a user prompt was accepted.
 
 This response does not indicate that the agent has finished processing.
-Agents report session state through `state_update` session updates.
+Processing and completion are reported through `state_update` session updates.
 
 See protocol docs: [Prompt Accepted](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#2-prompt-accepted)
 
@@ -1331,7 +1377,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="additionalDirectories" type={<><span>"string"</span><span>[]</span></>} >
+<ResponseField name="additionalDirectories" type={<a href="#absolutepath">AbsolutePath[]</a>} >
   Additional workspace roots to activate for this session. Each path must be absolute.
 
 When omitted or empty, no additional roots are activated. When non-empty,
@@ -1340,7 +1386,7 @@ session. It may differ from any previously used or reported list as long as
 the request `cwd` matches the session's `cwd`.
 
 </ResponseField>
-<ResponseField name="cwd" type={"string"} required>
+<ResponseField name="cwd" type={<a href="#absolutepath">AbsolutePath</a>} required>
   The working directory for this session. Must be an absolute path.
 </ResponseField>
 <ResponseField name="mcpServers" type={<a href="#mcpserver">McpServer[]</a>} >
@@ -1592,11 +1638,7 @@ URL-based elicitation where the client directs the user to a URL.
 
 <Expandable title="Properties">
 
-<ResponseField
-  name="elicitationId"
-  type={<a href="#elicitationid">ElicitationId</a>}
-  required
->
+<ResponseField name="elicitationId" type={<a href="#elicitationid">ElicitationId</a>} required>
   The unique identifier for this elicitation.
 </ResponseField>
 <ResponseField name="mode" type={"string"} required>
@@ -1604,6 +1646,9 @@ URL-based elicitation where the client directs the user to a URL.
 </ResponseField>
 <ResponseField name="url" type={"string"} required>
   The URL to direct the user to.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -2009,8 +2054,8 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 Handles session update notifications from the agent.
 
 This is a notification endpoint (no response expected) that receives
-real-time updates about session progress, including message updates,
-message chunks, tool calls, and execution plans.
+updates about session activity, including message updates, message chunks,
+tool calls, and execution plans.
 
 Note: Clients SHOULD continue accepting tool call updates even after
 sending a `session/cancel` notification, as the agent may send final
@@ -2023,7 +2068,7 @@ See protocol docs: [Agent Reports Output](https://agentclientprotocol.com/protoc
 
 Notification containing a session update from the agent.
 
-Used to stream real-time progress and results during prompt processing.
+Agents can send session updates at any point while the session exists.
 
 See protocol docs: [Agent Reports Output](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#3-agent-reports-output)
 
@@ -2097,9 +2142,19 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
   The ID of the request to cancel.
 </ResponseField>
 
+## <span class="font-mono">AbsolutePath</span>
+
+An absolute filesystem path used by the protocol.
+
+**Type:** `string`
+
 ## <span class="font-mono">AgentAuthCapabilities</span>
 
-Authentication-related capabilities supported by the agent.
+Authentication-related extension capabilities supported by the agent.
+
+This object does not advertise support for `auth/login` or `auth/logout`.
+Those methods are advertised by a non-empty `authMethods` list in the
+`initialize` response.
 
 **Type:** Object
 
@@ -2136,10 +2191,12 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 
 </ResponseField>
 <ResponseField name="auth" type={<><span><a href="#agentauthcapabilities">AgentAuthCapabilities</a></span><span> | null</span></>} >
-  Authentication-related capabilities supported by the agent.
+  Authentication-related extension capabilities supported by the agent.
 
 Optional. Omitted or `null` both mean the agent does not advertise any
-authentication-related extensions.
+authentication-related extensions. This field does not advertise support
+for `auth/login` or `auth/logout`; those methods are advertised by a
+non-empty `authMethods` list in the `initialize` response.
 
 </ResponseField>
 <ResponseField name="nes" type={<><span><a href="#nescapabilities">NesCapabilities</a></span><span> | null</span></>} >
@@ -2274,7 +2331,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="lastModified" type={"string | null"} >
   Timestamp indicating when the underlying resource was last modified.
 
-Must be an ISO 8601 formatted string (e.g., "2025-01-12T15:00:58Z").
+Must be an RFC 3339 formatted string (e.g., "2025-01-12T15:00:58Z").
+
+    - Format: `date-time`
 
 </ResponseField>
 <ResponseField name="priority" type={"number | null"} >
@@ -2308,8 +2367,11 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="data" type={"string"} required>
   Base64-encoded media payload.
+
+    - Content encoding: `base64`
+
 </ResponseField>
-<ResponseField name="mimeType" type={"string"} required>
+<ResponseField name="mimeType" type={<a href="#mediatype">MediaType</a>} required>
   MIME type describing the encoded media payload.
 </ResponseField>
 
@@ -2419,6 +2481,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="link" type={"string | null"} >
   Optional link to a page where the user can obtain their credentials.
+
+    - Format: `uri`
+
 </ResponseField>
 <ResponseField name="methodId" type={<a href="#authmethodid">AuthMethodId</a>} required>
   Unique identifier for this authentication method.
@@ -2603,6 +2668,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="link" type={"string | null"} >
   Optional link to a page where the user can obtain their credentials.
+
+    - Format: `uri`
+
 </ResponseField>
 <ResponseField name="methodId" type={<a href="#authmethodid">AuthMethodId</a>} required>
   Unique identifier for this authentication method.
@@ -2777,12 +2845,18 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="blob" type={"string"} required>
   Base64-encoded bytes for a binary resource payload.
+
+    - Content encoding: `base64`
+
 </ResponseField>
-<ResponseField name="mimeType" type={"string | null"} >
+<ResponseField name="mimeType" type={<><span><a href="#mediatype">MediaType</a></span><span> | null</span></>} >
   MIME type describing the encoded media payload.
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   URI associated with this resource or media payload.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">BooleanPropertySchema</span>
@@ -2922,7 +2996,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="command" type={"string"} required>
   The command that would be run if permission is granted.
 </ResponseField>
-<ResponseField name="cwd" type={"string"} required>
+<ResponseField name="cwd" type={<a href="#absolutepath">AbsolutePath</a>} required>
   The absolute working directory for the command.
 </ResponseField>
 <ResponseField name="terminalId" type={<><span><a href="#terminalid">TerminalId</a></span><span> | null</span></>} >
@@ -3042,8 +3116,11 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="data" type={"string"} required>
   Base64-encoded media payload.
+
+    - Content encoding: `base64`
+
 </ResponseField>
-<ResponseField name="mimeType" type={"string"} required>
+<ResponseField name="mimeType" type={<a href="#mediatype">MediaType</a>} required>
   MIME type describing the encoded media payload.
 </ResponseField>
 <ResponseField name="type" type={"string"} required>
@@ -3051,6 +3128,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string | null"} >
   URI associated with this resource or media payload.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -3076,8 +3156,11 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="data" type={"string"} required>
   Base64-encoded media payload.
+
+    - Content encoding: `base64`
+
 </ResponseField>
-<ResponseField name="mimeType" type={"string"} required>
+<ResponseField name="mimeType" type={<a href="#mediatype">MediaType</a>} required>
   MIME type describing the encoded media payload.
 </ResponseField>
 <ResponseField name="type" type={"string"} required>
@@ -3111,7 +3194,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="icons" type={<><span><a href="#icon">Icon[]</a></span><span> | null</span></>} >
   Optional set of sized icons that the client can display in a user interface.
 </ResponseField>
-<ResponseField name="mimeType" type={"string | null"} >
+<ResponseField name="mimeType" type={<><span><a href="#mediatype">MediaType</a></span><span> | null</span></>} >
   MIME type describing the encoded media payload.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
@@ -3128,6 +3211,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   URI associated with this resource or media payload.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -3245,10 +3331,10 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 
 File changes produced by a tool call.
 
-`changes` identifies affected absolute paths and operations. `patch`
-optionally carries renderable patch text for clients that can show it.
-Agents SHOULD provide `patch` whenever feasible. Clients MUST handle diffs
-where `patch` is omitted or `null`.
+`changes` is authoritative for affected absolute paths and operations.
+`patch` optionally carries renderable text for some or all of those changes
+and MUST be consistent with `changes`. Agents SHOULD provide `patch` whenever
+feasible. Clients MUST handle diffs where `patch` is omitted or `null`.
 
 See protocol docs: [Content](https://agentclientprotocol.com/protocol/v2/draft/tool-calls#content)
 
@@ -3271,7 +3357,7 @@ Clients can use this field without parsing patch text to determine affected path
 
 </ResponseField>
 <ResponseField name="patch" type={<><span><a href="#diffpatch">DiffPatch</a></span><span> | null</span></>} >
-  Renderable patch text.
+  Renderable patch text for some or all of the structured changes.
 
 Agents SHOULD provide patch text whenever feasible. Omitted or `null`
 means no renderable patch text was provided.
@@ -3303,7 +3389,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 Omitted or `null` means the content kind is unknown.
 
 </ResponseField>
-<ResponseField name="mimeType" type={"string | null"} >
+<ResponseField name="mimeType" type={<><span><a href="#mediatype">MediaType</a></span><span> | null</span></>} >
   MIME type of the file contents.
 
 Omitted or `null` means the MIME type is unknown.
@@ -3320,7 +3406,11 @@ A file was added.
 <ResponseField name="operation" type={"string"} required>
   The discriminator value. Must be `"add"`.
 </ResponseField>
-<ResponseField name="path" type={"string"} required>
+<ResponseField
+  name="path"
+  type={<a href="#absolutepath">AbsolutePath</a>}
+  required
+>
   Absolute path for the operation.
 </ResponseField>
 
@@ -3335,7 +3425,11 @@ A file was deleted.
 <ResponseField name="operation" type={"string"} required>
   The discriminator value. Must be `"delete"`.
 </ResponseField>
-<ResponseField name="path" type={"string"} required>
+<ResponseField
+  name="path"
+  type={<a href="#absolutepath">AbsolutePath</a>}
+  required
+>
   Absolute path for the operation.
 </ResponseField>
 
@@ -3350,7 +3444,11 @@ A file was modified in place.
 <ResponseField name="operation" type={"string"} required>
   The discriminator value. Must be `"modify"`.
 </ResponseField>
-<ResponseField name="path" type={"string"} required>
+<ResponseField
+  name="path"
+  type={<a href="#absolutepath">AbsolutePath</a>}
+  required
+>
   Absolute path for the operation.
 </ResponseField>
 
@@ -3362,13 +3460,21 @@ A file was moved or renamed.
 
 <Expandable title="Properties">
 
-<ResponseField name="oldPath" type={"string"} required>
+<ResponseField
+  name="oldPath"
+  type={<a href="#absolutepath">AbsolutePath</a>}
+  required
+>
   Absolute path before the operation.
 </ResponseField>
 <ResponseField name="operation" type={"string"} required>
   The discriminator value. Must be `"move"`.
 </ResponseField>
-<ResponseField name="path" type={"string"} required>
+<ResponseField
+  name="path"
+  type={<a href="#absolutepath">AbsolutePath</a>}
+  required
+>
   Absolute path after the operation.
 </ResponseField>
 
@@ -3380,13 +3486,21 @@ A file was copied.
 
 <Expandable title="Properties">
 
-<ResponseField name="oldPath" type={"string"} required>
+<ResponseField
+  name="oldPath"
+  type={<a href="#absolutepath">AbsolutePath</a>}
+  required
+>
   Absolute path before the operation.
 </ResponseField>
 <ResponseField name="operation" type={"string"} required>
   The discriminator value. Must be `"copy"`.
 </ResponseField>
-<ResponseField name="path" type={"string"} required>
+<ResponseField
+  name="path"
+  type={<a href="#absolutepath">AbsolutePath</a>}
+  required
+>
   Absolute path after the operation.
 </ResponseField>
 
@@ -3447,21 +3561,21 @@ future ACP variants.
 
 ## <span class="font-mono">DiffPatch</span>
 
-Renderable patch text.
+Renderable patch text and its format.
 
 **Type:** Object
 
 **Properties:**
 
-<ResponseField name="diff" type={"string"} required>
-  Git patch text.
-</ResponseField>
 <ResponseField
   name="format"
   type={<a href="#diffpatchformat">DiffPatchFormat</a>}
   required
 >
   Patch format. The only ACP-defined value is `git_patch`.
+</ResponseField>
+<ResponseField name="text" type={"string"} required>
+  Patch text in the format named by `format`.
 </ResponseField>
 
 ## <span class="font-mono">DiffPatchFormat</span>
@@ -3471,11 +3585,15 @@ Text patch format used by `DiffPatch`.
 **Type:** Union
 
 <ResponseField name="git_patch" type="string">
-  Git patch format.
+One or more `diff --git` sections in Git's `--patch` (`-p`) text format.
+
+Paths MUST be absolute. Surrounding commit metadata and email envelopes
+MUST NOT be included.
+
 </ResponseField>
 
 <ResponseField name="other" type="string">
-Custom or future diff format.
+Custom or future patch format.
 
 Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
@@ -3491,7 +3609,11 @@ Operation metadata for add, delete, and modify changes.
 
 **Properties:**
 
-<ResponseField name="path" type={"string"} required>
+<ResponseField
+  name="path"
+  type={<a href="#absolutepath">AbsolutePath</a>}
+  required
+>
   Absolute path for the operation.
 </ResponseField>
 
@@ -3503,10 +3625,18 @@ Operation metadata for move and copy changes.
 
 **Properties:**
 
-<ResponseField name="oldPath" type={"string"} required>
+<ResponseField
+  name="oldPath"
+  type={<a href="#absolutepath">AbsolutePath</a>}
+  required
+>
   Absolute path before the operation.
 </ResponseField>
-<ResponseField name="path" type={"string"} required>
+<ResponseField
+  name="path"
+  type={<a href="#absolutepath">AbsolutePath</a>}
+  required
+>
   Absolute path after the operation.
 </ResponseField>
 
@@ -3742,6 +3872,9 @@ Must contain at least one option when present.
 </ResponseField>
 <ResponseField name="pattern" type={"string | null"} >
   Pattern the string must match.
+
+    - Format: `regex`
+
 </ResponseField>
 <ResponseField name="title" type={"string | null"} >
   Optional title for the property.
@@ -4065,15 +4198,14 @@ URL-based elicitation mode where the client directs the user to a URL.
 
 **Shared properties:**
 
-<ResponseField
-  name="elicitationId"
-  type={<a href="#elicitationid">ElicitationId</a>}
-  required
->
+<ResponseField name="elicitationId" type={<a href="#elicitationid">ElicitationId</a>} required>
   The unique identifier for this elicitation.
 </ResponseField>
 <ResponseField name="url" type={"string"} required>
   The URL to direct the user to.
+
+    - Format: `uri`
+
 </ResponseField>
 
 **Variants:**
@@ -4166,7 +4298,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="mimeType" type={"string | null"} >
+<ResponseField name="mimeType" type={<><span><a href="#mediatype">MediaType</a></span><span> | null</span></>} >
   MIME type describing the encoded media payload.
 </ResponseField>
 <ResponseField name="text" type={"string"} required>
@@ -4174,6 +4306,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   URI associated with this resource or media payload.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -4194,12 +4329,18 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="blob" type={"string"} required>
   Base64-encoded bytes for a binary resource payload.
+
+    - Content encoding: `base64`
+
 </ResponseField>
-<ResponseField name="mimeType" type={"string | null"} >
+<ResponseField name="mimeType" type={<><span><a href="#mediatype">MediaType</a></span><span> | null</span></>} >
   MIME type describing the encoded media payload.
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   URI associated with this resource or media payload.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -4386,39 +4527,24 @@ An optionally-sized icon that can be displayed in a user interface.
 
 **Properties:**
 
-<ResponseField name="mimeType" type={"string | null"}>
+<ResponseField name="mimeType" type={<><span><a href="#mediatype">MediaType</a></span><span> | null</span></>} >
   Optional MIME type override if the source MIME type is missing or generic.
 </ResponseField>
-<ResponseField
-  name="sizes"
-  type={
-    <>
-      <span>
-        <>
-          <span>"string"</span>
-          <span>[]</span>
-        </>
-      </span>
-      <span> | null</span>
-    </>
-  }
->
-  Optional sizes at which the icon can be used.
+<ResponseField name="sizes" type={<><span><><span>"string"</span><span>[]</span></></span><span> | null</span></>} >
+  Optional array of strings that specify sizes at which the icon can be used.
+Each string should be in `WxH` format (e.g., `"48x48"`, `"96x96"`) or
+`"any"` for scalable formats like SVG.
+
+If not provided, the client should assume that the icon can be used at any size.
+
 </ResponseField>
 <ResponseField name="src" type={"string"} required>
   A standard URI pointing to an icon resource.
+
+    - Format: `uri`
+
 </ResponseField>
-<ResponseField
-  name="theme"
-  type={
-    <>
-      <span>
-        <a href="#icontheme">IconTheme</a>
-      </span>
-      <span> | null</span>
-    </>
-  }
->
+<ResponseField name="theme" type={<><span><a href="#icontheme">IconTheme</a></span><span> | null</span></>} >
   Optional theme this icon is designed for.
 </ResponseField>
 
@@ -4447,7 +4573,7 @@ future ACP variants.
 
 ## <span class="font-mono">IdleStateUpdate</span>
 
-The agent is not currently processing work in the session.
+The agent is ready to process a new prompt.
 
 **Type:** Object
 
@@ -4462,10 +4588,10 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 
 </ResponseField>
 <ResponseField name="stopReason" type={<><span><a href="#stopreason">StopReason</a></span><span> | null</span></>} >
-  Indicates why the agent stopped processing active session work.
+  Indicates why foreground work stopped.
 
 Optional. Omitted or `null` both mean the agent is not reporting a stop reason.
-Agents SHOULD include this when the idle transition ends active work.
+Agents SHOULD include this when the idle transition ends foreground work.
 
 </ResponseField>
 <ResponseField name="usage" type={<><span><a href="#usage">Usage</a></span><span> | null</span></>} >
@@ -4473,7 +4599,7 @@ Agents SHOULD include this when the idle transition ends active work.
 
 This capability is not part of the spec yet, and may be removed or changed at any point.
 
-Token usage for completed session work.
+Token usage for completed foreground work.
 
 Optional. Omitted or `null` both mean the agent is not reporting token
 usage for this state update.
@@ -4501,12 +4627,18 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="data" type={"string"} required>
   Base64-encoded media payload.
+
+    - Content encoding: `base64`
+
 </ResponseField>
-<ResponseField name="mimeType" type={"string"} required>
+<ResponseField name="mimeType" type={<a href="#mediatype">MediaType</a>} required>
   MIME type describing the encoded media payload.
 </ResponseField>
 <ResponseField name="uri" type={"string | null"} >
   URI associated with this resource or media payload.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">Implementation</span>
@@ -4750,6 +4882,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="url" type={"string"} required>
   URL to the MCP server.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -4810,7 +4945,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="args" type={<><span>"string"</span><span>[]</span></>} >
   Command-line arguments to pass to the MCP server.
 </ResponseField>
-<ResponseField name="command" type={"string"} required>
+<ResponseField name="command" type={<a href="#absolutepath">AbsolutePath</a>} required>
   Absolute path to the MCP server executable.
 </ResponseField>
 <ResponseField name="env" type={<a href="#envvariable">EnvVariable[]</a>} >
@@ -4923,6 +5058,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="url" type={"string"} required>
   URL to the MCP server.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">McpServerStdio</span>
@@ -4944,7 +5082,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="args" type={<><span>"string"</span><span>[]</span></>} >
   Command-line arguments to pass to the MCP server.
 </ResponseField>
-<ResponseField name="command" type={"string"} required>
+<ResponseField name="command" type={<a href="#absolutepath">AbsolutePath</a>} required>
   Absolute path to the MCP server executable.
 </ResponseField>
 <ResponseField name="env" type={<a href="#envvariable">EnvVariable[]</a>} >
@@ -4972,6 +5110,12 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
+
+## <span class="font-mono">MediaType</span>
+
+An Internet media type identifying the format of protocol content.
+
+**Type:** `string`
 
 ## <span class="font-mono">MessageId</span>
 
@@ -5174,6 +5318,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the file containing the diagnostic.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">NesDiagnosticSeverity</span>
@@ -5388,6 +5535,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the edited file.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">NesEditSuggestion</span>
@@ -5417,6 +5567,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the file to edit.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">NesEventCapabilities</span>
@@ -5512,6 +5665,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The file to navigate to.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">NesOpenFile</span>
@@ -5541,6 +5697,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the file.
+
+    - Format: `uri`
+
 </ResponseField>
 <ResponseField name="visibleRange" type={<><span><a href="#range">Range</a></span><span> | null</span></>} >
   The visible range in the editor, if any.
@@ -5587,6 +5746,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the file.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">NesRecentFilesCapabilities</span>
@@ -5664,6 +5826,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the file containing the snippets.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">NesRelatedSnippetsCapabilities</span>
@@ -5727,6 +5892,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The file URI containing the symbol.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">NesRepository</span>
@@ -5802,6 +5970,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The file URI to search within.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">NesSuggestContext</span>
@@ -5872,6 +6043,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the file to edit.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -5901,6 +6075,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The file to navigate to.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -5933,6 +6110,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The file URI containing the symbol.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -5968,6 +6148,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The file URI to search within.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -6091,6 +6274,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the file where the action occurred.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">NesUserActionsCapabilities</span>
@@ -6330,6 +6516,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the file containing the plan.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">PlanId</span>
@@ -6497,6 +6686,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the file containing the plan.
+
+    - Format: `uri`
+
 </ResponseField>
 
 </Expandable>
@@ -6759,6 +6951,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="baseUrl" type={"string"} required>
   Base URL currently used by this provider.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">ProviderId</span>
@@ -7070,7 +7265,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="command" type={"string"} required>
   The command that would be run if permission is granted.
 </ResponseField>
-<ResponseField name="cwd" type={"string"} required>
+<ResponseField name="cwd" type={<a href="#absolutepath">AbsolutePath</a>} required>
   The absolute working directory for the command.
 </ResponseField>
 <ResponseField name="terminalId" type={<><span><a href="#terminalid">TerminalId</a></span><span> | null</span></>} >
@@ -7114,7 +7309,7 @@ future ACP variants.
 
 ## <span class="font-mono">RequiresActionStateUpdate</span>
 
-The agent is waiting on user action before it can continue.
+Foreground work is blocked on user action.
 
 **Type:** Object
 
@@ -7154,7 +7349,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="icons" type={<><span><a href="#icon">Icon[]</a></span><span> | null</span></>} >
   Optional set of sized icons that the client can display in a user interface.
 </ResponseField>
-<ResponseField name="mimeType" type={"string | null"} >
+<ResponseField name="mimeType" type={<><span><a href="#mediatype">MediaType</a></span><span> | null</span></>} >
   MIME type describing the encoded media payload.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
@@ -7168,6 +7363,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   URI associated with this resource or media payload.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">Role</span>
@@ -7195,7 +7393,7 @@ future ACP variants.
 
 ## <span class="font-mono">RunningStateUpdate</span>
 
-The agent is actively processing work in the session.
+Foreground work is in progress.
 
 **Type:** Object
 
@@ -7647,7 +7845,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="additionalDirectories" type={<><span>"string"</span><span>[]</span></>} >
+<ResponseField name="additionalDirectories" type={<a href="#absolutepath">AbsolutePath[]</a>} >
   Additional workspace roots reported for this session. Each path must be absolute.
 
 When present, this is the complete ordered additional-root list reported
@@ -7655,7 +7853,7 @@ by the Agent. Omitted and empty values are equivalent: the response
 reports no additional roots.
 
 </ResponseField>
-<ResponseField name="cwd" type={"string"} required>
+<ResponseField name="cwd" type={<a href="#absolutepath">AbsolutePath</a>} required>
   The working directory for this session. Must be an absolute path.
 </ResponseField>
 <ResponseField name="sessionId" type={<a href="#sessionid">SessionId</a>} required>
@@ -7665,7 +7863,10 @@ reports no additional roots.
   Human-readable title for the session
 </ResponseField>
 <ResponseField name="updatedAt" type={"string | null"} >
-  ISO 8601 timestamp of last activity
+  RFC 3339 timestamp of last activity.
+
+    - Format: `date-time`
+
 </ResponseField>
 
 ## <span class="font-mono">SessionInfoUpdate</span>
@@ -7694,14 +7895,23 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
   Human-readable title for the session. Set to null to clear.
 </ResponseField>
 <ResponseField name="updatedAt" type={"string | null"} >
-  ISO 8601 timestamp of last activity. Set to null to clear.
+  RFC 3339 timestamp of last activity. Set to null to clear.
+
+    - Format: `date-time`
+
 </ResponseField>
+
+## <span class="font-mono">SessionListCursor</span>
+
+An opaque cursor used to paginate `session/list` results.
+
+**Type:** `string`
 
 ## <span class="font-mono">SessionUpdate</span>
 
-Different types of updates that can be sent during session processing.
+Different types of updates that can be sent while a session exists.
 
-These updates provide real-time feedback about the agent's progress.
+These updates report messages, progress, and other session activity.
 
 See protocol docs: [Agent Reports Output](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#3-agent-reports-output)
 
@@ -7888,11 +8098,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 
 <ResponseField name="state_update" type="object">
-The agent's session state has changed.
-
-Agents send this to report when work starts, completes, or pauses while
-waiting for user action. Completion of active work is reported here instead
-of in the `session/prompt` response.
+The state of the agent's foreground work has changed.
 
 <Expandable title="Properties">
 
@@ -7991,7 +8197,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="command" type={"string | null"} >
   The command being run.
 </ResponseField>
-<ResponseField name="cwd" type={"string | null"} >
+<ResponseField name="cwd" type={<><span><a href="#absolutepath">AbsolutePath</a></span><span> | null</span></>} >
   The absolute working directory of the command.
 </ResponseField>
 <ResponseField name="exitStatus" type={<><span><a href="#terminalexitstatus">TerminalExitStatus</a></span><span> | null</span></>} >
@@ -8026,6 +8232,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="data" type={"string"} required>
   Independently base64-encoded terminal output bytes.
+
+    - Content encoding: `base64`
+
 </ResponseField>
 <ResponseField name="sessionUpdate" type={"string"} required>
   The discriminator value. Must be `"terminal_output_chunk"`.
@@ -8154,7 +8363,10 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
   Human-readable title for the session. Set to null to clear.
 </ResponseField>
 <ResponseField name="updatedAt" type={"string | null"} >
-  ISO 8601 timestamp of last activity. Set to null to clear.
+  RFC 3339 timestamp of last activity. Set to null to clear.
+
+    - Format: `date-time`
+
 </ResponseField>
 
 </Expandable>
@@ -8222,17 +8434,15 @@ future ACP variants.
 
 ## <span class="font-mono">StateUpdate</span>
 
-The agent's session state has changed.
+The state of the agent's foreground work has changed.
 
-This update is the mechanism for reporting session activity transitions.
-A `session/prompt` response only acknowledges that the prompt was accepted;
-agents use `state_update` notifications to report that processing has started,
-that the session is idle, or that progress is blocked on user action.
+Background activity can continue and emit other `session/update` notifications
+while `idle`. Those notifications do not change this state.
 
 **Type:** Union
 
 <ResponseField name="running" type="object">
-The agent is actively processing work in the session.
+Foreground work is in progress.
 
 <Expandable title="Properties">
 
@@ -8252,7 +8462,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 
 <ResponseField name="idle" type="object">
-The agent is not currently processing work in the session.
+The agent is ready to process a new prompt.
 
 <Expandable title="Properties">
 
@@ -8268,10 +8478,10 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
   The discriminator value. Must be `"idle"`.
 </ResponseField>
 <ResponseField name="stopReason" type={<><span><a href="#stopreason">StopReason</a></span><span> | null</span></>} >
-  Indicates why the agent stopped processing active session work.
+  Indicates why foreground work stopped.
 
 Optional. Omitted or `null` both mean the agent is not reporting a stop reason.
-Agents SHOULD include this when the idle transition ends active work.
+Agents SHOULD include this when the idle transition ends foreground work.
 
 </ResponseField>
 <ResponseField name="usage" type={<><span><a href="#usage">Usage</a></span><span> | null</span></>} >
@@ -8279,7 +8489,7 @@ Agents SHOULD include this when the idle transition ends active work.
 
 This capability is not part of the spec yet, and may be removed or changed at any point.
 
-Token usage for completed session work.
+Token usage for completed foreground work.
 
 Optional. Omitted or `null` both mean the agent is not reporting token
 usage for this state update.
@@ -8290,7 +8500,7 @@ usage for this state update.
 </ResponseField>
 
 <ResponseField name="requires_action" type="object">
-The agent is waiting on user action before it can continue.
+Foreground work is blocked on user action.
 
 <Expandable title="Properties">
 
@@ -8394,7 +8604,7 @@ String format types for string properties in elicitation schemas.
 </ResponseField>
 
 <ResponseField name="date-time" type="string">
-  Date-time format (ISO 8601).
+  Date-time format (RFC 3339).
 </ResponseField>
 
 <ResponseField name="other" type="string">
@@ -8475,6 +8685,9 @@ Must contain at least one option when present.
 </ResponseField>
 <ResponseField name="pattern" type={"string | null"} >
   Pattern the string must match.
+
+    - Format: `regex`
+
 </ResponseField>
 <ResponseField name="title" type={"string | null"} >
   Optional title for the property.
@@ -8587,6 +8800,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="data" type={"string"} required>
   Base64-encoded replacement terminal output bytes.
+
+    - Content encoding: `base64`
+
 </ResponseField>
 
 ## <span class="font-mono">TerminalOutputChunk</span>
@@ -8608,6 +8824,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="data" type={"string"} required>
   Independently base64-encoded terminal output bytes.
+
+    - Content encoding: `base64`
+
 </ResponseField>
 <ResponseField name="terminalId" type={<a href="#terminalid">TerminalId</a>} required>
   The terminal receiving these bytes.
@@ -8637,7 +8856,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 <ResponseField name="command" type={"string | null"} >
   The command being run.
 </ResponseField>
-<ResponseField name="cwd" type={"string | null"} >
+<ResponseField name="cwd" type={<><span><a href="#absolutepath">AbsolutePath</a></span><span> | null</span></>} >
   The absolute working directory of the command.
 </ResponseField>
 <ResponseField name="exitStatus" type={<><span><a href="#terminalexitstatus">TerminalExitStatus</a></span><span> | null</span></>} >
@@ -8749,7 +8968,7 @@ these keys.
 See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
 
 </ResponseField>
-<ResponseField name="mimeType" type={"string | null"} >
+<ResponseField name="mimeType" type={<><span><a href="#mediatype">MediaType</a></span><span> | null</span></>} >
   MIME type describing the encoded media payload.
 </ResponseField>
 <ResponseField name="text" type={"string"} required>
@@ -8757,6 +8976,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   URI associated with this resource or media payload.
+
+    - Format: `uri`
+
 </ResponseField>
 
 ## <span class="font-mono">TitledMultiSelectItems</span>
@@ -8833,7 +9055,7 @@ Clients can use this field without parsing patch text to determine affected path
 
 </ResponseField>
 <ResponseField name="patch" type={<><span><a href="#diffpatch">DiffPatch</a></span><span> | null</span></>} >
-  Renderable patch text.
+  Renderable patch text for some or all of the structured changes.
 
 Agents SHOULD provide patch text whenever feasible. Omitted or `null`
 means no renderable patch text was provided.
@@ -8956,7 +9178,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
     - Minimum: `0`
 
 </ResponseField>
-<ResponseField name="path" type={"string"} required>
+<ResponseField name="path" type={<a href="#absolutepath">AbsolutePath</a>} required>
   The absolute file path being accessed or modified.
 </ResponseField>
 
@@ -9272,4 +9494,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="uri" type={"string"} required>
   The URI of the folder.
+
+    - Format: `uri`
+
 </ResponseField>

@@ -116,7 +116,7 @@
               {
                 "group": "v2",
                 "tag": "Draft",
-                "hidden": true,
+                "expanded": true,
                 "pages": [
                   "protocol/v2/overview",
                   "protocol/v2/migration",
@@ -266,6 +266,15 @@
           {
             "group": "Announcements",
             "pages": [
+              "announcements/acp-v2-draft",
+              "announcements/boolean-config-option-stabilized",
+              "announcements/request-cancellation-stabilized",
+              "announcements/sdk-1-0-releases",
+              "announcements/model-config-category-stabilized",
+              "announcements/message-id-stabilized",
+              "announcements/session-usage-stabilized",
+              "announcements/session-delete-stabilized",
+              "announcements/additional-directories-stabilized",
               "announcements/logout-method-stabilized",
               "announcements/session-close-stabilized",
               "announcements/session-resume-stabilized",
