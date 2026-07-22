@@ -190,7 +190,9 @@
               "rfds/diff-delete",
               "rfds/next-edit-suggestions",
               "rfds/custom-llm-endpoint",
-              "rfds/plan-operations"
+              "rfds/plan-operations",
+              "rfds/tool-call-name",
+              "rfds/get-auth-state"
             ]
           },
           {
