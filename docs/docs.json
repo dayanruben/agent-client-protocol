@@ -195,7 +195,9 @@
               "rfds/custom-llm-endpoint",
               "rfds/plan-operations",
               "rfds/tool-call-name",
-              "rfds/get-auth-state"
+              "rfds/get-auth-state",
+              "rfds/session-compaction",
+              "rfds/session-notices"
             ]
           },
           {
