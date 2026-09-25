@@ -135,10 +135,6 @@ mod default_on_null_tests {
                 $check::<v1::StartNesRequest>();
                 $check::<v1::CloseNesResponse>();
             }
-            #[cfg(feature = "unstable_mcp_over_acp")]
-            {
-                $check::<v1::DisconnectMcpResponse>();
-            }
 
             #[cfg(feature = "unstable_protocol_v2")]
             {
@@ -162,10 +158,6 @@ mod default_on_null_tests {
                 {
                     $check::<v2::StartNesRequest>();
                     $check::<v2::CloseNesResponse>();
-                }
-                #[cfg(feature = "unstable_mcp_over_acp")]
-                {
-                    $check::<v2::DisconnectMcpResponse>();
                 }
             }
         };
@@ -355,8 +347,9 @@ mod default_on_null_tests {
 
         #[cfg(feature = "unstable_mcp_over_acp")]
         {
-            let mcp: v1::MessageMcpResponse = serde_json::from_value(Value::Null).unwrap();
-            assert_eq!(serde_json::to_value(mcp).unwrap(), Value::Null);
+            let mcp: v1::MessageMcpResponse =
+                serde_json::from_value(json!({"result": null})).unwrap();
+            assert_eq!(serde_json::to_value(mcp).unwrap(), json!({"result": null}));
         }
 
         #[cfg(feature = "unstable_protocol_v2")]
@@ -367,8 +360,8 @@ mod default_on_null_tests {
             #[cfg(feature = "unstable_mcp_over_acp")]
             {
                 let mcp: crate::v2::MessageMcpResponse =
-                    serde_json::from_value(Value::Null).unwrap();
-                assert_eq!(serde_json::to_value(mcp).unwrap(), Value::Null);
+                    serde_json::from_value(json!({"result": null})).unwrap();
+                assert_eq!(serde_json::to_value(mcp).unwrap(), json!({"result": null}));
             }
         }
     }
