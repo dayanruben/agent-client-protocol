@@ -7606,6 +7606,29 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 
 </ResponseField>
 
+## <span class="font-mono">SessionCancelCapabilities</span>
+
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+Capability to cancel work in a subagent session without ending that session.
+
+Supplying `\{\}` advertises support; an omitted or `null` `cancel` does not.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
+</ResponseField>
+
 ## <span class="font-mono">SessionCapabilities</span>
 
 Session capabilities supported by the agent.
@@ -8063,6 +8086,69 @@ An opaque cursor used to paginate `session/list` results.
 
 **Type:** `string`
 
+## <span class="font-mono">SessionMessage</span>
+
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+An upsert for an inter-session message.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  Omitted leaves metadata unchanged; `null` clears it.
+
+Implementations MUST NOT make assumptions about values in `_meta`.
+
+</ResponseField>
+<ResponseField name="content" type={<><span><a href="#contentblock">ContentBlock[]</a></span><span> | null</span></>} >
+  Omitted leaves content unchanged; `null` clears it; a concrete array
+replaces the whole content collection.
+</ResponseField>
+<ResponseField name="messageId" type={<a href="#messageid">MessageId</a>} required>
+  Identifier of this message within the enclosing session's transcript.
+</ResponseField>
+<ResponseField name="recipientSessionId" type={<><span><a href="#sessionid">SessionId</a></span><span> | null</span></>} >
+  Optional receiving session identity; omission or `null` retains a known value.
+</ResponseField>
+<ResponseField name="senderSessionId" type={<><span><a href="#sessionid">SessionId</a></span><span> | null</span></>} >
+  Optional sending session identity; omission or `null` retains a known value.
+</ResponseField>
+
+## <span class="font-mono">SessionMessageChunk</span>
+
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+A streamed content block of an inter-session message.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  Optional and nullable chunk-scoped metadata; omitted or `null` means none.
+
+Implementations MUST NOT make assumptions about values in `_meta`.
+
+</ResponseField>
+<ResponseField name="content" type={<a href="#contentblock">ContentBlock</a>} required>
+  A single content block appended to the message.
+</ResponseField>
+<ResponseField name="messageId" type={<a href="#messageid">MessageId</a>} required>
+  Identifier of this message within the enclosing session's transcript.
+</ResponseField>
+<ResponseField name="recipientSessionId" type={<><span><a href="#sessionid">SessionId</a></span><span> | null</span></>} >
+  Optional receiving session identity; omission or `null` retains a known value.
+</ResponseField>
+<ResponseField name="senderSessionId" type={<><span><a href="#sessionid">SessionId</a></span><span> | null</span></>} >
+  Optional sending session identity; omission or `null` retains a known value.
+</ResponseField>
+
 ## <span class="font-mono">SessionUpdate</span>
 
 Different types of updates that can be sent while a session exists.
@@ -8339,6 +8425,28 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="state" type={"string"} required>
   The discriminator value. Must be `"requires_action"`.
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="unknown" type="object">
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+The Agent cannot currently determine foreground activity.
+This replaces previously confirmed activity without ending the work or session.
+
+<Expandable title="Properties">
+
+<ResponseField name="_meta" type={"object | null"}>
+  The _meta property is reserved by ACP for additional metadata. Implementations
+  MUST NOT make assumptions about values at these keys. Optional; omitted and
+  `null` mean no metadata for this state snapshot.
+</ResponseField>
+<ResponseField name="state" type={"string"} required>
+  The discriminator value. Must be `"unknown"`.
 </ResponseField>
 
 </Expandable>
@@ -8796,6 +8904,133 @@ A content block appended to a context compaction's retained summary.
 </Expandable>
 </ResponseField>
 
+<ResponseField name="subagent_update" type="object">
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+Announces a child session created and owned by this session, or updates
+that ownership association's metadata.
+
+<Expandable title="Properties">
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Omitted means no metadata update; `null` is an
+explicit clear signal. Implementations MUST NOT make assumptions about values at these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
+</ResponseField>
+<ResponseField name="capabilities" type={<><span><a href="#subagentsessioncapabilities">SubagentSessionCapabilities</a></span><span> | null</span></>} >
+  Client-initiated session mutations permitted for this subagent session.
+
+Read-only operations retain their normal protocol semantics and
+capability requirements.
+
+</ResponseField>
+<ResponseField name="description" type={"string | null"} >
+  The parent's human-readable description of the child's role or purpose.
+
+Optional and nullable. Omitted means unchanged; `null` clears it. This is
+current display metadata, not the history of instructions sent to the child.
+
+</ResponseField>
+<ResponseField name="sessionId" type={<a href="#sessionid">SessionId</a>} required>
+  The opaque session ID identifying the child in all ACP messages.
+</ResponseField>
+<ResponseField name="sessionUpdate" type={"string"} required>
+  The discriminator value. Must be `"subagent_update"`.
+</ResponseField>
+<ResponseField name="state" type={<><span><a href="#stateupdate">StateUpdate</a></span><span> | null</span></>} >
+  The child's current foreground state, mirrored onto its parent association.
+
+Optional and nullable. Omitted means unchanged; `null` removes the
+current report and leaves activity unconfirmed (not idle or cancelled).
+A concrete `StateUpdate` replaces the entire previous snapshot.
+
+</ResponseField>
+<ResponseField name="title" type={"string | null"} >
+  The parent's human-readable display title for this child. It need not be unique.
+
+Optional and nullable. Omitted means unchanged; `null` clears it. If no
+title is set, the Client chooses a fallback presentation.
+
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="session_message" type="object">
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+A message upsert observed in this session's transcript, sent to or
+received from another session.
+
+<Expandable title="Properties">
+
+<ResponseField name="_meta" type={"object | null"} >
+  Omitted leaves metadata unchanged; `null` clears it.
+
+Implementations MUST NOT make assumptions about values in `_meta`.
+
+</ResponseField>
+<ResponseField name="content" type={<><span><a href="#contentblock">ContentBlock[]</a></span><span> | null</span></>} >
+  Omitted leaves content unchanged; `null` clears it; a concrete array
+replaces the whole content collection.
+</ResponseField>
+<ResponseField name="messageId" type={<a href="#messageid">MessageId</a>} required>
+  Identifier of this message within the enclosing session's transcript.
+</ResponseField>
+<ResponseField name="recipientSessionId" type={<><span><a href="#sessionid">SessionId</a></span><span> | null</span></>} >
+  Optional receiving session identity; omission or `null` retains a known value.
+</ResponseField>
+<ResponseField name="senderSessionId" type={<><span><a href="#sessionid">SessionId</a></span><span> | null</span></>} >
+  Optional sending session identity; omission or `null` retains a known value.
+</ResponseField>
+<ResponseField name="sessionUpdate" type={"string"} required>
+  The discriminator value. Must be `"session_message"`.
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="session_message_chunk" type="object">
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+One content block appended to a sent or received session message.
+
+<Expandable title="Properties">
+
+<ResponseField name="_meta" type={"object | null"} >
+  Optional and nullable chunk-scoped metadata; omitted or `null` means none.
+
+Implementations MUST NOT make assumptions about values in `_meta`.
+
+</ResponseField>
+<ResponseField name="content" type={<a href="#contentblock">ContentBlock</a>} required>
+  A single content block appended to the message.
+</ResponseField>
+<ResponseField name="messageId" type={<a href="#messageid">MessageId</a>} required>
+  Identifier of this message within the enclosing session's transcript.
+</ResponseField>
+<ResponseField name="recipientSessionId" type={<><span><a href="#sessionid">SessionId</a></span><span> | null</span></>} >
+  Optional receiving session identity; omission or `null` retains a known value.
+</ResponseField>
+<ResponseField name="senderSessionId" type={<><span><a href="#sessionid">SessionId</a></span><span> | null</span></>} >
+  Optional sending session identity; omission or `null` retains a known value.
+</ResponseField>
+<ResponseField name="sessionUpdate" type={"string"} required>
+  The discriminator value. Must be `"session_message_chunk"`.
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
 <ResponseField name="other" type="object">
 Custom or future session update.
 
@@ -8903,6 +9138,28 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/d
 </ResponseField>
 <ResponseField name="state" type={"string"} required>
   The discriminator value. Must be `"requires_action"`.
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="unknown" type="object">
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+The Agent cannot currently determine foreground activity.
+This replaces previously confirmed activity without ending the work or session.
+
+<Expandable title="Properties">
+
+<ResponseField name="_meta" type={"object | null"}>
+  The _meta property is reserved by ACP for additional metadata. Implementations
+  MUST NOT make assumptions about values at these keys. Optional; omitted and
+  `null` mean no metadata for this state snapshot.
+</ResponseField>
+<ResponseField name="state" type={"string"} required>
+  The discriminator value. Must be `"unknown"`.
 </ResponseField>
 
 </Expandable>
@@ -9105,6 +9362,113 @@ Optional. Omitted and `null` are equivalent and mean there is no pattern constra
   Optional title for the property.
 
 Optional. Omitted and `null` are equivalent and mean no title is provided.
+
+</ResponseField>
+
+## <span class="font-mono">SubagentSessionCapabilities</span>
+
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+Client-initiated session mutations permitted for a specific subagent session.
+
+A mutation requires an explicit per-child capability; support for the method
+on ordinary sessions does not grant support on a child.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+</ResponseField>
+<ResponseField name="cancel" type={<><span><a href="#sessioncancelcapabilities">SessionCancelCapabilities</a></span><span> | null</span></>} >
+  Permits the client to cancel this child's current work without ending
+the session. Omitted or `null` means unsupported; an object (including
+`\{\}`) means supported.
+</ResponseField>
+
+## <span class="font-mono">SubagentUpdate</span>
+
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+Notification that the enclosing parent session created and owns a child session.
+
+Later updates modify the existing association's metadata, not its ownership.
+
+Sent on the immediate parent session. The first update for an unknown
+`SubagentUpdate::session_id` announces the child and MUST be sent
+before any live request or notification bearing the child's session ID,
+including messages naming it as sender or recipient. Child events are
+delivered automatically; no separate child load, resume, or subscription is needed.
+Understanding this update, registering child sessions, and applying their
+operation restrictions are baseline v2 requirements; no Client capability
+is required.
+
+Only `SubagentUpdate::session_id` is required. Other fields have
+patch semantics: omitted fields leave the stored value unchanged, `null`
+clears or unsets the value, and concrete values replace it. For `state`,
+`null` removes the current state report and leaves activity unconfirmed;
+it does not report idle or cancellation. A child whose capabilities are
+unset permits no Client-initiated session mutations.
+
+The title and description provide the parent's display metadata for the
+child. Agents SHOULD mirror known child state changes in the parent's
+`SubagentUpdate::state` using the same `StateUpdate` snapshot as the
+ordinary `state_update` notification on the child session. This reports
+child state, not a separate parent-owned lifecycle. Consumers should
+treat duplicate reports idempotently.
+Completing or cancelling work does not end the association: the parent may
+message the same child again. Individual messages and their outcomes do not
+change this association.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Omitted means no metadata update; `null` is an
+explicit clear signal. Implementations MUST NOT make assumptions about values at these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)
+
+</ResponseField>
+<ResponseField name="capabilities" type={<><span><a href="#subagentsessioncapabilities">SubagentSessionCapabilities</a></span><span> | null</span></>} >
+  Client-initiated session mutations permitted for this subagent session.
+
+Read-only operations retain their normal protocol semantics and
+capability requirements.
+
+</ResponseField>
+<ResponseField name="description" type={"string | null"} >
+  The parent's human-readable description of the child's role or purpose.
+
+Optional and nullable. Omitted means unchanged; `null` clears it. This is
+current display metadata, not the history of instructions sent to the child.
+
+</ResponseField>
+<ResponseField name="sessionId" type={<a href="#sessionid">SessionId</a>} required>
+  The opaque session ID identifying the child in all ACP messages.
+</ResponseField>
+<ResponseField name="state" type={<><span><a href="#stateupdate">StateUpdate</a></span><span> | null</span></>} >
+  The child's current foreground state, mirrored onto its parent association.
+
+Optional and nullable. Omitted means unchanged; `null` removes the
+current report and leaves activity unconfirmed (not idle or cancelled).
+A concrete `StateUpdate` replaces the entire previous snapshot.
+
+</ResponseField>
+<ResponseField name="title" type={"string | null"} >
+  The parent's human-readable display title for this child. It need not be unique.
+
+Optional and nullable. Omitted means unchanged; `null` clears it. If no
+title is set, the Client chooses a fallback presentation.
 
 </ResponseField>
 
@@ -9775,6 +10139,32 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
+</ResponseField>
+
+## <span class="font-mono">UnknownStateUpdate</span>
+
+**UNSTABLE**
+
+This capability is not part of the spec yet, and may be removed or changed at any point.
+
+The Agent cannot currently determine foreground activity.
+
+Report this when activity becomes unobservable, not merely because the session
+has been quiet. The Client MUST stop presenting the previous state as confirmed
+current activity, but may retain it as last known. A later state replaces this
+snapshot normally.
+
+This is not a task outcome or session closure. It does not cancel work, resolve
+pending requests, or revoke capabilities; capabilities are updated separately.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"}>
+  The _meta property is reserved by ACP for additional metadata. Implementations
+  MUST NOT make assumptions about values at these keys. Optional; omitted and
+  `null` mean no metadata for this state snapshot.
 </ResponseField>
 
 ## <span class="font-mono">Usage</span>
