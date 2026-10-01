@@ -4506,6 +4506,15 @@
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
         },
+        "availableCommands": {
+          "description": "Initial commands the agent can execute in this session.\n\nOptional. Omitted or empty means no initial commands are advertised.\nSenders MUST use an array, not `null`; receivers treat `null` like omission.\nLater `available_commands_update` notifications replace this list.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AvailableCommand"
+          },
+          "x-deserialize-default-on-error": true,
+          "x-deserialize-skip-invalid-items": true
+        },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
           "type": ["object", "null"],
@@ -4791,6 +4800,104 @@
       },
       "required": ["currentValue"]
     },
+    "AvailableCommand": {
+      "description": "Information about a command.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Command name (e.g., `create_plan`, `research_codebase`).",
+          "type": "string"
+        },
+        "description": {
+          "description": "Human-readable description of what the command does.",
+          "type": "string"
+        },
+        "input": {
+          "description": "Input for the command if required",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AvailableCommandInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-deserialize-default-on-error": true
+        },
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      },
+      "required": ["name", "description"]
+    },
+    "AvailableCommandInput": {
+      "description": "The input specification for a command.",
+      "anyOf": [
+        {
+          "description": "All text that was typed after the command name is provided as input.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "text"
+            }
+          },
+          "required": ["type"],
+          "allOf": [
+            {
+              "$ref": "#/$defs/TextCommandInput"
+            }
+          ]
+        },
+        {
+          "title": "other",
+          "description": "Custom or future command input specification.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this input type should preserve the raw\npayload when storing, replaying, proxying, or forwarding command\nmetadata, and otherwise ignore the input specification or display the\ncommand without structured input.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "description": "Custom or future command input type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
+              "type": "string"
+            }
+          },
+          "required": ["type"],
+          "not": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "text"
+                  }
+                },
+                "required": ["type"]
+              }
+            ]
+          },
+          "additionalProperties": true
+        }
+      ]
+    },
+    "TextCommandInput": {
+      "description": "All text that was typed after the command name is provided as input.",
+      "type": "object",
+      "properties": {
+        "hint": {
+          "description": "A hint to display when the input hasn't been provided yet",
+          "type": "string"
+        },
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      },
+      "required": ["hint"]
+    },
     "ListSessionsResponse": {
       "description": "Response from listing sessions.",
       "type": "object",
@@ -4915,6 +5022,15 @@
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
         },
+        "availableCommands": {
+          "description": "Initial commands the agent can execute in this session.\n\nOptional. Omitted or empty means no initial commands are advertised.\nSenders MUST use an array, not `null`; receivers treat `null` like omission.\nLater `available_commands_update` notifications replace this list.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AvailableCommand"
+          },
+          "x-deserialize-default-on-error": true,
+          "x-deserialize-skip-invalid-items": true
+        },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
           "type": ["object", "null"],
@@ -4935,6 +5051,15 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/SessionConfigOption"
+          },
+          "x-deserialize-default-on-error": true,
+          "x-deserialize-skip-invalid-items": true
+        },
+        "availableCommands": {
+          "description": "Initial commands the agent can execute in this session.\n\nOptional. Omitted or empty means no initial commands are advertised.\nSenders MUST use an array, not `null`; receivers treat `null` like omission.\nLater `available_commands_update` notifications replace this list.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AvailableCommand"
           },
           "x-deserialize-default-on-error": true,
           "x-deserialize-skip-invalid-items": true
@@ -5946,6 +6071,54 @@
           ]
         },
         {
+          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nAnnounces a child session created and owned by this session, or updates\nthat ownership association's metadata.",
+          "type": "object",
+          "properties": {
+            "sessionUpdate": {
+              "type": "string",
+              "const": "subagent_update"
+            }
+          },
+          "required": ["sessionUpdate"],
+          "allOf": [
+            {
+              "$ref": "#/$defs/SubagentUpdate"
+            }
+          ]
+        },
+        {
+          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nA message upsert observed in this session's transcript, sent to or\nreceived from another session.",
+          "type": "object",
+          "properties": {
+            "sessionUpdate": {
+              "type": "string",
+              "const": "session_message"
+            }
+          },
+          "required": ["sessionUpdate"],
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionMessage"
+            }
+          ]
+        },
+        {
+          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nOne content block appended to a sent or received session message.",
+          "type": "object",
+          "properties": {
+            "sessionUpdate": {
+              "type": "string",
+              "const": "session_message_chunk"
+            }
+          },
+          "required": ["sessionUpdate"],
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionMessageChunk"
+            }
+          ]
+        },
+        {
           "title": "other",
           "description": "Custom or future session update.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this update type should preserve the\nraw payload when storing, replaying, proxying, or forwarding session\nhistory, and otherwise ignore it or display it generically.",
           "type": "object",
@@ -6154,6 +6327,36 @@
                   "sessionUpdate": {
                     "type": "string",
                     "const": "compaction_summary_chunk"
+                  }
+                },
+                "required": ["sessionUpdate"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sessionUpdate": {
+                    "type": "string",
+                    "const": "subagent_update"
+                  }
+                },
+                "required": ["sessionUpdate"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sessionUpdate": {
+                    "type": "string",
+                    "const": "session_message"
+                  }
+                },
+                "required": ["sessionUpdate"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "sessionUpdate": {
+                    "type": "string",
+                    "const": "session_message_chunk"
                   }
                 },
                 "required": ["sessionUpdate"]
@@ -6430,6 +6633,18 @@
         }
       }
     },
+    "UnknownStateUpdate": {
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nThe Agent cannot currently determine foreground activity.\n\nReport this when activity becomes unobservable, not merely because the session\nhas been quiet. The Client MUST stop presenting the previous state as confirmed\ncurrent activity, but may retain it as last known. A later state replaces this\nsnapshot normally.\n\nThis is not a task outcome or session closure. It does not cancel work, resolve\npending requests, or revoke capabilities; capabilities are updated separately.",
+      "type": "object",
+      "properties": {
+        "_meta": {
+          "description": "The _meta property is reserved by ACP for additional metadata.\nImplementations MUST NOT make assumptions about values at these keys.\nOptional; omitted and `null` mean no metadata for this state snapshot.",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      }
+    },
     "StateUpdate": {
       "description": "The state of the agent's foreground work has changed.\n\nBackground activity can continue and emit other `session/update` notifications\nwhile `idle`. Those notifications do not change this state.",
       "anyOf": [
@@ -6482,6 +6697,22 @@
           ]
         },
         {
+          "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nThe Agent cannot currently determine foreground activity.\nThis replaces previously confirmed activity without ending the work or session.",
+          "type": "object",
+          "properties": {
+            "state": {
+              "type": "string",
+              "const": "unknown"
+            }
+          },
+          "required": ["state"],
+          "allOf": [
+            {
+              "$ref": "#/$defs/UnknownStateUpdate"
+            }
+          ]
+        },
+        {
           "title": "other",
           "description": "Custom or future session state.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
           "type": "object",
@@ -6520,6 +6751,16 @@
                   "state": {
                     "type": "string",
                     "const": "requires_action"
+                  }
+                },
+                "required": ["state"]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "const": "unknown"
                   }
                 },
                 "required": ["state"]
@@ -7012,104 +7253,6 @@
       },
       "required": ["planId"]
     },
-    "AvailableCommand": {
-      "description": "Information about a command.",
-      "type": "object",
-      "properties": {
-        "name": {
-          "description": "Command name (e.g., `create_plan`, `research_codebase`).",
-          "type": "string"
-        },
-        "description": {
-          "description": "Human-readable description of what the command does.",
-          "type": "string"
-        },
-        "input": {
-          "description": "Input for the command if required",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AvailableCommandInput"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "x-deserialize-default-on-error": true
-        },
-        "_meta": {
-          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
-          "type": ["object", "null"],
-          "x-deserialize-default-on-error": true,
-          "additionalProperties": true
-        }
-      },
-      "required": ["name", "description"]
-    },
-    "AvailableCommandInput": {
-      "description": "The input specification for a command.",
-      "anyOf": [
-        {
-          "description": "All text that was typed after the command name is provided as input.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "type": "string",
-              "const": "text"
-            }
-          },
-          "required": ["type"],
-          "allOf": [
-            {
-              "$ref": "#/$defs/TextCommandInput"
-            }
-          ]
-        },
-        {
-          "title": "other",
-          "description": "Custom or future command input specification.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this input type should preserve the raw\npayload when storing, replaying, proxying, or forwarding command\nmetadata, and otherwise ignore the input specification or display the\ncommand without structured input.",
-          "type": "object",
-          "properties": {
-            "type": {
-              "description": "Custom or future command input type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
-              "type": "string"
-            }
-          },
-          "required": ["type"],
-          "not": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "const": "text"
-                  }
-                },
-                "required": ["type"]
-              }
-            ]
-          },
-          "additionalProperties": true
-        }
-      ]
-    },
-    "TextCommandInput": {
-      "description": "All text that was typed after the command name is provided as input.",
-      "type": "object",
-      "properties": {
-        "hint": {
-          "description": "A hint to display when the input hasn't been provided yet",
-          "type": "string"
-        },
-        "_meta": {
-          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
-          "type": ["object", "null"],
-          "x-deserialize-default-on-error": true,
-          "additionalProperties": true
-        }
-      },
-      "required": ["hint"]
-    },
     "AvailableCommandsUpdate": {
       "description": "Available commands are ready or have changed",
       "type": "object",
@@ -7398,6 +7541,204 @@
         }
       },
       "required": ["compactionId", "content"]
+    },
+    "SubagentSessionCapabilities": {
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nClient-initiated session mutations permitted for a specific subagent session.\n\nA mutation requires an explicit per-child capability; support for the method\non ordinary sessions does not grant support on a child.",
+      "type": "object",
+      "properties": {
+        "cancel": {
+          "description": "Permits the client to cancel this child's current work without ending\nthe session. Omitted or `null` means unsupported; an object (including\n`{}`) means supported.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionCancelCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-deserialize-default-on-error": true
+        },
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      }
+    },
+    "SessionCancelCapabilities": {
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nCapability to cancel work in a subagent session without ending that session.\n\nSupplying `{}` advertises support; an omitted or `null` `cancel` does not.",
+      "type": "object",
+      "properties": {
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      }
+    },
+    "SubagentUpdate": {
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nNotification that the enclosing parent session created and owns a child session.\n\nLater updates modify the existing association's metadata, not its ownership.\n\nSent on the immediate parent session. The first update for an unknown\n[`SubagentUpdate::session_id`] announces the child and MUST be sent\nbefore any live request or notification bearing the child's session ID,\nincluding messages naming it as sender or recipient. Child events are\ndelivered automatically; no separate child load, resume, or subscription is needed.\nUnderstanding this update, registering child sessions, and applying their\noperation restrictions are baseline v2 requirements; no Client capability\nis required.\n\nOnly [`SubagentUpdate::session_id`] is required. Other fields have\npatch semantics: omitted fields leave the stored value unchanged, `null`\nclears or unsets the value, and concrete values replace it. For `state`,\n`null` removes the current state report and leaves activity unconfirmed;\nit does not report idle or cancellation. A child whose capabilities are\nunset permits no Client-initiated session mutations.\n\nThe title and description provide the parent's display metadata for the\nchild. Agents SHOULD mirror known child state changes in the parent's\n[`SubagentUpdate::state`] using the same [`StateUpdate`] snapshot as the\nordinary `state_update` notification on the child session. This reports\nchild state, not a separate parent-owned lifecycle. Consumers should\ntreat duplicate reports idempotently.\nCompleting or cancelling work does not end the association: the parent may\nmessage the same child again. Individual messages and their outcomes do not\nchange this association.",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "description": "The opaque session ID identifying the child in all ACP messages.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            }
+          ]
+        },
+        "title": {
+          "description": "The parent's human-readable display title for this child. It need not be unique.\n\nOptional and nullable. Omitted means unchanged; `null` clears it. If no\ntitle is set, the Client chooses a fallback presentation.",
+          "type": ["string", "null"],
+          "x-deserialize-default-on-error": true
+        },
+        "description": {
+          "description": "The parent's human-readable description of the child's role or purpose.\n\nOptional and nullable. Omitted means unchanged; `null` clears it. This is\ncurrent display metadata, not the history of instructions sent to the child.",
+          "type": ["string", "null"],
+          "x-deserialize-default-on-error": true
+        },
+        "capabilities": {
+          "description": "Client-initiated session mutations permitted for this subagent session.\n\nRead-only operations retain their normal protocol semantics and\ncapability requirements.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SubagentSessionCapabilities"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-deserialize-default-on-error": true
+        },
+        "state": {
+          "description": "The child's current foreground state, mirrored onto its parent association.\n\nOptional and nullable. Omitted means unchanged; `null` removes the\ncurrent report and leaves activity unconfirmed (not idle or cancelled).\nA concrete [`StateUpdate`] replaces the entire previous snapshot.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StateUpdate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-deserialize-default-on-error": true
+        },
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Omitted means no metadata update; `null` is an\nexplicit clear signal. Implementations MUST NOT make assumptions about values at these keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      },
+      "required": ["sessionId"]
+    },
+    "SessionMessage": {
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nAn upsert for an inter-session message.",
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "description": "Identifier of this message within the enclosing session's transcript.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/MessageId"
+            }
+          ]
+        },
+        "senderSessionId": {
+          "description": "Optional sending session identity; omission or `null` retains a known value.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-deserialize-default-on-error": true
+        },
+        "recipientSessionId": {
+          "description": "Optional receiving session identity; omission or `null` retains a known value.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-deserialize-default-on-error": true
+        },
+        "content": {
+          "description": "Omitted leaves content unchanged; `null` clears it; a concrete array\nreplaces the whole content collection.",
+          "type": ["array", "null"],
+          "items": {
+            "$ref": "#/$defs/ContentBlock"
+          },
+          "x-deserialize-default-on-error": true,
+          "x-deserialize-skip-invalid-items": true
+        },
+        "_meta": {
+          "description": "Omitted leaves metadata unchanged; `null` clears it.\n\nImplementations MUST NOT make assumptions about values in `_meta`.",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      },
+      "required": ["messageId"]
+    },
+    "SessionMessageChunk": {
+      "description": "**UNSTABLE**\n\nThis capability is not part of the spec yet, and may be removed or changed at any point.\n\nA streamed content block of an inter-session message.",
+      "type": "object",
+      "properties": {
+        "messageId": {
+          "description": "Identifier of this message within the enclosing session's transcript.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/MessageId"
+            }
+          ]
+        },
+        "senderSessionId": {
+          "description": "Optional sending session identity; omission or `null` retains a known value.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-deserialize-default-on-error": true
+        },
+        "recipientSessionId": {
+          "description": "Optional receiving session identity; omission or `null` retains a known value.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-deserialize-default-on-error": true
+        },
+        "content": {
+          "description": "A single content block appended to the message.",
+          "allOf": [
+            {
+              "$ref": "#/$defs/ContentBlock"
+            }
+          ]
+        },
+        "_meta": {
+          "description": "Optional and nullable chunk-scoped metadata; omitted or `null` means none.\n\nImplementations MUST NOT make assumptions about values in `_meta`.",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      },
+      "required": ["messageId", "content"]
     },
     "CompleteElicitationNotification": {
       "description": "Notification sent by the agent when a URL-based elicitation is complete.",
@@ -9521,7 +9862,7 @@
       }
     },
     "MessageMcpResponse": {
-      "description": "**UNSTABLE**\n\nThe successful outer ACP `mcp/message` response carries exactly one\ninner MCP outcome: an opaque result (including JSON null), or an MCP error.\nOuter ACP errors are reserved for binding and runtime failures.\n\nBoth branches require their carrier key. An error must be a non-null object.\nCarrier `_meta` is optional; null is equivalent to omission.",
+      "description": "**UNSTABLE**\n\nThe successful outer ACP `mcp/message` response carries exactly one\ninner MCP outcome: an opaque result (including JSON null), or an MCP error.\nOuter ACP errors are reserved for binding and runtime failures.\n\nBoth branches require their carrier key. An error must be a non-null object.\nUnknown outer fields are ignored; inner result and error fields are preserved.\nCarrier `_meta` is optional; null or invalid values are treated as absent.\nSenders must include exactly one outcome; receivers prefer `result` if both are present.",
       "anyOf": [
         {
           "title": "Result",
@@ -9538,8 +9879,7 @@
               "additionalProperties": true
             }
           },
-          "required": ["result"],
-          "additionalProperties": false
+          "required": ["result"]
         },
         {
           "title": "Error",
@@ -9561,8 +9901,7 @@
               "additionalProperties": true
             }
           },
-          "required": ["error"],
-          "additionalProperties": false
+          "required": ["error"]
         }
       ],
       "x-side": "client",
