@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use serde_with::{DefaultOnError, VecSkipError, serde_as, skip_serializing_none};
 
 use super::{
-    AbsolutePath, AvailableCommand, ClientCapabilities, ContentBlock, ExtNotification, ExtRequest,
-    ExtResponse, MessageId, Meta, SessionId,
+    AbsolutePath, AvailableCommand, ClientCapabilities, ContentBlock, Error, ExtNotification,
+    ExtRequest, ExtResponse, MessageId, Meta, SessionId,
 };
 use crate::{IntoOption, ProtocolVersion};
 
@@ -3345,7 +3345,7 @@ impl PromptResponse {
 /// See protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/prompt-lifecycle#stop-reasons)
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(tag = "stopReason", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum StopReason {
     /// The active work ended successfully.
@@ -3365,13 +3365,143 @@ pub enum StopReason {
     /// when cancellation succeeds, even if cancellation causes exceptions in
     /// underlying operations.
     Cancelled,
+    /// The active work ended because something failed.
+    ///
+    /// For work started by a prompt, this covers failures after the user message
+    /// was inserted; earlier failures are an error response to `session/prompt`.
+    Error(ErrorStopReason),
     /// Custom or future stop reason.
     ///
     /// Values beginning with `_` are reserved for implementation-specific
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
     #[serde(untagged)]
-    Other(String),
+    Other(OtherStopReason),
+}
+
+impl From<ErrorStopReason> for StopReason {
+    fn from(value: ErrorStopReason) -> Self {
+        Self::Error(value)
+    }
+}
+
+/// Details of a failure that ended active work.
+#[serde_as]
+#[skip_serializing_none]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ErrorStopReason {
+    /// The failure, as a JSON-RPC error object.
+    ///
+    /// Optional. Omitted or `null` both mean the agent is not reporting failure details.
+    /// Agents SHOULD include it.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
+    #[serde(default)]
+    pub error: Option<Box<Error>>,
+}
+
+impl ErrorStopReason {
+    /// Builds [`ErrorStopReason`] with the required fields set; optional fields start unset or empty.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The failure, as a JSON-RPC error object.
+    #[must_use]
+    pub fn error(mut self, error: impl IntoOption<Error>) -> Self {
+        self.error = error.into_option().map(Box::new);
+        self
+    }
+}
+
+/// Custom or future stop reason payload.
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[cfg_attr(feature = "schemars", schemars(inline))]
+#[cfg_attr(feature = "schemars", schemars(transform = other_stop_reason_schema))]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct OtherStopReason {
+    /// Custom or future stop reason.
+    ///
+    /// Values beginning with `_` are reserved for implementation-specific
+    /// extensions. Unknown values that do not begin with `_` are reserved for
+    /// future ACP variants.
+    pub stop_reason: String,
+    /// Additional fields from the unknown stop reason payload.
+    #[serde(flatten)]
+    pub fields: BTreeMap<String, serde_json::Value>,
+}
+
+impl OtherStopReason {
+    /// Builds [`OtherStopReason`] from an unknown discriminator and preserves the remaining extension fields.
+    #[must_use]
+    pub fn new(
+        stop_reason: impl Into<String>,
+        mut fields: BTreeMap<String, serde_json::Value>,
+    ) -> Self {
+        remove_idle_state_update_fields(&mut fields);
+        Self {
+            stop_reason: stop_reason.into(),
+            fields,
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for OtherStopReason {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let stop_reason = fields
+            .remove("stopReason")
+            .ok_or_else(|| serde::de::Error::missing_field("stopReason"))?;
+        let serde_json::Value::String(stop_reason) = stop_reason else {
+            return Err(serde::de::Error::custom("`stopReason` must be a string"));
+        };
+
+        if KNOWN_STOP_REASONS.contains(&stop_reason.as_str()) {
+            return Err(serde::de::Error::custom(format!(
+                "known stop reason `{stop_reason}` did not match its schema"
+            )));
+        }
+        remove_idle_state_update_fields(&mut fields);
+
+        Ok(Self {
+            stop_reason,
+            fields,
+        })
+    }
+}
+
+const KNOWN_STOP_REASONS: &[&str] = &[
+    "end_turn",
+    "max_tokens",
+    "max_turn_requests",
+    "refusal",
+    "cancelled",
+    "error",
+];
+
+/// Keeps the idle update's own fields out of an unknown stop reason's payload.
+fn remove_idle_state_update_fields(fields: &mut BTreeMap<String, serde_json::Value>) {
+    fields.remove("stopReason");
+    fields.remove("usage");
+    fields.remove("_meta");
+}
+
+#[cfg(feature = "schemars")]
+fn other_stop_reason_schema(schema: &mut Schema) {
+    super::schema_util::reject_known_string_discriminators(
+        schema,
+        "stopReason",
+        KNOWN_STOP_REASONS,
+    );
 }
 
 /// **UNSTABLE**
@@ -5261,6 +5391,10 @@ pub enum ClientRequest {
     /// this notification may arrive before or after the response. Processing state,
     /// output, tool calls, and completion are also reported through session updates.
     ///
+    /// An error response means the user message was not inserted. Once it is
+    /// inserted, the Agent MUST NOT answer with an error, even if the work fails
+    /// before the response is sent; it ends that work with the `error` stop reason.
+    ///
     /// See protocol docs: [Prompt Lifecycle](https://agentclientprotocol.com/protocol/prompt-lifecycle)
     PromptRequest(Box<PromptRequest>),
     #[cfg(feature = "unstable_nes")]
@@ -5684,8 +5818,8 @@ mod test_serialization {
         else {
             panic!("Expected Stdio variant");
         };
-        assert!(args.is_empty());
-        assert!(env.is_empty());
+        assert_eq!(args, Vec::<String>::new());
+        assert_eq!(env, []);
 
         let http = McpServer::Http(McpServerHttp::new("http-server", "https://api.example.com"));
         assert_eq!(
@@ -5707,7 +5841,7 @@ mod test_serialization {
         else {
             panic!("Expected Http variant");
         };
-        assert!(headers.is_empty());
+        assert_eq!(headers, []);
     }
 
     #[test]
@@ -5975,21 +6109,21 @@ mod test_serialization {
     fn test_session_response_config_options_deserialize_missing_null_and_invalid() {
         let missing: NewSessionResponse =
             serde_json::from_value(json!({ "sessionId": "sess" })).unwrap();
-        assert!(missing.config_options.is_empty());
+        assert_eq!(missing.config_options, []);
 
         let null: NewSessionResponse = serde_json::from_value(json!({
             "sessionId": "sess",
             "configOptions": null
         }))
         .unwrap();
-        assert!(null.config_options.is_empty());
+        assert_eq!(null.config_options, []);
 
         let wrong_shape: NewSessionResponse = serde_json::from_value(json!({
             "sessionId": "sess",
             "configOptions": "oops"
         }))
         .unwrap();
-        assert!(wrong_shape.config_options.is_empty());
+        assert_eq!(wrong_shape.config_options, []);
 
         let valid_option = serde_json::to_value(test_config_option()).unwrap();
         let mixed: NewSessionResponse = serde_json::from_value(json!({
@@ -6000,12 +6134,12 @@ mod test_serialization {
         assert_eq!(mixed.config_options.len(), 1);
 
         let resume: ResumeSessionResponse = serde_json::from_value(json!({})).unwrap();
-        assert!(resume.config_options.is_empty());
+        assert_eq!(resume.config_options, []);
         #[cfg(feature = "unstable_session_fork")]
         {
             let fork: ForkSessionResponse =
                 serde_json::from_value(json!({ "sessionId": "fork" })).unwrap();
-            assert!(fork.config_options.is_empty());
+            assert_eq!(fork.config_options, []);
         }
     }
 
@@ -6107,7 +6241,7 @@ mod test_serialization {
         }
 
         let resume: ResumeSessionResponse = serde_json::from_value(json!(null)).unwrap();
-        assert!(resume.available_commands.is_empty());
+        assert_eq!(resume.available_commands, []);
     }
 
     #[test]
@@ -6432,8 +6566,8 @@ mod test_serialization {
         let deserialized: AuthMethod = serde_json::from_value(json).unwrap();
         match deserialized {
             AuthMethod::Terminal(AuthMethodTerminal { args, env, .. }) => {
-                assert!(args.is_empty());
-                assert!(env.is_empty());
+                assert_eq!(args, Vec::<String>::new());
+                assert_eq!(env, []);
             }
             _ => panic!("Expected Terminal variant"),
         }
