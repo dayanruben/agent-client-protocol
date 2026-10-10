@@ -35,20 +35,37 @@ Agents send `session/update` notifications to report streamed content, tool acti
 | `config_option_update`      | The session's [configuration options](/protocol/v2/draft/session-config-options#from-the-agent) have changed.                      |
 | `session_info_update`       | [Session metadata](/protocol/v2/draft/session-list#updating-session-metadata), such as the title or last update time, has changed. |
 | `usage_update`              | The session's [context window usage and cumulative cost](#session-usage-updates).                                                  |
-| `notice`                    | **Draft only.** A live [advisory notice](#session-notices) that is not part of session history.                                    |
-| `compaction_update`         | **Draft only.** Creates or updates a [context compaction](#session-compaction).                                                    |
-| `compaction_summary_chunk`  | **Draft only.** Appends content to a [compaction's retained summary](#session-compaction).                                         |
+| `notice`                    | A live [user-facing notice](#session-notices) that is not part of session history.                                                 |
+| `compaction_update`         | Creates or updates a [context compaction](#session-compaction).                                                                    |
+| `compaction_summary_chunk`  | Appends content to a [compaction's retained summary](#session-compaction).                                                         |
 
 This is the complete set of standard variants defined in the current draft [`SessionUpdate` schema](/protocol/v2/draft/schema#sessionupdate), which describes each payload in detail. Draft-only variants are unstable and may change or be removed. The walkthrough below illustrates common uses of these updates.
 
 The protocol also supports [custom and future variants](/protocol/v2/draft/extensibility#enum-and-tagged-union-variants). Clients that do not understand an update should preserve its raw payload when storing, replaying, proxying, or forwarding session history, and otherwise ignore it or display it generically.
 
-Preserving a payload does not make it durable session history. In particular,
-live-only [notices](#session-notices) **SHOULD NOT** be replayed, even when a
-Client carries them through the unknown-update fallback. They may be forwarded
-live or retained for local diagnostics instead.
+Live-only [notices](#session-notices) **SHOULD NOT** be replayed, even when
+preserved as unknown updates.
 
 Session updates are not limited to prompt-driven foreground work. For example, Agents may advertise commands after creating a session, and background activity may emit updates while the Agent is [idle](#session-states).
+
+### Entity IDs
+
+Messages, tool calls, terminals, plans, and compactions are entities that the Agent creates and then updates by ID across multiple session updates. An entity is identified by its type together with its ID, not by its ID alone:
+
+| Entity type                           | Session updates                                 | ID field       |
+| ------------------------------------- | ----------------------------------------------- | -------------- |
+| User message                          | `user_message`, `user_message_chunk`            | `messageId`    |
+| Agent message                         | `agent_message`, `agent_message_chunk`          | `messageId`    |
+| Agent thought                         | `agent_thought`, `agent_thought_chunk`          | `messageId`    |
+| Session-directed message (draft only) | `session_message`, `session_message_chunk`      | `messageId`    |
+| Tool call                             | `tool_call_update`, `tool_call_content_chunk`   | `toolCallId`   |
+| Terminal                              | `terminal_update`, `terminal_output_chunk`      | `terminalId`   |
+| Plan                                  | `plan_update`, `plan_removed`                   | `planId`       |
+| Compaction (draft only)               | `compaction_update`, `compaction_summary_chunk` | `compactionId` |
+
+An ID is unique among entities of the same type within a session, not across all entity types, so the same string can identify one entity of each type. User messages, Agent messages, Agent thoughts, and session-directed messages are separate types even though they share the `messageId` field. For example, an Agent may report a thought and a response derived from the same model output with the same `messageId`; they remain two distinct entities.
+
+The Agent **MUST NOT** reuse an ID for a different entity of the same type within a session. Clients **MUST** key entities by both type and ID. An update applies only to the entity of its own type: an `agent_thought` whose `messageId` matches an existing Agent message creates or updates a thought and leaves the message unchanged. Likewise, a field that references an entity identifies an entity of one specific type; for example, the `messageId` returned by `session/prompt` identifies a user message.
 
 ### Session-directed messages (unstable)
 
@@ -408,19 +425,13 @@ If the model requested tool calls, these are also reported immediately:
 
 #### Session Notices
 
-<Note>
-  Session notices are a Preview feature and are available only in the draft
-  schema. Their wire contract may change before stabilization. See the [Session
-  Notices RFD](/rfds/session-notices).
-</Note>
-
 No Client capability is required in v2. Clients that do not implement `notice`
 may preserve it through the [unknown-update
 fallback](/protocol/v2/draft/extensibility#enum-and-tagged-union-variants) and
 ignore it or present it generically; this does not give it replay semantics.
 
 At any point while a session exists, including outside prompt processing, the
-Agent **MAY** send a live advisory notice:
+Agent **MAY** send a live user-facing notice:
 
 ```json
 {
@@ -471,18 +482,15 @@ Agent may emit a new notice.
 
 #### Session Compaction
 
-<Note>
-  Session compaction is a Preview feature and is available only in the draft
-  schema. Its wire contract may change before stabilization. See the [Session
-  Compaction RFD](/rfds/session-compaction).
-</Note>
-
 No Client capability is required in v2.
 
-The Agent **MAY** report context compaction as one persistent, ID-addressed timeline
-entity. It first sends `compaction_update` and may then append retained summary
-content with `compaction_summary_chunk` before sending one terminal update for
-the same `compactionId`:
+The Agent **MAY** report context compaction as one persistent, ID-addressed
+timeline entity. A single `compaction_update` with `status: "completed"` is
+sufficient; reporting progress is optional. Summary content is also optional.
+It may be sent all at once in the `summary` field or streamed using
+`compaction_summary_chunk` for the same `compactionId`.
+
+For example, an Agent can report that compaction has started:
 
 ```json
 {
@@ -503,10 +511,13 @@ the same `compactionId`:
 `compaction_update`. The ID is an opaque, Agent-owned string, unique within the
 session, and **MUST NOT** be reused for another compaction.
 
-The first update fixes the entity's timeline position relative to other
-ID-addressed entities: it follows entities first seen earlier and precedes
-entities first seen later. Later updates and chunks patch the same entity in
-place; they do not move it or split another entity around it.
+Clients initialize a first-seen compaction ID with status `in_progress` and unset
+optional fields, then apply the notification.
+
+The first notification fixes the entity's timeline position in receive
+order: it follows previously received timeline content and precedes content
+first received later. Later updates and chunks for an ID-addressed entity patch
+it in place; they do not move or split it around the compaction.
 
 | `status`      | Meaning                                      |
 | ------------- | -------------------------------------------- |
@@ -515,11 +526,7 @@ place; they do not move it or split another entity around it.
 | `failed`      | Compaction finished unsuccessfully.          |
 | `cancelled`   | Compaction was cancelled before it finished. |
 
-After emitting `in_progress`, the Agent **MUST** eventually send exactly one
-terminal status (`completed`, `failed`, or `cancelled`) when the compaction
-ends, unless the session or connection ends before delivery. A terminal status
-may be the first update during replay or when the runtime exposes only
-completed compactions.
+The Agent **MUST** report a terminal status when a reported compaction ends.
 
 `status` is an open string enum. Values beginning with `_` are reserved for
 implementation-specific extensions; other unknown values are reserved for
@@ -547,15 +554,14 @@ If the retained summary is available incrementally, the Agent may append one
 }
 ```
 
-`compactionId` and `content` are required and non-null on each chunk. Agents
-**MUST** send the first `compaction_update` before any chunk for that ID and may
-send chunks only after `in_progress` and before a terminal update. Chunk `_meta`
-is optional and nullable, is scoped to that chunk, and has no patch semantics:
-omission and `null` both mean no chunk metadata.
+`compactionId` and `content` are required and non-null on each chunk.
+Chunk `_meta` is optional and nullable, is scoped to that chunk, and has no
+patch semantics: omission and `null` both mean no chunk metadata.
 
-A completed update may omit `summary` to retain the streamed content. A
+An update may omit `summary` to retain the streamed content. A
 non-streaming Agent can instead supply the complete summary, and a streaming
-Agent can use the same field as an authoritative final replacement:
+Agent can use the same field as an authoritative replacement of content received
+so far:
 
 ```json
 {
@@ -580,11 +586,11 @@ Agent can use the same field as an authoritative final replacement:
 
 The following `compaction_update` fields are optional, nullable patches:
 
-| Field     | Type             | Meaning                                                                                                             |
-| --------- | ---------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `summary` | `ContentBlock[]` | The unencrypted, user-displayable content retained by compaction. A non-empty array is only valid with `completed`. |
-| `error`   | `string`         | A human-readable failure description, only valid with `failed`.                                                     |
-| `_meta`   | `object`         | Extensible metadata for the compaction entity.                                                                      |
+| Field     | Type             | Meaning                                                                               |
+| --------- | ---------------- | ------------------------------------------------------------------------------------- |
+| `summary` | `ContentBlock[]` | The unencrypted, user-displayable summary content produced or retained by compaction. |
+| `error`   | `string`         | A human-readable error description.                                                   |
+| `_meta`   | `object`         | Extensible metadata for the compaction entity.                                        |
 
 For each patch field, omission leaves the stored value unchanged, `null` clears
 it, and a concrete value replaces it. On a first-seen ID, omission and `null`
@@ -604,14 +610,11 @@ unencrypted summary is available or when disclosure would reveal context that
 was not otherwise user-visible.
 
 During [history replay](/protocol/v2/draft/session-setup#resuming-sessions),
-Agents use materialized `compaction_update` entries with the original IDs and
-timeline positions rather than replaying the transient start/chunk/finish
-sequence. A completed entry includes its full summary when available, so replay
-replaces rather than duplicates content the Client already holds.
+compaction updates and summary chunks follow the same semantics as live delivery.
 
-Replay does not implicitly reset omitted patch fields. If a materialized entry
-should clear summary content the Client already holds, the Agent sends
-`summary: null` or `summary: []`; omitting `summary` retains that content.
+Replay does not implicitly reset omitted patch fields. Agents use replacement
+or clearing summary patches as needed to avoid duplicating content the Client
+already holds.
 
 Compaction does not instruct the Client to discard earlier conversation
 history; collapsing it is a local presentation choice. It also does not replace

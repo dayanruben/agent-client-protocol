@@ -9,7 +9,7 @@ use derive_more::{Display, From};
 #[cfg(all(feature = "schemars", feature = "unstable_subagents"))]
 use schemars::Schema;
 use serde::{Deserialize, Serialize};
-use serde_with::{DefaultOnError, VecSkipError, serde_as, skip_serializing_none};
+use serde_with::{DefaultOnError, DefaultOnNull, VecSkipError, serde_as, skip_serializing_none};
 #[cfg(feature = "unstable_subagents")]
 use std::collections::BTreeMap;
 
@@ -143,35 +143,20 @@ pub enum SessionUpdate {
     SessionInfoUpdate(SessionInfoUpdate),
     /// Context window and cost update for the session.
     UsageUpdate(UsageUpdate),
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
-    /// Advisory information for the user that is not part of session history.
+    /// Information for the user that is not part of session history.
     ///
     /// Agents MUST only send this update when the Client advertised
     /// [`ClientSessionCapabilities::notices`].
-    #[cfg(feature = "unstable_session_notices")]
     Notice(Notice),
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// A context compaction has been created or updated.
     ///
     /// Agents MUST only send this update when the Client advertised
     /// [`ClientSessionCapabilities::compaction`].
-    #[cfg(feature = "unstable_session_compaction")]
     CompactionUpdate(CompactionUpdate),
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// A content block appended to a context compaction's retained summary.
     ///
     /// Agents MUST only send this update when the Client advertised
     /// [`ClientSessionCapabilities::compaction`].
-    #[cfg(feature = "unstable_session_compaction")]
     CompactionSummaryChunk(CompactionSummaryChunk),
     /// **UNSTABLE**
     ///
@@ -642,12 +627,7 @@ mod disabled_session_message_tests {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Severity hint for a session notice.
-#[cfg(feature = "unstable_session_notices")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -667,11 +647,7 @@ pub enum NoticeSeverity {
     Other(String),
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
-/// Fire-and-forget advisory information for the user.
+/// Fire-and-forget information for the user.
 ///
 /// Notices are live events rather than session history. Agents must not rely on
 /// a notice being received, displayed, or seen by the user.
@@ -680,7 +656,6 @@ pub enum NoticeSeverity {
 /// message when the information should still be surfaced to the user.
 ///
 /// See RFD: [Session Notices](https://agentclientprotocol.com/rfds/session-notices)
-#[cfg(feature = "unstable_session_notices")]
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -709,7 +684,6 @@ pub struct Notice {
     pub meta: Option<Meta>,
 }
 
-#[cfg(feature = "unstable_session_notices")]
 impl Notice {
     /// Builds a notice with the required fields set and optional fields omitted.
     #[must_use]
@@ -737,12 +711,7 @@ impl Notice {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Unique identifier for a context compaction within a session.
-#[cfg(feature = "unstable_session_compaction")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Display, From)]
 #[serde(transparent)]
@@ -750,7 +719,6 @@ impl Notice {
 #[non_exhaustive]
 pub struct CompactionId(pub Arc<str>);
 
-#[cfg(feature = "unstable_session_compaction")]
 impl CompactionId {
     /// Wraps a protocol string as a typed [`CompactionId`].
     #[must_use]
@@ -759,18 +727,14 @@ impl CompactionId {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Lifecycle state of a context compaction.
-#[cfg(feature = "unstable_session_compaction")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum CompactionStatus {
     /// Compaction has started and has not finished.
+    #[default]
     InProgress,
     /// Compaction finished successfully.
     Completed,
@@ -786,20 +750,14 @@ pub enum CompactionStatus {
     Other(String),
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
-/// A context compaction upsert. The first update fixes the compaction's
+/// A context compaction upsert. The first notification fixes the compaction's
 /// timeline position. Later updates with the same ID patch that entity in place.
 /// Agents MUST only send this update when the Client advertised
 /// [`ClientSessionCapabilities::compaction`].
 ///
 /// `summary`, `error`, and `_meta` have patch semantics: omission leaves the
 /// stored value unchanged, `null` clears it, and a concrete value replaces it.
-/// `summary: []` also clears the retained summary. A non-empty summary is only
-/// valid with `completed`; `error` is only valid with `failed`.
-#[cfg(feature = "unstable_session_compaction")]
+/// `summary: []` also clears the summary.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -811,12 +769,12 @@ pub struct CompactionUpdate {
     pub compaction_id: CompactionId,
     /// Current lifecycle status.
     pub status: CompactionStatus,
-    /// Complete replacement user-displayable summary retained by the compaction.
+    /// Complete replacement user-displayable summary content for the compaction.
     #[serde_as(deserialize_as = "DefaultOnError<MaybeUndefined<VecSkipError<_>>>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
     pub summary: MaybeUndefined<Vec<ContentBlock>>,
-    /// Human-readable description of why the compaction failed.
+    /// Human-readable error details for the compaction.
     #[serde_as(deserialize_as = "DefaultOnError<MaybeUndefined<_>>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
@@ -832,7 +790,6 @@ pub struct CompactionUpdate {
     pub meta: MaybeUndefined<Meta>,
 }
 
-#[cfg(feature = "unstable_session_compaction")]
 impl CompactionUpdate {
     /// Builds a compaction update with optional patch fields omitted.
     #[must_use]
@@ -853,7 +810,7 @@ impl CompactionUpdate {
         self
     }
 
-    /// Sets, clears, or omits the failure description patch.
+    /// Sets, clears, or omits the error details patch.
     #[must_use]
     pub fn error(mut self, error: impl IntoMaybeUndefined<String>) -> Self {
         self.error = error.into_maybe_undefined();
@@ -868,15 +825,10 @@ impl CompactionUpdate {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
-/// A content block appended to the retained summary of an in-progress
-/// compaction. Agents send chunks only after an `in_progress` update and before
-/// the terminal update for the same ID. Agents MUST only send this update when
-/// the Client advertised [`ClientSessionCapabilities::compaction`].
-#[cfg(feature = "unstable_session_compaction")]
+/// A content block appended to a compaction's summary. A first-seen ID creates
+/// an in-progress compaction. Chunks append in receive order.
+/// Agents MUST only send this update when the Client advertised
+/// [`ClientSessionCapabilities::compaction`].
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -895,7 +847,6 @@ pub struct CompactionSummaryChunk {
     pub meta: Option<Meta>,
 }
 
-#[cfg(feature = "unstable_session_compaction")]
 impl CompactionSummaryChunk {
     /// Builds a summary chunk without metadata.
     #[must_use]
@@ -2556,13 +2507,9 @@ pub struct ReadTextFileRequest {
     /// Absolute path to the file to read.
     pub path: PathBuf,
     /// Line number to start reading from (1-based).
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub line: Option<u32>,
     /// Maximum number of lines to read.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub limit: Option<u32>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -2693,18 +2640,14 @@ pub struct CreateTerminalRequest {
     /// The command to execute.
     pub command: String,
     /// Array of command arguments.
-    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_>>")]
-    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true)))]
+    #[serde_as(deserialize_as = "DefaultOnNull")]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
     /// Environment variables for the command.
-    #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_>>")]
-    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true)))]
+    #[serde_as(deserialize_as = "DefaultOnNull")]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub env: Vec<EnvVariable>,
     /// Working directory for the command. Must be an absolute path.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub cwd: Option<PathBuf>,
     /// Maximum number of output bytes to retain.
@@ -2715,8 +2658,6 @@ pub struct CreateTerminalRequest {
     /// The Client MUST ensure truncation happens at a character boundary to maintain valid
     /// string output, even if this means the retained output is slightly less than the
     /// specified limit.
-    #[serde_as(deserialize_as = "DefaultOnError")]
-    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub output_byte_limit: Option<u64>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -3558,13 +3499,8 @@ impl SubagentCapabilities {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ClientSessionCapabilities {
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// Support for ID-addressed context compaction updates. Omitted or `null`
     /// means unsupported; `{}` advertises the complete compaction contract.
-    #[cfg(feature = "unstable_session_compaction")]
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
@@ -3577,15 +3513,10 @@ pub struct ClientSessionCapabilities {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub config_options: Option<SessionConfigOptionsCapabilities>,
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
-    /// Support for live advisory `notice` session updates.
+    /// Support for live user-facing `notice` session updates.
     ///
     /// Optional. Omitted or `null` both mean the client does not advertise support.
     /// Supplying `{}` means the client can present notices to the user.
-    #[cfg(feature = "unstable_session_notices")]
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
@@ -3610,7 +3541,6 @@ impl ClientSessionCapabilities {
     }
 
     /// Advertises support for ID-addressed context compaction updates.
-    #[cfg(feature = "unstable_session_compaction")]
     #[must_use]
     pub fn compaction(mut self, compaction: impl IntoOption<CompactionCapabilities>) -> Self {
         self.compaction = compaction.into_option();
@@ -3630,8 +3560,7 @@ impl ClientSessionCapabilities {
         self
     }
 
-    /// Advertises support for presenting live advisory notices to the user.
-    #[cfg(feature = "unstable_session_notices")]
+    /// Advertises support for presenting live notices to the user.
     #[must_use]
     pub fn notices(mut self, notices: impl IntoOption<NoticeCapabilities>) -> Self {
         self.notices = notices.into_option();
@@ -3650,19 +3579,13 @@ impl ClientSessionCapabilities {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Client support for ID-addressed context compaction updates.
-#[cfg(feature = "unstable_session_compaction")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CompactionCapabilities {}
 
-#[cfg(feature = "unstable_session_compaction")]
 impl CompactionCapabilities {
     /// Advertises the complete compaction update contract.
     #[must_use]
@@ -3671,21 +3594,15 @@ impl CompactionCapabilities {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
-/// Client support for presenting live advisory notices to the user.
-#[cfg(feature = "unstable_session_notices")]
+/// Client support for presenting live notices to the user.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct NoticeCapabilities {}
 
-#[cfg(feature = "unstable_session_notices")]
 impl NoticeCapabilities {
-    /// Advertises support for presenting live advisory notices to the user.
+    /// Advertises support for presenting live notices to the user.
     #[must_use]
     pub fn new() -> Self {
         Self {}
@@ -4221,7 +4138,6 @@ impl AgentNotification {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "unstable_session_notices")]
     #[test]
     fn notice_preserves_wire_shape_nullable_fields_and_open_severity() {
         use serde_json::json;
@@ -4284,12 +4200,21 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "unstable_session_notices")]
     #[test]
-    fn notice_requires_non_null_severity_and_title() {
+    fn notice_requires_string_severity_and_title() {
         use serde_json::json;
 
         for malformed in [
+            json!({
+                "sessionUpdate": "notice",
+                "severity": "warning",
+                "title": 42
+            }),
+            json!({
+                "sessionUpdate": "notice",
+                "severity": 42,
+                "title": "MCP server unavailable"
+            }),
             json!({
                 "sessionUpdate": "notice",
                 "severity": "warning"
@@ -4309,11 +4234,70 @@ mod tests {
                 "title": "MCP server unavailable"
             }),
         ] {
+            assert!(serde_json::from_str::<SessionUpdate>(&malformed.to_string()).is_err());
             assert!(serde_json::from_value::<SessionUpdate>(malformed).is_err());
         }
     }
 
-    #[cfg(feature = "unstable_session_notices")]
+    #[test]
+    fn notice_tolerates_invalid_optional_display_fields_and_custom_severity() {
+        use serde_json::json;
+
+        let wire = json!({
+            "sessionUpdate": "notice",
+            "severity": "_custom",
+            "title": "Provider degraded",
+            "description": 42,
+            "_meta": false
+        });
+        let SessionUpdate::Notice(notice) = serde_json::from_value(wire.clone()).unwrap() else {
+            panic!("expected notice");
+        };
+        // Streaming deserialization must enforce the same contract as from_value.
+        assert_eq!(
+            serde_json::from_str::<SessionUpdate>(&wire.to_string()).unwrap(),
+            SessionUpdate::Notice(notice.clone())
+        );
+        assert_eq!(notice.severity, NoticeSeverity::Other("_custom".into()));
+        assert_eq!(notice.description, None);
+        assert_eq!(notice.meta, None);
+        assert_eq!(
+            serde_json::to_value(notice).unwrap(),
+            json!({"severity": "_custom", "title": "Provider degraded"})
+        );
+    }
+
+    #[cfg(feature = "schemars")]
+    #[test]
+    fn notice_schema_preserves_required_and_nullable_fields() {
+        use serde_json::json;
+
+        let schema = serde_json::to_value(schemars::schema_for!(Notice)).unwrap();
+        assert_eq!(schema["required"], json!(["severity", "title"]));
+        assert_eq!(schema["properties"]["title"]["minLength"], 1);
+        for field in ["description", "_meta"] {
+            assert!(
+                schema["properties"][field]["type"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&json!("null"))
+            );
+        }
+        let capabilities =
+            serde_json::to_value(schemars::schema_for!(ClientSessionCapabilities)).unwrap();
+        assert!(
+            capabilities["properties"]["notices"]["anyOf"]
+                .as_array()
+                .unwrap()
+                .contains(&json!({"type": "null"}))
+        );
+        assert!(
+            !capabilities["required"]
+                .as_array()
+                .is_some_and(|required| required.contains(&json!("notices")))
+        );
+    }
+
     #[test]
     fn notice_capability_advertises_support_only_when_present() {
         use serde_json::json;
@@ -4356,32 +4340,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(feature = "unstable_session_notices"))]
-    #[test]
-    fn unsupported_notice_capability_is_ignored() {
-        use serde_json::json;
-
-        let capabilities: ClientSessionCapabilities =
-            serde_json::from_value(json!({ "notices": {} })).unwrap();
-        assert_eq!(serde_json::to_value(capabilities).unwrap(), json!({}));
-    }
-
-    #[cfg(not(feature = "unstable_session_notices"))]
-    #[test]
-    fn unsupported_notice_is_rejected_by_closed_update_union() {
-        use serde_json::json;
-
-        assert!(
-            serde_json::from_value::<SessionUpdate>(json!({
-                "sessionUpdate": "notice",
-                "severity": "warning",
-                "title": "MCP server unavailable"
-            }))
-            .is_err()
-        );
-    }
-
-    #[cfg(feature = "unstable_session_compaction")]
     #[test]
     fn compaction_updates_preserve_patch_and_open_status_semantics() {
         use serde_json::json;
@@ -4404,18 +4362,17 @@ mod tests {
             "compactionId": "cmp_001",
             "status": "paused",
             "summary": null,
-            "error": "waiting"
+            "error": null
         }))
         .unwrap() else {
             panic!("expected compaction update");
         };
         assert_eq!(update.status, CompactionStatus::Other("paused".into()));
         assert!(update.summary.is_null());
-        assert_eq!(update.error.value().map(String::as_str), Some("waiting"));
+        assert!(update.error.is_null());
         assert!(update.meta.is_undefined());
     }
 
-    #[cfg(feature = "unstable_session_compaction")]
     #[test]
     fn compaction_chunk_and_v1_capability_serialize() {
         use serde_json::json;
@@ -5543,5 +5500,58 @@ mod tests {
             }))
             .is_err()
         );
+    }
+
+    #[test]
+    fn create_terminal_request_rejects_malformed_fields() {
+        use serde_json::json;
+
+        let request = |field: &str, value: serde_json::Value| {
+            let mut request = json!({"sessionId": "sess-1", "command": "npx"});
+            request[field] = value;
+            serde_json::from_value::<CreateTerminalRequest>(request)
+        };
+
+        // Defaulting any of these would run a different command than requested.
+        for (field, value) in [
+            ("args", json!(["serve", "--port", 3000])),
+            ("args", json!("serve --port 3000")),
+            ("env", json!([{"name": "PORT", "value": 3000}])),
+            ("env", json!({"PORT": "3000"})),
+            ("cwd", json!({"path": "/repo"})),
+            ("outputByteLimit", json!("1048576")),
+        ] {
+            assert!(request(field, value.clone()).is_err(), "{field}: {value}");
+        }
+
+        for field in ["args", "env", "cwd", "outputByteLimit"] {
+            assert_eq!(
+                request(field, serde_json::Value::Null).unwrap(),
+                CreateTerminalRequest::new("sess-1", "npx"),
+                "{field}"
+            );
+        }
+    }
+
+    #[test]
+    fn read_text_file_request_rejects_malformed_range() {
+        use serde_json::json;
+
+        let request = |field: &str, value: serde_json::Value| {
+            let mut request = json!({"sessionId": "sess-1", "path": "/repo/src/main.rs"});
+            request[field] = value;
+            serde_json::from_value::<ReadTextFileRequest>(request)
+        };
+
+        // Defaulting either bound would return a different part of the file.
+        for field in ["line", "limit"] {
+            assert!(request(field, json!("120")).is_err(), "{field}");
+            assert!(request(field, json!(-1)).is_err(), "{field}");
+            assert_eq!(
+                request(field, serde_json::Value::Null).unwrap(),
+                ReadTextFileRequest::new("sess-1", "/repo/src/main.rs"),
+                "{field}"
+            );
+        }
     }
 }

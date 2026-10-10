@@ -1,7 +1,7 @@
 [package]
 name = "agent-client-protocol-schema"
 authors = ["Zed <hi@zed.dev>"]
-version = "1.10.2"
+version = "1.11.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "A protocol for standardizing communication between code editors and AI coding agents"
@@ -33,8 +33,6 @@ unstable = [
     "unstable_plan_operations",
     "unstable_session_fork",
     "unstable_subagents",
-    "unstable_session_compaction",
-    "unstable_session_notices",
     "unstable_end_turn_token_usage",
 ]
 # Protocol v2 is intentionally NOT part of the `unstable` umbrella.
@@ -46,8 +44,6 @@ unstable_mcp_over_acp = []
 unstable_nes = []
 unstable_plan_operations = []
 unstable_session_fork = []
-unstable_session_compaction = []
-unstable_session_notices = []
 unstable_subagents = []
 unstable_end_turn_token_usage = []
 

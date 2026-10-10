@@ -148,29 +148,14 @@ pub enum SessionUpdate {
     SessionInfoUpdate(SessionInfoUpdate),
     /// Context window and cost update for the session.
     UsageUpdate(UsageUpdate),
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
-    /// Advisory information for the user that is not part of session history.
+    /// Information for the user that is not part of session history.
     ///
     /// No Client capability is required. Clients that do not understand or
     /// present notices may ignore them.
-    #[cfg(feature = "unstable_session_notices")]
     Notice(Notice),
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// A context compaction has been created or updated.
-    #[cfg(feature = "unstable_session_compaction")]
     CompactionUpdate(CompactionUpdate),
-    /// **UNSTABLE**
-    ///
-    /// This capability is not part of the spec yet, and may be removed or changed at any point.
-    ///
     /// A content block appended to a context compaction's retained summary.
-    #[cfg(feature = "unstable_session_compaction")]
     CompactionSummaryChunk(CompactionSummaryChunk),
     /// **UNSTABLE**
     ///
@@ -615,12 +600,7 @@ mod disabled_session_message_tests {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Severity hint for a session notice.
-#[cfg(feature = "unstable_session_notices")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -640,18 +620,13 @@ pub enum NoticeSeverity {
     Other(String),
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
-/// Fire-and-forget advisory information for the user.
+/// Fire-and-forget information for the user.
 ///
 /// Notices are live events rather than session history. Agents must not rely on
 /// a notice being received, displayed, or seen by the user.
 /// No Client capability is required, and unsupported Clients may ignore notices.
 ///
 /// See RFD: [Session Notices](https://agentclientprotocol.com/rfds/session-notices)
-#[cfg(feature = "unstable_session_notices")]
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -680,7 +655,6 @@ pub struct Notice {
     pub meta: Option<Meta>,
 }
 
-#[cfg(feature = "unstable_session_notices")]
 impl Notice {
     /// Builds a notice with the required fields set and optional fields omitted.
     #[must_use]
@@ -708,12 +682,7 @@ impl Notice {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Unique identifier for a context compaction within a session.
-#[cfg(feature = "unstable_session_compaction")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Display, From)]
 #[serde(transparent)]
@@ -721,7 +690,6 @@ impl Notice {
 #[non_exhaustive]
 pub struct CompactionId(pub Arc<str>);
 
-#[cfg(feature = "unstable_session_compaction")]
 impl CompactionId {
     /// Wraps a protocol string as a typed [`CompactionId`].
     #[must_use]
@@ -730,18 +698,14 @@ impl CompactionId {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
 /// Lifecycle state of a context compaction.
-#[cfg(feature = "unstable_session_compaction")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum CompactionStatus {
     /// Compaction has started and has not finished.
+    #[default]
     InProgress,
     /// Compaction finished successfully.
     Completed,
@@ -757,18 +721,12 @@ pub enum CompactionStatus {
     Other(String),
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
-/// A context compaction upsert. The first update fixes the compaction's
+/// A context compaction upsert. The first notification fixes the compaction's
 /// timeline position. Later updates with the same ID patch that entity in place.
 ///
 /// `summary`, `error`, and `_meta` have patch semantics: omission leaves the
 /// stored value unchanged, `null` clears it, and a concrete value replaces it.
-/// `summary: []` also clears the retained summary. A non-empty summary is only
-/// valid with `completed`; `error` is only valid with `failed`.
-#[cfg(feature = "unstable_session_compaction")]
+/// `summary: []` also clears the summary.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -780,12 +738,12 @@ pub struct CompactionUpdate {
     pub compaction_id: CompactionId,
     /// Current lifecycle status.
     pub status: CompactionStatus,
-    /// Complete replacement user-displayable summary retained by the compaction.
+    /// Complete replacement user-displayable summary content for the compaction.
     #[serde_as(deserialize_as = "DefaultOnError<MaybeUndefined<VecSkipError<_>>>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
     pub summary: MaybeUndefined<Vec<ContentBlock>>,
-    /// Human-readable description of why the compaction failed.
+    /// Human-readable error details for the compaction.
     #[serde_as(deserialize_as = "DefaultOnError<MaybeUndefined<_>>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
@@ -801,7 +759,6 @@ pub struct CompactionUpdate {
     pub meta: MaybeUndefined<Meta>,
 }
 
-#[cfg(feature = "unstable_session_compaction")]
 impl CompactionUpdate {
     /// Builds a compaction update with optional patch fields omitted.
     #[must_use]
@@ -822,7 +779,7 @@ impl CompactionUpdate {
         self
     }
 
-    /// Sets, clears, or omits the failure description patch.
+    /// Sets, clears, or omits the error details patch.
     #[must_use]
     pub fn error(mut self, error: impl IntoMaybeUndefined<String>) -> Self {
         self.error = error.into_maybe_undefined();
@@ -837,14 +794,8 @@ impl CompactionUpdate {
     }
 }
 
-/// **UNSTABLE**
-///
-/// This capability is not part of the spec yet, and may be removed or changed at any point.
-///
-/// A content block appended to the retained summary of an in-progress
-/// compaction. Agents send chunks only after an `in_progress` update and before
-/// the terminal update for the same ID.
-#[cfg(feature = "unstable_session_compaction")]
+/// A content block appended to a compaction's summary. A first-seen ID creates
+/// an in-progress compaction. Chunks append in receive order.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -863,7 +814,6 @@ pub struct CompactionSummaryChunk {
     pub meta: Option<Meta>,
 }
 
-#[cfg(feature = "unstable_session_compaction")]
 impl CompactionSummaryChunk {
     /// Builds a summary chunk without metadata.
     #[must_use]
@@ -1198,11 +1148,9 @@ impl<'de> Deserialize<'de> for OtherSessionUpdate {
 }
 
 fn is_known_session_update(session_update: &str) -> bool {
-    #[cfg(feature = "unstable_session_notices")]
     if session_update == "notice" {
         return true;
     }
-    #[cfg(feature = "unstable_session_compaction")]
     if matches!(
         session_update,
         "compaction_update" | "compaction_summary_chunk"
@@ -1265,11 +1213,8 @@ fn other_session_update_schema(schema: &mut Schema) {
             #[cfg(feature = "unstable_plan_operations")]
             "plan_removed",
             "usage_update",
-            #[cfg(feature = "unstable_session_notices")]
             "notice",
-            #[cfg(feature = "unstable_session_compaction")]
             "compaction_update",
-            #[cfg(feature = "unstable_session_compaction")]
             "compaction_summary_chunk",
             #[cfg(feature = "unstable_subagents")]
             "subagent_update",
@@ -2130,7 +2075,11 @@ impl AgentThought {
     }
 }
 
-/// Unique identifier for a message within a session.
+/// Identifier for a message, unique among messages of the same type within a session.
+///
+/// Each message type, such as user messages, agent messages, and agent thoughts,
+/// has its own ID space: messages of different types may share an ID and remain
+/// distinct messages.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Display, From)]
 #[serde(transparent)]
@@ -3788,7 +3737,6 @@ mod tests {
         assert_eq!(serde_json::to_value(parsed).unwrap(), wire);
     }
 
-    #[cfg(feature = "unstable_session_notices")]
     #[test]
     fn notice_preserves_wire_shape_nullable_fields_and_open_severity() {
         use serde_json::json;
@@ -3846,12 +3794,21 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "unstable_session_notices")]
     #[test]
     fn malformed_known_notice_is_not_hidden_as_unknown() {
         use serde_json::json;
 
         for malformed in [
+            json!({
+                "sessionUpdate": "notice",
+                "severity": "warning",
+                "title": 42
+            }),
+            json!({
+                "sessionUpdate": "notice",
+                "severity": 42,
+                "title": "MCP server unavailable"
+            }),
             json!({
                 "sessionUpdate": "notice",
                 "severity": "warning"
@@ -3871,33 +3828,64 @@ mod tests {
                 "title": "MCP server unavailable"
             }),
         ] {
+            assert!(serde_json::from_str::<SessionUpdate>(&malformed.to_string()).is_err());
             assert!(serde_json::from_value::<SessionUpdate>(malformed).is_err());
         }
     }
 
-    #[cfg(not(feature = "unstable_session_notices"))]
     #[test]
-    fn unsupported_notice_is_preserved_as_an_unknown_update() {
+    fn notice_tolerates_invalid_optional_display_fields_and_custom_severity() {
         use serde_json::json;
 
-        let SessionUpdate::Other(notice) = serde_json::from_value(json!({
+        let wire = json!({
             "sessionUpdate": "notice",
-            "severity": "warning",
-            "title": "MCP server unavailable"
-        }))
-        .unwrap() else {
-            panic!("expected unknown session update");
+            "severity": "_custom",
+            "title": "Provider degraded",
+            "description": 42,
+            "_meta": false
+        });
+        let SessionUpdate::Notice(notice) = serde_json::from_value(wire.clone()).unwrap() else {
+            panic!("expected notice");
         };
-
-        assert_eq!(notice.session_update, "notice");
-        assert_eq!(notice.fields.get("severity"), Some(&json!("warning")));
         assert_eq!(
-            notice.fields.get("title"),
-            Some(&json!("MCP server unavailable"))
+            serde_json::from_str::<SessionUpdate>(&wire.to_string()).unwrap(),
+            SessionUpdate::Notice(notice.clone())
+        );
+        assert_eq!(notice.severity, NoticeSeverity::Other("_custom".into()));
+        assert_eq!(notice.description, None);
+        assert_eq!(notice.meta, None);
+        assert_eq!(
+            serde_json::to_value(notice).unwrap(),
+            json!({"severity": "_custom", "title": "Provider degraded"})
         );
     }
 
-    #[cfg(feature = "unstable_session_compaction")]
+    #[cfg(feature = "schemars")]
+    #[test]
+    fn notice_schema_preserves_required_fields_and_excludes_unknown_fallback() {
+        use serde_json::json;
+
+        let schema = serde_json::to_value(schemars::schema_for!(Notice)).unwrap();
+        assert_eq!(schema["required"], json!(["severity", "title"]));
+        assert_eq!(schema["properties"]["title"]["minLength"], 1);
+        for field in ["description", "_meta"] {
+            assert!(
+                schema["properties"][field]["type"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&json!("null"))
+            );
+        }
+        let fallback = serde_json::to_value(schemars::schema_for!(OtherSessionUpdate)).unwrap();
+        assert!(
+            fallback["not"]["anyOf"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|variant| variant["properties"]["sessionUpdate"]["const"] == "notice")
+        );
+    }
+
     #[test]
     fn compaction_updates_preserve_patch_and_open_status_semantics() {
         use serde_json::json;
@@ -3931,7 +3919,6 @@ mod tests {
         assert!(update.error.is_undefined());
     }
 
-    #[cfg(feature = "unstable_session_compaction")]
     #[test]
     fn malformed_known_compaction_update_is_not_hidden_as_unknown() {
         use serde_json::json;
