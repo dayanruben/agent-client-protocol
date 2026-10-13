@@ -334,7 +334,7 @@ User messages, including locally handled commands, must be reported live but nee
 
 ### Session states
 
-`state_update` is new in v2 and reports foreground work using one of three stable states (extensible like all v2 enums):
+`state_update` is new in v2 and reports foreground work, whether or not a prompt started it, using one of three stable states (extensible like all v2 enums):
 
 - `running`: Foreground work is in progress.
 - `idle`: The Agent is ready to process a new prompt. Carries a `stopReason` when the transition ends foreground work.
@@ -404,6 +404,14 @@ lossy adapter may omit the clear. The remaining fields (`title`, `kind`,
 `status`, `content`, `locations`, `rawInput`, `rawOutput`) and `kind` values are
 unchanged from v1. The `status` enum adds `cancelled`, and both enums are now
 extensible.
+
+Top-level `_meta` is now stored tool-call state, too. v1 gave no rule for
+keeping a `tool_call_update`'s `_meta`, so Agents could use it for data about
+one report. In v2, a concrete `_meta` replaces the tool call's whole stored
+`_meta` object, and Clients do not merge keys. An Agent that sends different
+keys on different reports loses the earlier keys at each later report. To keep
+them, resend every key on each report that includes `_meta`, or omit `_meta`
+from reports that don't change it.
 
 ### Streaming tool-call content
 
@@ -494,7 +502,7 @@ The v1 diff shape (a single `path` with `oldText`/`newText`) could not distingui
 ```
 
 - `changes` (required) is the authoritative list of file-level operations. `add`, `delete`, and `modify` carry a `path`. `move` and `copy` carry `oldPath` and `path`. Each change may carry an optional `fileType` (`text`, `binary`, `directory`, `symlink`) and `mimeType`. Clients can build file trees and summaries from `changes` without parsing any patch text.
-- `patch` (optional) carries renderable text for some or all changes and **MUST** be consistent with `changes`. Stable v2 defines `git_patch` as one or more `diff --git` sections in Git's `--patch` (`-p`) text format. Paths **MUST** be absolute. Surrounding commit metadata and email envelopes **MUST NOT** be included. Agents **SHOULD** provide `patch` whenever feasible. Clients **MUST** handle diffs where `patch` is omitted or `null` (binary changes, symlink retargets, and similar cases have no useful text rendering).
+- `patch` (optional) carries renderable text for some or all changes and **MUST** be consistent with `changes`. Stable v2 defines `git_patch` as one or more `diff --git` sections in Git's `--patch` (`-p`) text format. Unlike Git's repository-relative paths, every path **MUST** be absolute, including in `rename from`, `rename to`, `copy from`, and `copy to` lines, with no prefix such as Git's default `a/` and `b/`; otherwise paths follow Git, including `/dev/null` for the missing side of an added or deleted file and Git's quoting of unusual paths. See [Diffs](/protocol/v2/tool-calls#diffs) for producing this with `git diff`. Surrounding commit metadata and email envelopes **MUST NOT** be included. Agents **SHOULD** provide `patch` whenever feasible. Clients **MUST** handle diffs where `patch` is omitted or `null` (binary changes, symlink retargets, and similar cases have no useful text rendering).
 
 A deleted file is now simply:
 
@@ -512,6 +520,17 @@ A deleted file is now simply:
 ```
 
 There is no mechanical mapping from v2 diffs back to `oldText`/`newText`. When migrating a v1 client, render `patch.text` according to `patch.format`, using `changes` for headers, file trees, and non-text cases.
+
+### Edits known only as a snippet
+
+Many v1 Agents filled `oldText` and `newText` with just the replaced snippet, such as an edit tool's `old_string` and `new_string`, without reading the file. v2 has no form for a snippet: a `git_patch` hunk needs line numbers, and each entry in `changes` needs an operation, which a snippet does not always tell. An edit with an empty `old_string`, for example, is an `add` or a `modify` depending on whether the file exists. A tool that writes a whole file has the same gap: its input has the new contents, but not the old ones or the operation.
+
+Such an Agent has two options:
+
+- Read the file before the tool runs, and compute `changes` and `patch` from its contents.
+- Send no diff until the change is done. Until then, `locations` can still point the Client at the file.
+
+Read the file somewhere the tool waits on, so it still holds its contents from before the change. Reading once the tool input is complete races an auto-approved edit, which may already have run, and the patch would then be computed against the edited file. A permission check is safe, but auto-approved edits skip it, so they need a hook that runs before the tool, such as Claude Code's `PreToolUse` hook.
 
 ## Permission requests
 
@@ -776,7 +795,7 @@ A standard remote transport (streamable HTTP with SSE streams, plus WebSocket) i
 5. **Message IDs.** Generate and attach a `messageId` to every message chunk and update.
 6. **Tool calls.** Stop sending `tool_call`. Send `tool_call_update` for creation and patches. Use `tool_call_content_chunk` to stream content. Respect omit/`null`/value patch semantics.
 7. **Terminal output.** Add `terminal` content references for Agent-owned display terminals. Send `terminal_update` for command, absolute cwd, snapshots, and exit state; send independently base64-encoded `terminal_output_chunk` values for live bytes. Do not expect Client control methods or capability negotiation.
-8. **Diffs.** Replace `oldText`/`newText` with `changes` (+ `fileType`/`mimeType` where known) and provide `patch` in `git_patch` format whenever feasible.
+8. **Diffs.** Replace `oldText`/`newText` with `changes` (+ `fileType`/`mimeType` where known) and provide `patch` in `git_patch` format whenever feasible. If a tool's input describes an edit only as a snippet, read the file somewhere the tool waits on, before it can run, or send no diff until the change is done (see [Edits known only as a snippet](#edits-known-only-as-a-snippet)).
 9. **Permissions.** Put prompt copy in required `title` (+ optional `description`). Use the `tool_call` subject for tool-call state and the `command` subject for a command, required absolute cwd, and optional tool-call/terminal associations.
 10. **Plans.** Send `plan_update` with `{ "type": "items", "planId": ..., "entries": [...] }`.
 11. **Modes.** Drop `session/set_mode`, `modes`, and `current_mode_update`. Expose the same state as config options with `category: "mode"` and emit `config_option_update`.

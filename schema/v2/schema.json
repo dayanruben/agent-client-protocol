@@ -1835,7 +1835,7 @@
       "description": "Text patch format used by [`DiffPatch`].",
       "anyOf": [
         {
-          "description": "One or more `diff --git` sections in Git's `--patch` (`-p`) text format.\n\nPaths MUST be absolute. Surrounding commit metadata and email envelopes\nMUST NOT be included.",
+          "description": "One or more `diff --git` sections in Git's `--patch` (`-p`) text format.\n\nUnlike Git, which writes paths relative to the repository root, every\npath MUST be absolute, including in `rename from`, `rename to`,\n`copy from`, and `copy to` lines, and MUST NOT have a prefix such as\nGit's default `a/` and `b/`. Otherwise paths follow Git: `/dev/null`\nnames the missing side of an added or deleted file in the `---` and\n`+++` lines, and paths with unusual characters are quoted as Git quotes\nthem. Surrounding commit metadata and email envelopes MUST NOT be\nincluded.",
           "type": "string",
           "const": "git_patch"
         },
@@ -3125,7 +3125,7 @@
       "type": "object",
       "properties": {
         "session": {
-          "description": "Session capabilities supported by the agent.\n\nOptional. Omitted or `null` both mean the agent does not support the\n`session/*` method surface. Supplying `{}` means the agent supports the\nbaseline session methods: `session/new`, `session/prompt`,\n`session/cancel`, and `session/update`.",
+          "description": "Session capabilities supported by the agent.\n\nOptional. Omitted or `null` both mean the agent does not support the\n`session/*` method surface. Supplying `{}` means the agent supports the\nbaseline session methods: `session/new`, `session/list`,\n`session/resume`, `session/close`, `session/prompt`, `session/cancel`,\nand `session/update`.",
           "anyOf": [
             {
               "$ref": "#/$defs/SessionCapabilities"
@@ -5264,7 +5264,7 @@
       }
     },
     "StateUpdate": {
-      "description": "The state of the agent's foreground work has changed.\n\nBackground activity can continue and emit other `session/update` notifications\nwhile `idle`. Those notifications do not change this state.",
+      "description": "The state of the agent's foreground work has changed.\n\nForeground work can start without a prompt, such as when the agent follows up\non a background task that finished; it reports the same states either way.\n\nBackground activity can continue and emit other `session/update` notifications\nwhile `idle`. Those notifications do not change this state.",
       "anyOf": [
         {
           "description": "Foreground work is in progress.",

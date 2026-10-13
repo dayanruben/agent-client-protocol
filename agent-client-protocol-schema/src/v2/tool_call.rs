@@ -31,7 +31,7 @@ use crate::{IntoMaybeUndefined, IntoOption, MaybeUndefined};
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ToolCallUpdate {
@@ -231,7 +231,7 @@ impl ToolCallUpdate {
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ToolCallContentChunk {
@@ -375,7 +375,7 @@ pub enum ToolCallStatus {
 ///
 /// See protocol docs: [Content](https://agentclientprotocol.com/protocol/tool-calls#content)
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ToolCallContent {
@@ -400,7 +400,7 @@ pub enum ToolCallContent {
 
 /// Custom or future tool call content payload.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[cfg_attr(feature = "schemars", schemars(inline))]
 #[cfg_attr(feature = "schemars", schemars(transform = other_tool_call_content_schema))]
 #[serde(rename_all = "camelCase")]
@@ -488,7 +488,7 @@ impl From<Terminal> for ToolCallContent {
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct Content {
@@ -636,8 +636,14 @@ impl DiffPatch {
 pub enum DiffPatchFormat {
     /// One or more `diff --git` sections in Git's `--patch` (`-p`) text format.
     ///
-    /// Paths MUST be absolute. Surrounding commit metadata and email envelopes
-    /// MUST NOT be included.
+    /// Unlike Git, which writes paths relative to the repository root, every
+    /// path MUST be absolute, including in `rename from`, `rename to`,
+    /// `copy from`, and `copy to` lines, and MUST NOT have a prefix such as
+    /// Git's default `a/` and `b/`. Otherwise paths follow Git: `/dev/null`
+    /// names the missing side of an added or deleted file in the `---` and
+    /// `+++` lines, and paths with unusual characters are quoted as Git quotes
+    /// them. Surrounding commit metadata and email envelopes MUST NOT be
+    /// included.
     GitPatch,
     /// Custom or future patch format.
     ///
