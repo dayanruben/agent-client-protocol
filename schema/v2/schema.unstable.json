@@ -5181,7 +5181,7 @@
       "x-method": "session/set_config_option"
     },
     "PromptResponse": {
-      "description": "Response acknowledging that a user prompt was inserted into the ACP conversation.\n\nThis response does not indicate that the prompt was merely received or queued, nor that the\nagent has finished processing it.\nProcessing and completion are reported through `state_update` session updates.\n\nSee protocol docs: [Prompt Accepted](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#2-prompt-accepted)",
+      "description": "Response acknowledging that a user prompt was inserted into the ACP conversation.\n\nThis response does not indicate that the prompt was merely received or queued, nor that the\nagent has finished processing it.\nProcessing and completion are reported through `state_update` session updates.\n\nInsertion is the logical addition of a user message with a message ID and a position\nrelative to other messages in the ACP conversation.\n\nSee protocol docs: [Prompt Accepted](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#2-prompt-accepted)",
       "type": "object",
       "properties": {
         "messageId": {
@@ -6637,7 +6637,7 @@
       "required": ["totalTokens", "inputTokens", "outputTokens"]
     },
     "IdleStateUpdate": {
-      "description": "The agent is ready to process a new prompt.\n\nAgents SHOULD include a `stopReason` when the idle transition ends foreground\nwork. An omitted, `null`, or malformed `stopReason` means the agent is not\nreporting one.",
+      "description": "No foreground work is active. Background activity may continue.\n\nAgents SHOULD include a `stopReason` when the idle transition ends foreground\nwork. An idle update that does not end foreground work need not include one.\nReceivers treat an omitted, `null`, or malformed `stopReason` as the agent not\nreporting one.",
       "type": "object",
       "properties": {
         "usage": {
@@ -6710,7 +6710,7 @@
           "required": ["stopReason"]
         },
         {
-          "description": "Active session work was cancelled by the client via `session/cancel`.\n\nAgents should report this stop reason on an idle `state_update` session update\nwhen cancellation succeeds, even if cancellation causes exceptions in\nunderlying operations.",
+          "description": "Active session work was cancelled by the client via `session/cancel`.\n\nAgents MUST report this stop reason on an idle `state_update` session update\nwhen cancellation succeeds, even if cancellation causes exceptions in\nunderlying operations. Agents MUST catch these errors and report\n`cancelled`, not `error`.",
           "type": "object",
           "properties": {
             "stopReason": {
@@ -6721,7 +6721,7 @@
           "required": ["stopReason"]
         },
         {
-          "description": "The active work ended because something failed.\n\nFor work started by a prompt, this covers failures after the user message\nwas inserted; earlier failures are an error response to `session/prompt`.",
+          "description": "The active work ended because something failed.\n\nThis includes pre-insertion foreground work. A prompt failure before\ninsertion also requires an error response to `session/prompt`; after\ninsertion, the prompt's response remains successful.",
           "type": "object",
           "properties": {
             "stopReason": {
@@ -6850,7 +6850,7 @@
       }
     },
     "StateUpdate": {
-      "description": "The state of the agent's foreground work has changed.\n\nForeground work can start without a prompt, such as when the agent follows up\non a background task that finished; it reports the same states either way.\n\nBackground activity can continue and emit other `session/update` notifications\nwhile `idle`. Those notifications do not change this state.",
+      "description": "The state of the agent's foreground work has changed.\n\nForeground work is the agent's active response or workflow in the session,\nincluding model processing, tool execution, and waiting for user action needed\nto continue that work. It can start with a prompt or be agent-initiated, for\nexample to pursue an ongoing goal or follow up on a completed background task.\nEither way, the agent MUST report `running` when foreground work starts or\nresumes, and `idle` when it ends. The agent SHOULD include a stop reason on\nthat idle update. Agent-initiated work does not require a prompt request or a\nsynthetic user message.\n\n`running` may precede user-message insertion, for example during a foreground\nhook. It is not acknowledgment of insertion, and rejecting a prompt does not\nitself end foreground work.\n\nBackground activity can continue and emit other `session/update` notifications\nwhile `idle`. Those notifications, including a detached task's progress or\ncompletion, do not by themselves change this state. A permission request only\nwarrants `requires_action` when foreground work is blocked on user action.\n\nSee protocol docs: [Foreground and Background Work](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#foreground-and-background-work)",
       "anyOf": [
         {
           "description": "Foreground work is in progress.",
@@ -6869,7 +6869,7 @@
           ]
         },
         {
-          "description": "The agent is ready to process a new prompt.",
+          "description": "No foreground work is active. Background activity may continue.",
           "type": "object",
           "properties": {
             "state": {
@@ -8111,7 +8111,7 @@
                 },
                 {
                   "title": "PromptRequest",
-                  "description": "Processes a user prompt within a session.\n\nAcceptance means insertion into the ACP conversation:\n- Receives user messages with optional context (files, images, etc.)\n- Returns the inserted user message's ID without waiting for processing to finish\n\nThe Agent reports the user message with the same ID through `session/update`;\nthis notification may arrive before or after the response. Processing state,\noutput, tool calls, and completion are also reported through session updates.\n\nAn error response means the user message was not inserted. Once it is\ninserted, the Agent MUST NOT answer with an error, even if the work fails\nbefore the response is sent; it ends that work with the `error` stop reason.\n\nSee protocol docs: [Prompt Lifecycle](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle)",
+                  "description": "Processes a user prompt within a session.\n\nAcceptance means adding a logical user message with an ID and a position\nrelative to other messages in the ACP conversation, not receipt or queueing.\nThe Agent MUST return the inserted message's ID without waiting for\nprocessing to finish.\n\nThe Agent reports the user message with the same ID through `session/update`;\nthis notification may arrive before or after the response, but neither may\nprecede insertion. Processing state, output, tool calls, and completion are\nalso reported through session updates.\n\nAn error response means the user message was not inserted. Once it is\ninserted, the Agent MUST NOT answer with an error, even if the work fails\nbefore the response is sent; it ends that work with the `error` stop reason.\n\nA rejected submission produces no user-message updates. Foreground state\nfollows its normal lifecycle independently of the request outcome:\n`running` may precede insertion, and rejection alone does not imply `idle`.\n\nSee protocol docs: [Prompt Lifecycle](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle)",
                   "allOf": [
                     {
                       "$ref": "#/$defs/PromptRequest"
@@ -9020,7 +9020,7 @@
           }
         },
         "replayFrom": {
-          "description": "Inclusive cursor describing where conversation replay should begin.\n\nOptional. Omitted or `null` both mean the Agent should resume without\nreplaying previous conversation history. Replay cursors are inclusive:\nreplay includes the position identified by the cursor. Supplying\n`{ \"type\": \"start\" }` means the Agent should replay all retained\nconversation history before responding.",
+          "description": "Inclusive cursor describing where conversation replay should begin.\n\nOptional. Omitted or `null` both mean the Agent should resume without\nreplaying previous conversation history. Replay cursors are inclusive:\nreplay includes the position identified by the cursor. Supplying\n`{ \"type\": \"start\" }` means the Agent should replay all retained\nconversation history before responding.\n\nAgents MUST reject unsupported cursor types or malformed cursor values\nwith `-32602` (Invalid params), rather than substituting another cursor\nor resuming without replay.",
           "anyOf": [
             {
               "$ref": "#/$defs/ReplayFrom"
@@ -9073,7 +9073,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future replay cursor.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this cursor should preserve the raw\npayload when storing, replaying, proxying, or forwarding requests, and\notherwise reject the request rather than guessing where to replay from.",
+          "description": "Custom or future replay cursor.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nIntermediaries SHOULD preserve the raw payload when storing, replaying,\nproxying, or forwarding requests. Agents that do not support this cursor\nMUST reject the request with `-32602` (Invalid params), rather than\nsubstituting another cursor or resuming without replay.",
           "type": "object",
           "properties": {
             "type": {
@@ -9119,7 +9119,7 @@
       }
     },
     "CloseSessionRequest": {
-      "description": "Request parameters for closing an active session.\n\nThe agent **must** cancel any ongoing work related to the session (treat it\nas if `session/cancel` was called) and then free up any resources associated\nwith the session.",
+      "description": "Request parameters for closing an active session.\n\nThe agent **must** cancel any ongoing work related to the session (treat it\nas if `session/cancel` was called) and then free up any resources associated\nwith the session.\n\nWhen closing cancels active foreground work, the Agent MUST send the final\nupdates for that work and the idle `state_update` with `stopReason: \"cancelled\"`\nbefore responding successfully to `session/close`. Closing an idle session\ndoes not itself require another idle update.\n\nClosing may also cancel pending `session/prompt` requests, including queued\nprompts. If closing prevents a prompt's user message from being inserted, the\nAgent MUST answer that request with `-32800` (Request Cancelled). If the message\nhas already been inserted, the Agent MUST respond successfully with its\n`messageId`. Prompt responses need not precede the close response.",
       "type": "object",
       "properties": {
         "sessionId": {
@@ -10215,7 +10215,7 @@
               "anyOf": [
                 {
                   "title": "CancelSessionNotification",
-                  "description": "Cancels ongoing operations for a session.\n\nThis is a notification sent by the client to cancel active work in a\nsession.\n\nUpon receiving this notification, the Agent SHOULD:\n- Stop all language model requests as soon as possible\n- Abort all tool call invocations in progress\n- Send any pending `session/update` notifications\n- Report an idle `state_update` with `StopReason::Cancelled` after\n  cancellation succeeds\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#cancellation)",
+                  "description": "Cancels ongoing operations for a session.\n\nThis is a notification sent by the client to cancel active work in a\nsession.\n\nUpon receiving this notification, the Agent SHOULD stop all language model\nrequests and all tool call invocations as soon as possible.\n\nAfter all ongoing operations have been successfully aborted and pending\nupdates have been sent, the Agent MUST send an idle `state_update` session\nupdate with the `cancelled` stop reason.\n\nAgents MUST catch errors caused by aborting cancelled work and report the\n`cancelled` stop reason, not `error`.\n\nThe Agent MAY send content or tool call updates after receiving\n`session/cancel`, but MUST send them before the idle `state_update` that\nreports cancellation.\n\nSee protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v2/draft/prompt-lifecycle#cancellation)",
                   "allOf": [
                     {
                       "$ref": "#/$defs/CancelSessionNotification"
