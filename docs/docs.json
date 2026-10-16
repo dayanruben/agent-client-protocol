@@ -228,10 +228,6 @@
             "pages": []
           },
           {
-            "group": "To be removed",
-            "pages": ["rfds/next-edit-suggestions"]
-          },
-          {
             "group": "Completed",
             "pages": [
               "rfds/introduce-rfd-process",

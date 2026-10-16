@@ -128,11 +128,6 @@ mod default_on_null_tests {
                 $check::<v1::SetProviderResponse>();
                 $check::<v1::DisableProviderResponse>();
             }
-            #[cfg(feature = "unstable_nes")]
-            {
-                $check::<v1::StartNesRequest>();
-                $check::<v1::CloseNesResponse>();
-            }
 
             #[cfg(feature = "unstable_protocol_v2")]
             {
@@ -151,11 +146,6 @@ mod default_on_null_tests {
                     $check::<v2::ListProvidersRequest>();
                     $check::<v2::SetProviderResponse>();
                     $check::<v2::DisableProviderResponse>();
-                }
-                #[cfg(feature = "unstable_nes")]
-                {
-                    $check::<v2::StartNesRequest>();
-                    $check::<v2::CloseNesResponse>();
                 }
             }
         };
