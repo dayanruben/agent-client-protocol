@@ -218,7 +218,8 @@
                   "rfds/v2/required-session-methods",
                   "rfds/v2/session-resume-replay",
                   "rfds/v2/diff-file-states",
-                  "rfds/v2/terminal-output"
+                  "rfds/v2/terminal-output",
+                  "rfds/v2/meta-patches"
                 ]
               }
             ]
@@ -226,10 +227,6 @@
           {
             "group": "Preview",
             "pages": []
-          },
-          {
-            "group": "To be removed",
-            "pages": ["rfds/next-edit-suggestions"]
           },
           {
             "group": "Completed",
