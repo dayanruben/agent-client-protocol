@@ -2133,7 +2133,7 @@
             }
           },
           "required": ["mode"],
-          "anyOf": [
+          "oneOf": [
             {
               "title": "Session",
               "description": "Tied to a session, optionally to a specific tool call within that session.",
@@ -2216,7 +2216,7 @@
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "The request this elicitation is tied to.",
+          "description": "The pending Client-to-Agent request this elicitation is tied to.",
           "allOf": [
             {
               "$ref": "#/$defs/RequestId"
@@ -2829,7 +2829,7 @@
           ]
         }
       },
-      "anyOf": [
+      "oneOf": [
         {
           "title": "Session",
           "description": "Tied to a session, optionally to a specific tool call within that session.",
@@ -2873,7 +2873,7 @@
           "format": "uri"
         }
       },
-      "anyOf": [
+      "oneOf": [
         {
           "title": "Session",
           "description": "Tied to a session, optionally to a specific tool call within that session.",
