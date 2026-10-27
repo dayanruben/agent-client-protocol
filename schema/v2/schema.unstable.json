@@ -1379,6 +1379,12 @@
             }
           ],
           "x-deserialize-default-on-error": true
+        },
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
         }
       },
       "required": ["src"]
@@ -1892,6 +1898,12 @@
         "text": {
           "description": "Patch text in the format named by `format`.",
           "type": "string"
+        },
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
         }
       },
       "required": ["format", "text"]
@@ -2008,6 +2020,12 @@
               "$ref": "#/$defs/ToolCallUpdate"
             }
           ]
+        },
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
         }
       },
       "required": ["toolCall"]
@@ -8441,7 +8459,12 @@
               "const": "cancelled"
             }
           },
-          "required": ["outcome"]
+          "required": ["outcome"],
+          "allOf": [
+            {
+              "$ref": "#/$defs/CancelledPermissionOutcome"
+            }
+          ]
         },
         {
           "description": "The user selected one of the provided options.",
@@ -8497,6 +8520,18 @@
           "additionalProperties": true
         }
       ]
+    },
+    "CancelledPermissionOutcome": {
+      "description": "The session's work was cancelled before the user responded.",
+      "type": "object",
+      "properties": {
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      }
     },
     "SelectedPermissionOutcome": {
       "description": "The user selected one of the provided options.",
