@@ -235,6 +235,16 @@ Each permission option provided to the Client contains:
 
 </ParamField>
 
+### Security
+
+- Clients **SHOULD** describe the operation from the tool call's `kind`, `locations`, and content, present `title` as Agent-authored text, and show commands and paths in full.
+- Agents **SHOULD NOT** give an option a `name` that contradicts its `kind`, and **SHOULD** act on a selected option according to its known `kind`.
+- Automatic approval **SHOULD NOT** rely only on `title` or option `name`.
+- Agents **SHOULD NOT** treat an outcome they don't recognize as approval.
+- Agents **SHOULD** perform only the operation the approved request described, and **SHOULD** request again if the command or resolved target changes.
+- Agents **SHOULD** state the scope of a remembered decision (`allow_always`, `reject_always`) in the option `name` and **SHOULD NOT** apply it beyond that scope.
+- Agents **SHOULD NOT** switch to a mode or configuration that reduces user oversight without user action.
+
 ## Status
 
 Tool calls progress through different statuses during their lifecycle:
@@ -338,3 +348,5 @@ Tool calls can report file locations they're working with, enabling Clients to i
   integer. Omission and `null` are equivalent and mean no specific line was
   provided.
 </ParamField>
+
+Locations are display metadata and do not grant file access. Clients **SHOULD NOT** automatically open locations outside the session's [root set](/protocol/v1/draft/session-setup#workspace-root-security).

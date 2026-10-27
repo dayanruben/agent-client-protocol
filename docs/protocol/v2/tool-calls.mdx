@@ -359,6 +359,15 @@ Custom or future permission option kinds can be used as UI hints. Custom kinds *
 
 </ParamField>
 
+### Security
+
+- Clients **SHOULD** describe the operation from `subject`, present `title` as Agent-authored text, and show commands and paths in full.
+- Agents **SHOULD NOT** give an option a `name` that contradicts its `kind`, and **SHOULD** act on a selected option according to its known `kind`.
+- Automatic approval **SHOULD NOT** rely only on `title`, `description`, or option `name`. Unless the user's policy allows all requests, it **SHOULD NOT** allow a request with an absent or unknown subject.
+- Agents **SHOULD** perform only the operation the approved request described, and **SHOULD** request again if the command or resolved target changes.
+- Agents **SHOULD** state the scope of a remembered decision (`allow_always`, `reject_always`) in the option `name` and **SHOULD NOT** apply it beyond that scope.
+- Agents **SHOULD NOT** switch to a configuration that reduces user oversight without user action.
+
 ## Status
 
 Tool calls progress through different statuses during their lifecycle:
@@ -489,6 +498,8 @@ sequences, so decoders retain parser state across chunks. Optional nullable
 `_meta` is chunk-scoped; omission and `null` both mean no chunk metadata was
 provided.
 
+Terminal output is Agent content. Clients **SHOULD** render it so that it cannot write the clipboard, send input or query responses, or open links without user action, and sanitizers **SHOULD** keep state across chunks.
+
 ### Diffs
 
 File modifications shown as diffs. A diff always includes structured file
@@ -591,6 +602,8 @@ update or symlink target change:
 }
 ```
 
+Clients **SHOULD** show affected paths from `changes`, not from `patch` headers.
+
 ## Following the Agent
 
 Tool calls can report file locations they're working with, enabling Clients to implement "follow-along" features that track which files the Agent is accessing or modifying in real-time.
@@ -611,3 +624,5 @@ Tool calls can report file locations they're working with, enabling Clients to i
   integer. Omission and `null` are equivalent and mean no specific line was
   provided.
 </ParamField>
+
+Locations are display metadata and do not grant file access. Clients **SHOULD NOT** automatically open locations outside the session's [root set](/protocol/v2/session-setup#workspace-root-security).
