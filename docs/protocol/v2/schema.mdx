@@ -731,6 +731,12 @@ Sets the current value for a session configuration option.
 
 Request parameters for setting a session configuration option.
 
+Agents MUST support this method for any session where they advertise config options.
+Agents MUST reject an unknown `configId` or invalid value with `-32602` and leave the
+configuration unchanged.
+
+See protocol docs: [Session Config Options](https://agentclientprotocol.com/protocol/v2/session-config-options#setting-a-config-option)
+
 **Type:** Union
 
 **Shared properties:**
@@ -792,6 +798,9 @@ Custom or future session configuration option value payload.
 Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
+
+Agents MUST reject a `session/set_config_option` request with a value type
+they do not support with `-32602`.
 
 <Expandable title="Properties">
 
@@ -934,7 +943,7 @@ Form-based elicitation where the client renders a form from the provided schema.
 
 </Expandable>
 
-**Alternatives (`anyOf`):**
+**Alternatives (`oneOf`):**
 
 <ResponseField name="Session">
 Tied to a session, optionally to a specific tool call within that session.
@@ -966,7 +975,7 @@ Tied to a specific JSON-RPC request outside of a session
   type={<a href="#requestid">RequestId</a>}
   required
 >
-  The request this elicitation is tied to.
+  The pending Client-to-Agent request this elicitation is tied to.
 </ResponseField>
 
 </Expandable>
@@ -994,7 +1003,7 @@ URL-based elicitation where the client directs the user to a URL.
 
 </Expandable>
 
-**Alternatives (`anyOf`):**
+**Alternatives (`oneOf`):**
 
 <ResponseField name="Session">
 Tied to a session, optionally to a specific tool call within that session.
@@ -1026,7 +1035,7 @@ Tied to a specific JSON-RPC request outside of a session
   type={<a href="#requestid">RequestId</a>}
   required
 >
-  The request this elicitation is tied to.
+  The pending Client-to-Agent request this elicitation is tied to.
 </ResponseField>
 
 </Expandable>
@@ -1058,7 +1067,7 @@ future ACP variants.
 
 </Expandable>
 
-**Alternatives (`anyOf`):**
+**Alternatives (`oneOf`):**
 
 <ResponseField name="Session">
 Tied to a session, optionally to a specific tool call within that session.
@@ -1090,7 +1099,7 @@ Tied to a specific JSON-RPC request outside of a session
   type={<a href="#requestid">RequestId</a>}
   required
 >
-  The request this elicitation is tied to.
+  The pending Client-to-Agent request this elicitation is tied to.
 </ResponseField>
 
 </Expandable>
@@ -1167,7 +1176,7 @@ future ACP variants.
 
 Agents that do not understand this action should preserve the raw
 payload when storing, replaying, proxying, or forwarding elicitation
-responses. They MUST NOT treat it as a known elicitation action.
+responses, and otherwise MUST handle it as `cancel`.
 
 <Expandable title="Properties">
 
@@ -1795,11 +1804,16 @@ base launch configuration.
 
 ## <span class="font-mono">AvailableCommand</span>
 
-Information about a command.
+A command the agent advertises to the client.
 
-**Type:** Object
+The `type` field acts as the discriminator in the serialized JSON form.
 
-**Properties:**
+**Type:** Union
+
+<ResponseField name="command" type="object">
+A slash command the user can invoke by including it in a prompt.
+
+<Expandable title="Properties">
 
 <ResponseField name="_meta" type={"object | null"} >
   The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -1817,6 +1831,52 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
   Command name (e.g., `create_plan`, `research_codebase`).
+</ResponseField>
+<ResponseField name="type" type={"string"} required>
+  The discriminator value. Must be `"command"`.
+</ResponseField>
+
+</Expandable>
+</ResponseField>
+
+<ResponseField name="other" type="object">
+Custom or future command kind.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+Clients that do not understand this command type should preserve the raw
+payload when storing, replaying, proxying, or forwarding command
+metadata, and otherwise ignore the command or display it as a plain
+command using its `name` and `description`.
+
+<Expandable title="Properties">
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+
+</ResponseField>
+<ResponseField name="description" type={"string"} required>
+  Human-readable description of what the command does.
+</ResponseField>
+<ResponseField name="name" type={"string"} required>
+  Command name.
+</ResponseField>
+<ResponseField name="type" type={"string"} required>
+  Custom or future command type.
+
+Values beginning with `_` are reserved for implementation-specific
+extensions. Unknown values that do not begin with `_` are reserved for
+future ACP variants.
+
+</ResponseField>
+
+</Expandable>
 </ResponseField>
 
 ## <span class="font-mono">AvailableCommandInput</span>
@@ -2000,6 +2060,34 @@ Determines which elicitation modes the agent may use.
 Optional. Omitted or `null` both mean the client does not advertise
 elicitation support.
 
+</ResponseField>
+
+## <span class="font-mono">Command</span>
+
+A slash command the user can invoke by including it in a prompt.
+
+The `type` discriminator value is `command`.
+
+**Type:** Object
+
+**Properties:**
+
+<ResponseField name="_meta" type={"object | null"} >
+  The _meta property is reserved by ACP to allow clients and agents to attach additional
+metadata to their interactions. Implementations MUST NOT make assumptions about values at
+these keys.
+
+See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+
+</ResponseField>
+<ResponseField name="description" type={"string"} required>
+  Human-readable description of what the command does.
+</ResponseField>
+<ResponseField name="input" type={<><span><a href="#availablecommandinput">AvailableCommandInput</a></span><span> | null</span></>} >
+  Input for the command if required
+</ResponseField>
+<ResponseField name="name" type={"string"} required>
+  Command name (e.g., `create_plan`, `research_codebase`).
 </ResponseField>
 
 ## <span class="font-mono">CommandPermissionSubject</span>
@@ -2384,7 +2472,9 @@ future ACP variants.
 
 Receivers that do not understand this content block type should preserve
 the raw payload when storing, replaying, proxying, or forwarding content,
-and otherwise ignore it or display it generically.
+and otherwise ignore it or display it generically. Agents MUST reject a
+`session/prompt` request with a content block type they do not support
+with `-32602`.
 
 <Expandable title="Properties">
 
@@ -2912,7 +3002,7 @@ Tied to a specific JSON-RPC request outside of a session
   type={<a href="#requestid">RequestId</a>}
   required
 >
-  The request this elicitation is tied to.
+  The pending Client-to-Agent request this elicitation is tied to.
 </ResponseField>
 
 </Expandable>
@@ -3258,7 +3348,7 @@ Request-scoped elicitation, tied to a specific JSON-RPC request outside of a ses
   type={<a href="#requestid">RequestId</a>}
   required
 >
-  The request this elicitation is tied to.
+  The pending Client-to-Agent request this elicitation is tied to.
 </ResponseField>
 
 ## <span class="font-mono">ElicitationSchema</span>
@@ -3417,7 +3507,7 @@ Tied to a specific JSON-RPC request outside of a session
   type={<a href="#requestid">RequestId</a>}
   required
 >
-  The request this elicitation is tied to.
+  The pending Client-to-Agent request this elicitation is tied to.
 </ResponseField>
 
 </Expandable>
@@ -4178,7 +4268,8 @@ future ACP variants.
 
 Receivers that do not understand this transport should preserve the raw
 payload when storing, replaying, proxying, or forwarding session setup
-data, and otherwise ignore it or reject the server configuration.
+data. Agents MUST reject a request with a transport they do not support
+with `-32602`.
 
 <Expandable title="Properties">
 
@@ -5006,28 +5097,18 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 ## <span class="font-mono">RequestId</span>
 
-JSON RPC Request Id
+A JSON-RPC request ID: a string or an integer. Unlike base JSON-RPC, it MUST NOT be `null`.
 
-An identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is not included it is assumed to be a notification. The value SHOULD normally not be Null \[1\] and Numbers SHOULD NOT contain fractional parts \[2\]
-
-The Server MUST reply with the same value in the Response object if included. This member is used to correlate the context between the two objects.
-
-\[1\] The use of Null as a value for the id member in a Request object is discouraged, because this specification uses a value of Null for Responses with an unknown id. Also, because JSON-RPC 1.0 uses an id value of Null for Notifications this could cause confusion in handling.
-
-\[2\] Fractional parts may be problematic, since many decimal fractions cannot be represented exactly as binary fractions.
+The receiver MUST reply with the same value in the response.
 
 **Type:** Union
 
-<ResponseField name="null" type="null">
-  The JSON-RPC `null` request id.
-</ResponseField>
-
 <ResponseField name="Number" type="int64">
-  A numeric JSON-RPC request id.
+  A numeric request ID.
 </ResponseField>
 
 <ResponseField name="Str" type="string">
-  A string JSON-RPC request id.
+  A string request ID.
 </ResponseField>
 
 ## <span class="font-mono">RequestPermissionOutcome</span>

@@ -2587,6 +2587,9 @@ pub enum SessionConfigOptionValue {
     /// Values beginning with `_` are reserved for implementation-specific
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
+    ///
+    /// Agents MUST reject a `session/set_config_option` request with a value type
+    /// they do not support with `-32602`.
     #[serde(untagged)]
     Other(OtherSessionConfigOptionValue),
 }
@@ -2769,6 +2772,12 @@ impl From<&str> for SessionConfigOptionValue {
 }
 
 /// Request parameters for setting a session configuration option.
+///
+/// Agents MUST support this method for any session where they advertise config options.
+/// Agents MUST reject an unknown `configId` or invalid value with `-32602` and leave the
+/// configuration unchanged.
+///
+/// See protocol docs: [Session Config Options](https://agentclientprotocol.com/protocol/session-config-options#setting-a-config-option)
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2912,7 +2921,8 @@ pub enum McpServer {
     ///
     /// Receivers that do not understand this transport should preserve the raw
     /// payload when storing, replaying, proxying, or forwarding session setup
-    /// data, and otherwise ignore it or reject the server configuration.
+    /// data. Agents MUST reject a request with a transport they do not support
+    /// with `-32602`.
     #[serde(untagged)]
     Other(OtherMcpServer),
 }
@@ -6411,23 +6421,26 @@ mod test_serialization {
 
     #[test]
     fn test_session_response_available_commands_roundtrip_with_config_options() {
-        use super::super::{AvailableCommandInput, TextCommandInput};
+        use super::super::{AvailableCommandInput, Command, TextCommandInput};
 
         let commands = vec![
-            AvailableCommand::new("web", "Search the web")
-                .input(AvailableCommandInput::Text(TextCommandInput::new("Query"))),
-            AvailableCommand::new("test", "Run project tests"),
+            AvailableCommand::Command(
+                Command::new("web", "Search the web")
+                    .input(AvailableCommandInput::Text(TextCommandInput::new("Query"))),
+            ),
+            AvailableCommand::Command(Command::new("test", "Run project tests")),
         ];
         let mut expected = json!({
             "sessionId": "sess",
             "configOptions": [test_config_option()],
             "availableCommands": [
                 {
+                    "type": "command",
                     "name": "web",
                     "description": "Search the web",
                     "input": { "type": "text", "hint": "Query" }
                 },
-                { "name": "test", "description": "Run project tests" }
+                { "type": "command", "name": "test", "description": "Run project tests" }
             ]
         });
 
@@ -6466,7 +6479,8 @@ mod test_serialization {
 
     #[test]
     fn test_session_response_available_commands_deserialize_missing_null_and_invalid() {
-        let command = AvailableCommand::new("test", "Run project tests");
+        let command =
+            AvailableCommand::Command(super::super::Command::new("test", "Run project tests"));
         let config_options = vec![test_config_option()];
 
         for (commands, expected) in [
@@ -6476,6 +6490,10 @@ mod test_serialization {
             (Some(json!("oops")), vec![]),
             (Some(json!({})), vec![]),
             (Some(json!([null, {}, { "name": "invalid" }])), vec![]),
+            (
+                Some(json!([{ "name": "test", "description": "Run project tests" }])),
+                vec![],
+            ),
             (
                 Some(json!([null, command, { "name": "invalid" }])),
                 vec![command.clone()],

@@ -298,10 +298,18 @@
             "type": "object",
             "properties": {
               "id": {
-                "description": "The id of the request this response answers.",
-                "allOf": [
+                "description": "The id of the request this response answers.\n\nRequired. `null` only when the request's id could not be determined, such as\nfor a parse error or an invalid request.",
+                "anyOf": [
                   {
-                    "$ref": "#/$defs/RequestId"
+                    "title": "Number",
+                    "description": "A numeric request ID.",
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  {
+                    "title": "Str",
+                    "description": "A string request ID.",
+                    "type": "string"
                   }
                 ]
               },
@@ -442,10 +450,18 @@
             "type": "object",
             "properties": {
               "id": {
-                "description": "The id of the request this response answers.",
-                "allOf": [
+                "description": "The id of the request this response answers.\n\nRequired. `null` only when the request's id could not be determined, such as\nfor a parse error or an invalid request.",
+                "anyOf": [
                   {
-                    "$ref": "#/$defs/RequestId"
+                    "title": "Number",
+                    "description": "A numeric request ID.",
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  {
+                    "title": "Str",
+                    "description": "A string request ID.",
+                    "type": "string"
                   }
                 ]
               },
@@ -576,22 +592,17 @@
       "x-docs-ignore": true
     },
     "RequestId": {
-      "description": "JSON RPC Request Id\n\nAn identifier established by the Client that MUST contain a String, Number, or NULL value if included. If it is not included it is assumed to be a notification. The value SHOULD normally not be Null \\[1\\] and Numbers SHOULD NOT contain fractional parts \\[2\\]\n\nThe Server MUST reply with the same value in the Response object if included. This member is used to correlate the context between the two objects.\n\n\\[1\\] The use of Null as a value for the id member in a Request object is discouraged, because this specification uses a value of Null for Responses with an unknown id. Also, because JSON-RPC 1.0 uses an id value of Null for Notifications this could cause confusion in handling.\n\n\\[2\\] Fractional parts may be problematic, since many decimal fractions cannot be represented exactly as binary fractions.",
+      "description": "A JSON-RPC request ID: a string or an integer. Unlike base JSON-RPC, it MUST NOT be `null`.\n\nThe receiver MUST reply with the same value in the response.",
       "anyOf": [
         {
-          "title": "Null",
-          "description": "The JSON-RPC `null` request id.",
-          "type": "null"
-        },
-        {
           "title": "Number",
-          "description": "A numeric JSON-RPC request id.",
+          "description": "A numeric request ID.",
           "type": "integer",
           "format": "int64"
         },
         {
           "title": "Str",
-          "description": "A string JSON-RPC request id.",
+          "description": "A string request ID.",
           "type": "string"
         }
       ]
@@ -1090,7 +1101,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future content block.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content block type should preserve\nthe raw payload when storing, replaying, proxying, or forwarding content,\nand otherwise ignore it or display it generically.",
+          "description": "Custom or future content block.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content block type should preserve\nthe raw payload when storing, replaying, proxying, or forwarding content,\nand otherwise ignore it or display it generically. Agents MUST reject a\n`session/prompt` request with a content block type they do not support\nwith `-32602`.",
           "type": "object",
           "properties": {
             "type": {
@@ -2176,7 +2187,7 @@
             }
           },
           "required": ["mode"],
-          "anyOf": [
+          "oneOf": [
             {
               "title": "Session",
               "description": "Tied to a session, optionally to a specific tool call within that session.",
@@ -2259,7 +2270,7 @@
       "type": "object",
       "properties": {
         "requestId": {
-          "description": "The request this elicitation is tied to.",
+          "description": "The pending Client-to-Agent request this elicitation is tied to.",
           "allOf": [
             {
               "$ref": "#/$defs/RequestId"
@@ -2872,7 +2883,7 @@
           ]
         }
       },
-      "anyOf": [
+      "oneOf": [
         {
           "title": "Session",
           "description": "Tied to a session, optionally to a specific tool call within that session.",
@@ -2916,7 +2927,7 @@
           "format": "uri"
         }
       },
-      "anyOf": [
+      "oneOf": [
         {
           "title": "Session",
           "description": "Tied to a session, optionally to a specific tool call within that session.",
@@ -3154,10 +3165,18 @@
           "type": "object",
           "properties": {
             "id": {
-              "description": "The id of the request this response answers.",
-              "allOf": [
+              "description": "The id of the request this response answers.\n\nRequired. `null` only when the request's id could not be determined, such as\nfor a parse error or an invalid request.",
+              "anyOf": [
                 {
-                  "$ref": "#/$defs/RequestId"
+                  "title": "Number",
+                  "description": "A numeric request ID.",
+                  "type": "integer",
+                  "format": "int64"
+                },
+                {
+                  "title": "Str",
+                  "description": "A string request ID.",
+                  "type": "string"
                 }
               ]
             },
@@ -4378,37 +4397,66 @@
       "required": ["currentValue"]
     },
     "AvailableCommand": {
-      "description": "Information about a command.",
-      "type": "object",
-      "properties": {
-        "name": {
-          "description": "Command name (e.g., `create_plan`, `research_codebase`).",
-          "type": "string"
-        },
-        "description": {
-          "description": "Human-readable description of what the command does.",
-          "type": "string"
-        },
-        "input": {
-          "description": "Input for the command if required",
-          "anyOf": [
-            {
-              "$ref": "#/$defs/AvailableCommandInput"
-            },
-            {
-              "type": "null"
+      "description": "A command the agent advertises to the client.\n\nThe `type` field acts as the discriminator in the serialized JSON form.",
+      "anyOf": [
+        {
+          "description": "A slash command the user can invoke by including it in a prompt.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "command"
             }
-          ],
-          "x-deserialize-default-on-error": true
+          },
+          "required": ["type"],
+          "allOf": [
+            {
+              "$ref": "#/$defs/Command"
+            }
+          ]
         },
-        "_meta": {
-          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
-          "type": ["object", "null"],
-          "x-deserialize-default-on-error": true,
+        {
+          "title": "other",
+          "description": "Custom or future command kind.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this command type should preserve the raw\npayload when storing, replaying, proxying, or forwarding command\nmetadata, and otherwise ignore the command or display it as a plain\ncommand using its `name` and `description`.",
+          "type": "object",
+          "properties": {
+            "type": {
+              "description": "Custom or future command type.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
+              "type": "string"
+            },
+            "name": {
+              "description": "Command name.",
+              "type": "string"
+            },
+            "description": {
+              "description": "Human-readable description of what the command does.",
+              "type": "string"
+            },
+            "_meta": {
+              "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+              "type": ["object", "null"],
+              "x-deserialize-default-on-error": true,
+              "additionalProperties": true
+            }
+          },
+          "required": ["type", "name", "description"],
+          "not": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "command"
+                  }
+                },
+                "required": ["type"]
+              }
+            ]
+          },
           "additionalProperties": true
         }
-      },
-      "required": ["name", "description"]
+      ]
     },
     "AvailableCommandInput": {
       "description": "The input specification for a command.",
@@ -4474,6 +4522,39 @@
         }
       },
       "required": ["hint"]
+    },
+    "Command": {
+      "description": "A slash command the user can invoke by including it in a prompt.\n\nThe `type` discriminator value is `command`.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Command name (e.g., `create_plan`, `research_codebase`).",
+          "type": "string"
+        },
+        "description": {
+          "description": "Human-readable description of what the command does.",
+          "type": "string"
+        },
+        "input": {
+          "description": "Input for the command if required",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AvailableCommandInput"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "x-deserialize-default-on-error": true
+        },
+        "_meta": {
+          "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Implementations MUST NOT make assumptions about values at\nthese keys.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/draft/extensibility)",
+          "type": ["object", "null"],
+          "x-deserialize-default-on-error": true,
+          "additionalProperties": true
+        }
+      },
+      "required": ["name", "description"]
     },
     "ListSessionsResponse": {
       "description": "Response from listing sessions.",
@@ -7613,7 +7694,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future MCP server transport configuration.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this transport should preserve the raw\npayload when storing, replaying, proxying, or forwarding session setup\ndata, and otherwise ignore it or reject the server configuration.",
+          "description": "Custom or future MCP server transport configuration.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this transport should preserve the raw\npayload when storing, replaying, proxying, or forwarding session setup\ndata. Agents MUST reject a request with a transport they do not support\nwith `-32602`.",
           "type": "object",
           "properties": {
             "type": {
@@ -8094,7 +8175,7 @@
       "x-method": "session/close"
     },
     "SetSessionConfigOptionRequest": {
-      "description": "Request parameters for setting a session configuration option.",
+      "description": "Request parameters for setting a session configuration option.\n\nAgents MUST support this method for any session where they advertise config options.\nAgents MUST reject an unknown `configId` or invalid value with `-32602` and leave the\nconfiguration unchanged.\n\nSee protocol docs: [Session Config Options](https://agentclientprotocol.com/protocol/v2/draft/session-config-options#setting-a-config-option)",
       "type": "object",
       "properties": {
         "sessionId": {
@@ -8158,7 +8239,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future session configuration option value payload.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.",
+          "description": "Custom or future session configuration option value payload.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nAgents MUST reject a `session/set_config_option` request with a value type\nthey do not support with `-32602`.",
           "type": "object",
           "properties": {
             "type": {
@@ -8296,10 +8377,18 @@
           "type": "object",
           "properties": {
             "id": {
-              "description": "The id of the request this response answers.",
-              "allOf": [
+              "description": "The id of the request this response answers.\n\nRequired. `null` only when the request's id could not be determined, such as\nfor a parse error or an invalid request.",
+              "anyOf": [
                 {
-                  "$ref": "#/$defs/RequestId"
+                  "title": "Number",
+                  "description": "A numeric request ID.",
+                  "type": "integer",
+                  "format": "int64"
+                },
+                {
+                  "title": "Str",
+                  "description": "A string request ID.",
+                  "type": "string"
                 }
               ]
             },
@@ -8482,7 +8571,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future elicitation action.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nAgents that do not understand this action should preserve the raw\npayload when storing, replaying, proxying, or forwarding elicitation\nresponses. They MUST NOT treat it as a known elicitation action.",
+          "description": "Custom or future elicitation action.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nAgents that do not understand this action should preserve the raw\npayload when storing, replaying, proxying, or forwarding elicitation\nresponses, and otherwise MUST handle it as `cancel`.",
           "type": "object",
           "properties": {
             "action": {
