@@ -3,7 +3,7 @@
 //! When an LLM determines it needs to interact with external systems—like reading files,
 //! running code, or fetching data—it generates tool calls that the agent executes on its behalf.
 //!
-/// See protocol docs: [Tool Calls](https://agentclientprotocol.com/protocol/tool-calls)
+/// See protocol docs: [Tool Calls](https://agentclientprotocol.com/protocol/v2/tool-calls)
 use std::{collections::BTreeMap, sync::Arc};
 
 use derive_more::{Display, From};
@@ -20,7 +20,7 @@ use crate::{IntoMaybeUndefined, IntoOption, MaybeUndefined};
 /// Tool calls are actions that the agent executes on behalf of the language model,
 /// such as reading files, executing code, or fetching data from external sources.
 ///
-/// Only [`ToolCallUpdate::tool_call_id`] is required. Other fields have patch semantics:
+/// Only `toolCallId` is required. Other fields have patch semantics:
 /// omitted fields leave the existing tool call value unchanged, `null` clears or
 /// unsets the value, and concrete values replace the previous value. For
 /// collection fields, concrete arrays replace the previous collection, and both
@@ -28,7 +28,7 @@ use crate::{IntoMaybeUndefined, IntoOption, MaybeUndefined};
 /// patches the stored metadata by top-level key. When a client receives a tool
 /// call ID it has not seen before, omitted fields use client defaults.
 ///
-/// See protocol docs: [Tool Calls](https://agentclientprotocol.com/protocol/tool-calls)
+/// See protocol docs: [Tool Calls](https://agentclientprotocol.com/protocol/v2/tool-calls)
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -49,17 +49,26 @@ pub struct ToolCallUpdate {
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
     pub name: MaybeUndefined<String>,
     /// Human-readable title describing what the tool is doing.
+    ///
+    /// Omission leaves the title unchanged, `null` unsets it, and a string replaces it.
+    /// A new tool call starts without a title.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
     pub title: MaybeUndefined<String>,
     /// The category of tool being invoked.
     /// Helps clients choose appropriate icons and UI treatment.
+    ///
+    /// Omission leaves the kind unchanged, `null` resets it to `other`, and a value replaces it.
+    /// A new tool call starts as `other`.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
     pub kind: MaybeUndefined<ToolKind>,
     /// Current execution status of the tool call.
+    ///
+    /// Omission leaves the status unchanged, `null` resets it to `pending`, and a value
+    /// replaces it. A new tool call starts as `pending`.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
@@ -92,7 +101,7 @@ pub struct ToolCallUpdate {
     /// stored value without merging nested objects. Beyond this patch rule, implementations
     /// MUST NOT make assumptions about values at these keys.
     ///
-    /// See protocol docs: [Metadata Patches](https://agentclientprotocol.com/protocol/extensibility#metadata-patches)
+    /// See protocol docs: [Metadata Patches](https://agentclientprotocol.com/protocol/v2/extensibility#metadata-patches)
     #[serde_as(deserialize_as = "DefaultOnError<MaybeUndefined<_>>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(
@@ -226,10 +235,10 @@ impl ToolCallUpdate {
 
 /// A streamed item of tool-call content.
 ///
-/// Tool-call content chunks append one [`ToolCallContent`] item to the current
-/// content for the matching [`ToolCallId`]. Agents can use
-/// [`ToolCallUpdate::content`] when they need to replace the whole content
-/// collection instead.
+/// Tool-call content chunks append one `ToolCallContent` item to the current
+/// content for the matching `toolCallId`. Agents can send a `tool_call_update`
+/// with `content` when they need to replace the whole content collection
+/// instead.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -242,10 +251,11 @@ pub struct ToolCallContentChunk {
     /// A single item of content produced by the tool call.
     pub content: ToolCallContent,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys. This field is chunk-scoped.
+    /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
+    /// Implementations MUST NOT make assumptions about values at these keys.
+    /// This metadata is scoped to the chunk and does not patch stored metadata.
     ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
@@ -268,7 +278,7 @@ impl ToolCallContentChunk {
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys. This field is chunk-scoped.
     ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
     pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
         self.meta = meta.into_option();
@@ -303,7 +313,7 @@ impl IntoOption<ToolCallId> for &str {
 /// Tool kinds help clients choose appropriate icons and optimize how they
 /// display tool execution progress.
 ///
-/// See protocol docs: [Creating](https://agentclientprotocol.com/protocol/tool-calls#creating)
+/// See protocol docs: [Reporting](https://agentclientprotocol.com/protocol/v2/tool-calls#reporting)
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -325,7 +335,7 @@ pub enum ToolKind {
     Think,
     /// Retrieving external data.
     Fetch,
-    /// Switching the current session mode.
+    /// Changing the session's mode, a [config option](https://agentclientprotocol.com/protocol/v2/session-config-options) with the `mode` category.
     SwitchMode,
     /// Other tool types (default).
     #[default]
@@ -334,7 +344,7 @@ pub enum ToolKind {
     ///
     /// Values beginning with `_` are reserved for implementation-specific
     /// extensions. Unknown values that do not begin with `_` are reserved for
-    /// future ACP variants.
+    /// future ACP variants. Clients display an unrecognized kind as `other`.
     #[serde(untagged)]
     Unknown(String),
 }
@@ -343,7 +353,7 @@ pub enum ToolKind {
 ///
 /// Tool calls progress through different statuses during their lifecycle.
 ///
-/// See protocol docs: [Status](https://agentclientprotocol.com/protocol/tool-calls#status)
+/// See protocol docs: [Status](https://agentclientprotocol.com/protocol/v2/tool-calls#status)
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -366,6 +376,8 @@ pub enum ToolCallStatus {
     /// Values beginning with `_` are reserved for implementation-specific
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
+    ///
+    /// Clients treat a tool call with an unrecognized status as still in progress.
     #[serde(untagged)]
     Other(String),
 }
@@ -375,7 +387,7 @@ pub enum ToolCallStatus {
 /// Tool calls can produce different types of content including standard
 /// content blocks (text, images), file diffs, or display-only terminals.
 ///
-/// See protocol docs: [Content](https://agentclientprotocol.com/protocol/tool-calls#content)
+/// See protocol docs: [Content](https://agentclientprotocol.com/protocol/v2/tool-calls#content)
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -497,10 +509,10 @@ pub struct Content {
     /// The actual content block.
     pub content: ContentBlock,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
+    /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
+    /// Implementations MUST NOT make assumptions about values at these keys.
     ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
@@ -522,7 +534,7 @@ impl Content {
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
     ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
     pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
         self.meta = meta.into_option();
@@ -537,7 +549,7 @@ impl Content {
 /// and MUST be consistent with `changes`. Agents SHOULD provide `patch` whenever
 /// feasible. Clients MUST handle diffs where `patch` is omitted or `null`.
 ///
-/// See protocol docs: [Content](https://agentclientprotocol.com/protocol/tool-calls#content)
+/// See protocol docs: [Content](https://agentclientprotocol.com/protocol/v2/tool-calls#content)
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -553,17 +565,17 @@ pub struct Diff {
     pub changes: Vec<DiffChange>,
     /// Renderable patch text for some or all of the structured changes.
     ///
-    /// Agents SHOULD provide patch text whenever feasible. Omitted or `null`
-    /// means no renderable patch text was provided.
+    /// Agents SHOULD provide patch text whenever feasible. Omitted and `null` are
+    /// equivalent and mean no renderable patch text was provided.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub patch: Option<DiffPatch>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
+    /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
+    /// Implementations MUST NOT make assumptions about values at these keys.
     ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
@@ -599,7 +611,7 @@ impl Diff {
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
     ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
     pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
         self.meta = meta.into_option();
@@ -608,6 +620,8 @@ impl Diff {
 }
 
 /// Renderable patch text and its format.
+#[serde_as]
+#[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -617,6 +631,16 @@ pub struct DiffPatch {
     pub format: DiffPatchFormat,
     /// Patch text in the format named by `format`.
     pub text: String,
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
+    /// Implementations MUST NOT make assumptions about values at these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
+    #[serde(default)]
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
 }
 
 impl DiffPatch {
@@ -626,11 +650,23 @@ impl DiffPatch {
         Self {
             format: DiffPatchFormat::GitPatch,
             text: text.into(),
+            meta: None,
         }
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
+    /// these keys.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
     }
 }
 
-/// Text patch format used by [`DiffPatch`].
+/// Text patch format used by `DiffPatch`.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -679,7 +715,7 @@ pub enum DiffFileType {
     Other(String),
 }
 
-/// One file-level change described by a [`Diff`].
+/// One file-level change described by a `Diff`.
 ///
 /// Structured change metadata lets clients identify affected files and
 /// operations without parsing the text patch.
@@ -690,16 +726,16 @@ pub enum DiffFileType {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct DiffChange {
-    /// File content kind.
+    /// File content kind after the operation (for `delete`, of the deleted file).
     ///
-    /// Omitted or `null` means the content kind is unknown.
+    /// Omitted and `null` are equivalent and mean the content kind is unknown.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub file_type: Option<DiffFileType>,
-    /// MIME type of the file contents.
+    /// MIME type of the file contents after the operation (for `delete`, of the deleted file).
     ///
-    /// Omitted or `null` means the MIME type is unknown.
+    /// Omitted and `null` are equivalent and mean the MIME type is unknown.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
@@ -708,10 +744,10 @@ pub struct DiffChange {
     #[serde(flatten)]
     pub operation: DiffChangeOperation,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
+    /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
+    /// Implementations MUST NOT make assumptions about values at these keys.
     ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
@@ -767,7 +803,7 @@ impl DiffChange {
 
     /// File content kind.
     ///
-    /// Omitted or `null` means the content kind is unknown.
+    /// Omitted and `null` are equivalent and mean the content kind is unknown.
     #[must_use]
     pub fn file_type(mut self, file_type: impl IntoOption<DiffFileType>) -> Self {
         self.file_type = file_type.into_option();
@@ -776,7 +812,7 @@ impl DiffChange {
 
     /// MIME type of the file contents.
     ///
-    /// Omitted or `null` means the MIME type is unknown.
+    /// Omitted and `null` are equivalent and mean the MIME type is unknown.
     #[must_use]
     pub fn mime_type(mut self, mime_type: impl IntoOption<MediaType>) -> Self {
         self.mime_type = mime_type.into_option();
@@ -787,7 +823,7 @@ impl DiffChange {
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
     ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
     pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
         self.meta = meta.into_option();
@@ -942,7 +978,7 @@ fn other_diff_change_schema(schema: &mut Schema) {
 /// Enables clients to implement "follow-along" features that track
 /// which files the agent is working with in real-time.
 ///
-/// See protocol docs: [Following the Agent](https://agentclientprotocol.com/protocol/tool-calls#following-the-agent)
+/// See protocol docs: [Following the Agent](https://agentclientprotocol.com/protocol/v2/tool-calls#following-the-agent)
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -952,16 +988,17 @@ fn other_diff_change_schema(schema: &mut Schema) {
 pub struct ToolCallLocation {
     /// The absolute file path being accessed or modified.
     pub path: AbsolutePath,
-    /// Optional line number within the file.
+    /// Optional 1-based line number within the file. Omitted and `null` are equivalent and
+    /// mean no specific line; `0` is invalid.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
-    pub line: Option<u32>,
+    pub line: Option<std::num::NonZeroU32>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
+    /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
+    /// Implementations MUST NOT make assumptions about values at these keys.
     ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
@@ -981,9 +1018,11 @@ impl ToolCallLocation {
     }
 
     /// Optional line number within the file.
+    ///
+    /// Line numbers are 1-based; `0` means no specific line.
     #[must_use]
     pub fn line(mut self, line: impl IntoOption<u32>) -> Self {
-        self.line = line.into_option();
+        self.line = line.into_option().and_then(std::num::NonZeroU32::new);
         self
     }
 
@@ -991,7 +1030,7 @@ impl ToolCallLocation {
     /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
     /// these keys.
     ///
-    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/extensibility)
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
     pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
         self.meta = meta.into_option();
@@ -1001,6 +1040,18 @@ impl ToolCallLocation {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn location_line_is_one_based() {
+        let location: ToolCallLocation =
+            serde_json::from_value(serde_json::json!({ "path": "/a.rs", "line": 0 })).unwrap();
+        assert_eq!(location.line, None);
+        let location: ToolCallLocation =
+            serde_json::from_value(serde_json::json!({ "path": "/a.rs", "line": 3 })).unwrap();
+        assert_eq!(location.line.map(std::num::NonZeroU32::get), Some(3));
+        assert_eq!(ToolCallLocation::new("/a.rs").line(0).line, None);
+    }
+
     use super::*;
     use crate::MaybeUndefined;
     use serde_json::{from_value, json, to_value};

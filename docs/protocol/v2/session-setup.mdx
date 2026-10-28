@@ -7,6 +7,8 @@ Sessions represent a specific conversation or thread between the [Client](/proto
 
 Before creating a session, Clients **MUST** first complete the [initialization](/protocol/v2/initialization) phase to establish protocol compatibility and capabilities.
 
+If the Agent requires authentication, session methods may fail with `auth_required` (`-32000`) until the Client completes the [authentication flow](/protocol/v2/authentication).
+
 <br />
 
 ```mermaid
@@ -117,7 +119,7 @@ Agents **MAY** include initial [configuration options](/protocol/v2/session-conf
 }
 ```
 
-`availableCommands` is optional. Omission or `[]` means no initial commands are advertised, and empty lists are omitted when serializing setup responses. Agents **MUST NOT** send `null` for this field. Tolerant receivers treat `null` or a malformed non-array value like omission and skip invalid command items within an array.
+`availableCommands` is optional. Omission or `[]` means no initial commands are advertised, and empty lists are omitted when serializing setup responses. Agents **MUST NOT** send `null` for this field.
 
 Returning commands in the response avoids requiring command notifications before the `session/new` response. Agents can still advertise commands later or update the list through `available_commands_update` notifications. Each notification replaces the complete command list, including `[]` to clear it.
 
@@ -374,14 +376,15 @@ On success, the Agent responds with an empty result object:
 }
 ```
 
-Agents MAY return an error if the session does not exist or is not currently active.
+If the session does not exist or is not active, the Agent **MUST** respond with
+`-32002`. See [Unknown Sessions](/protocol/v2/error#unknown-sessions).
 
 ## Additional Workspace Roots
 
 Agents that advertise `session.additionalDirectories` allow Clients
 to include `additionalDirectories` on supported session lifecycle requests to
-expand the session's effective workspace root set. Supported stable lifecycle
-requests include `session/new` and `session/resume`.
+expand the session's effective workspace root set. The supported stable requests
+are `session/new` and `session/resume`.
 
 ```json
 {
@@ -404,7 +407,7 @@ When present, `additionalDirectories` has the following behavior:
 - `cwd` remains the primary working directory and the base for relative paths
 - each `additionalDirectories` entry **MUST** be an absolute path
 - omitting the field or providing an empty array activates no additional roots for the resulting session
-- on `session/resume`, Clients must send the full intended additional-root list again; that list may differ from any previous or reported list as long as the request `cwd` matches the session's `cwd`, and omitting the field or providing an empty array does not restore stored roots implicitly
+- on `session/resume`, Clients **MUST** send the full intended additional-root list again; that list may differ from any previous or reported list as long as the request `cwd` matches the session's `cwd`, and omitting the field or providing an empty array does not restore stored roots implicitly
 
 Clients **MUST** only send `additionalDirectories` when the Agent advertises `session.additionalDirectories`.
 
@@ -430,11 +433,19 @@ The `cwd` (current working directory) parameter establishes the primary file sys
 
 When `session.additionalDirectories` is in use, the session's effective root set is `[cwd, ...additionalDirectories]`. This root set **SHOULD** serve as a boundary for tool operations on the file system.
 
+### Workspace Root Security
+
+The root set declares the session's scope. It confines shell commands only when a sandbox enforces it.
+
+- Clients **SHOULD** only include directories the user expects the Agent to access, such as the workspace or directories the Client provides, like skills.
+- Agents **SHOULD NOT** treat model output, Agent content, or replayed history as granting access outside the root set. Access outside it goes through a permission request.
+- Implementations that enforce the root set **SHOULD** check the resolved path at the time of use, compare paths by component, and fail closed.
+
 ## MCP Servers
 
 The [Model Context Protocol (MCP)](https://modelcontextprotocol.io) allows Agents to access external tools and data sources. When creating a session, Clients **MAY** include connection details for MCP servers that the Agent should connect to.
 
-MCP servers can be connected to using different transports. Agents advertise supported transports during initialization using `session.mcp.stdio`, `session.mcp.http`, and any extension-specific transport capabilities. Agents **MUST** reject a request with a transport they don't support with `-32602`.
+MCP servers can be connected to using different transports. Agents advertise supported transports during initialization using `session.mcp.stdio`, `session.mcp.http`, and any extension-specific transport capabilities. Agents **MUST** reject a request with a transport they don't support with `-32602`, including a transport they did not advertise and v1's `sse`.
 
 ### Transport Types
 
@@ -466,10 +477,10 @@ When the Agent supports `session.mcp.stdio`, Clients can specify MCP servers con
   values are equivalent.
 
   <Expandable title="EnvVariable">
-      <ParamField path="name" type="string">
+      <ParamField path="name" type="string" required>
         The name of the environment variable.
       </ParamField>
-      <ParamField path="value" type="string">
+      <ParamField path="value" type="string" required>
         The value of the environment variable.
       </ParamField>
   </Expandable>
@@ -513,10 +524,10 @@ When the Agent supports `session.mcp.http`, Clients can specify MCP servers conf
   equivalent.
 
   <Expandable title="HttpHeader">
-      <ParamField path="name" type="string">
+      <ParamField path="name" type="string" required>
         The name of the HTTP header.
       </ParamField>
-      <ParamField path="value" type="string">
+      <ParamField path="value" type="string" required>
         The value to set for the HTTP header.
       </ParamField>
   </Expandable>
@@ -573,6 +584,16 @@ If `session.mcp.stdio` is omitted or `null`, the Agent does not support stdio tr
 If `session.mcp.http` is omitted or `null`, the Agent does not support HTTP transport.
 Supplying `{}` means the Agent supports the corresponding transport.
 
-Agents **SHOULD** connect to all MCP servers specified by the Client.
+Agents **SHOULD** connect to all MCP servers specified by the Client. If a server fails to launch or connect, the Agent either fails the request or continues without that server. If it continues, it **SHOULD** tell the user, for example with a [notice](/protocol/v2/prompt-lifecycle#session-notices).
 
 Clients **MAY** use this ability to provide tools directly to the underlying language model by including their own MCP server.
+
+### Security
+
+MCP server configurations can launch processes, and their `env` and `headers` values are credentials.
+
+- Agents **SHOULD** launch `command` with `args` as separate arguments, without a shell.
+- Clients **SHOULD NOT** send a stdio server from workspace files or Agent output until the user has approved its exact command, arguments, and environment variable names.
+- Agents **SHOULD NOT** include `env` or `headers` values in session updates, errors, `_meta`, `session/list` results, replayed history, model context, or command lines, and **SHOULD NOT** log or persist them.
+- Agents **SHOULD** send `headers` only to the configured origin.
+- Clients that persist `mcpServers` **SHOULD** keep credentials in operating-system secret storage and **SHOULD NOT** log them.
