@@ -264,7 +264,7 @@ The Agent **MAY** request permission from the user before proceeding with an ope
   about the operation. Omitted or `null` means no structured subject was
   provided. Custom or future subject types may appear. Clients that do not
   understand a subject **SHOULD** preserve it when proxying and use the common
-  prompt fields or decline according to policy.
+  prompt fields or decline according to policy with the `cancelled` outcome.
 </ParamField>
 
 Clients apply a `tool_call` subject's `toolCall` to their stored tool call
@@ -337,12 +337,16 @@ When the Client sends [`session/cancel`](/protocol/v2/draft/prompt-lifecycle#can
 }
 ```
 
+Clients also send `cancelled` when the user dismisses the prompt or the Client declines it by policy, including when no `reject_*` option is offered. After a `cancelled` outcome, the Agent **MUST NOT** proceed with the operation.
+
 <ResponseField name="outcome" type="RequestPermissionOutcome" required>
   The user's decision. Known outcomes are `cancelled` when the [active work was
-  cancelled](/protocol/v2/draft/prompt-lifecycle#cancellation), and `selected`
-  with an `optionId` for the selected permission option. Custom or future
-  outcomes may appear; agents that do not understand the outcome **MUST NOT**
-  treat it as approval.
+  cancelled](/protocol/v2/draft/prompt-lifecycle#cancellation), the user
+  dismissed the prompt, or the Client declined it, and `selected` with an
+  `optionId` for the selected permission option. If `optionId` doesn't match an
+  offered option, the Agent **MUST** treat the request as not approved. Custom
+  or future outcomes may appear; agents that do not understand the outcome
+  **MUST NOT** treat it as approval.
 </ResponseField>
 
 ### Permission Options
@@ -350,7 +354,7 @@ When the Client sends [`session/cancel`](/protocol/v2/draft/prompt-lifecycle#can
 Each permission option provided to the Client contains:
 
 <ParamField path="optionId" type="string" required>
-  Unique identifier for this option
+  Identifier for this option. **MUST** be unique within the request.
 </ParamField>
 
 <ParamField path="name" type="string" required>
@@ -524,8 +528,9 @@ sequences, so decoders retain parser state across chunks. Optional nullable
 provided. A chunk for a `terminalId` the Client hasn't seen creates the terminal
 with unknown fields and empty output, then appends to it.
 
-Clients **SHOULD** ignore a chunk or snapshot whose `data` isn't valid base64,
-keeping the bytes they already have. Agents **SHOULD** send all output before a
+Clients **SHOULD** ignore a chunk, or the `output` snapshot of a `terminal_update`,
+whose `data` isn't valid base64, keeping the bytes they already have. The other
+fields of that `terminal_update` still apply. Agents **SHOULD** send all output before a
 concrete `exitStatus`, but Clients still append output that arrives after it.
 Clients **MAY** bound how much output they keep, for example by dropping the
 oldest bytes; a later `output` snapshot replaces whatever they kept.
@@ -593,9 +598,12 @@ Git can produce most of this. With `$ROOT` set to the repository root,
 repository root prepended, with Git's quoting applied to the full path.
 
 Many diff parsers strip one leading path component by default to remove Git's
-`a/` and `b/` prefixes, so configure them not to strip any. Take paths from
-`changes`, or from the `---`, `+++`, rename, and copy lines, rather than by
-splitting the `diff --git` header, which is ambiguous when paths contain spaces.
+`a/` and `b/` prefixes. Don't strip anything from an absolute path, which has no
+such prefix. A Client can still strip a leading `a/` or `b/` from a relative
+path to tolerate Agents that send Git's default output, as long as `changes`
+decides which file a patch belongs to. Take paths from `changes`, or from the
+`---`, `+++`, rename, and copy lines, rather than by splitting the `diff --git`
+header, which is ambiguous when paths contain spaces.
 
 </ParamField>
 

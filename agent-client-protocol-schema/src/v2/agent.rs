@@ -1966,6 +1966,7 @@ pub struct SessionInfo {
     /// by the Agent. Omitted, `null`, and empty values are equivalent: the response
     /// reports no additional roots.
     #[serde_as(deserialize_as = "DefaultOnNull")]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-null" = true)))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub additional_directories: Vec<AbsolutePath>,
 
@@ -3543,9 +3544,11 @@ pub enum StopReason {
     /// prompt and everything that comes after it won't be included in the next
     /// prompt, so this should be reflected in the UI.
     Refusal,
-    /// The client cancelled the work, via `session/cancel` or by closing the
-    /// session. Work the agent stops on its own uses another reason, such as
-    /// `error` for an internal timeout.
+    /// The user or client chose to stop the work: via `session/cancel`, by
+    /// closing the session, or through an interaction the agent offers, such
+    /// as a permission option that tells the agent to stop. Work the agent
+    /// stops for its own reasons uses another reason, such as `error` for an
+    /// internal timeout.
     ///
     /// Agents MUST report this stop reason on an idle `state_update` when
     /// cancellation ends active foreground work, even if aborting causes
