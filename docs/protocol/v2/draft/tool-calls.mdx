@@ -413,6 +413,8 @@ Tool calls progress through different statuses during their lifecycle:
 
 Custom or future status values can be used when Clients can display a generic progress state. Custom status values **MUST** begin with `_`; unknown non-underscore statuses are reserved for future ACP variants. Clients treat a tool call with an unrecognized status as still in progress.
 
+`completed`, `failed`, and `cancelled` are final. When foreground work ends, whether it finished, was [cancelled](/protocol/v2/draft/prompt-lifecycle#cancellation), or failed, the Agent **SHOULD** give each of that work's unfinished tool calls a final status. If a tool call's [permission request](#requesting-permission) is rejected or answered with `cancelled`, the Agent reports the tool call as `cancelled` or `failed` rather than leaving it `pending`.
+
 ## Content
 
 Tool calls can produce different types of content:
@@ -484,8 +486,7 @@ empty.
 - `cwd` is the command's working directory and **MUST** be absolute when
   supplied.
 - `size` is the terminal size the command runs with, in character cells, with
-  required `cols` and `rows`. It is optional; when present, Clients **SHOULD**
-  render output at this size so that column layouts, progress bars, and
+  required `cols` and `rows`. It is optional; when present, Clients can render output at this size so that column layouts, progress bars, and
   cursor-positioned output display as the program wrote them. Without it,
   Clients choose a size.
 - `output` is an authoritative replacement snapshot. Its required `data` is
@@ -549,8 +550,7 @@ be consistent with `changes`: it describes only those paths and operations. Agen
 `patch` is omitted or `null`, and **SHOULD** follow `changes` when `patch`
 disagrees with it.
 
-A diff describes each file's change from its state before the change. Each path
-appears in at most one entry of `changes`. A move or copy that also edits the
+A diff describes each file's change from its state before the change. Each `path` value appears in at most one entry of `changes`. A move or copy's `oldPath` may also appear as another entry's `path`, for example a file copied and then edited, or a file moved and replaced by a new one. A move or copy that also edits the
 file is a single `move` or `copy` entry, with the edits in `patch`.
 
 ```json
@@ -588,14 +588,14 @@ file is a single `move` or `copy` entry, with the edits in `patch`.
   **MUST NOT** have a prefix such as Git's default `a/` and `b/`. Otherwise paths
   follow Git: `/dev/null` names the missing side of an added or deleted file in
   the `---` and `+++` lines, and paths with unusual characters are [quoted as Git
-  quotes them](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corequotePath).
+  quotes them](https://git-scm.com/docs/git-config#Documentation/git-config.txt-corequotePath). Each path, once unquoted, is the same native absolute path string as the matching `changes` entry, for example `C:\repo\src\a.rs` on Windows.
   Surrounding commit metadata and email envelopes **MUST NOT** be included.
 
 Git can produce most of this. With `$ROOT` set to the repository root,
 `git diff --src-prefix="$ROOT/" --dst-prefix="$ROOT/"` writes absolute
 `diff --git`, `---`, and `+++` lines. Git never prefixes `rename from`,
 `rename to`, `copy from`, or `copy to` paths, so those still need the
-repository root prepended, with Git's quoting applied to the full path.
+repository root prepended, with Git's quoting applied to the full path. On Windows, Git still writes `/` after the root (`C:\repo/src/a.rs`), so Agents convert those paths to native separators before quoting.
 
 Many diff parsers strip one leading path component by default to remove Git's
 `a/` and `b/` prefixes. Don't strip anything from an absolute path, which has no

@@ -91,11 +91,10 @@ Protocol object types that define a `_meta` field can use it to attach custom in
 }
 ```
 
-Clients may propagate fields to the agent for correlation purposes, such as `requestId`. The following root-level keys in `_meta` **SHOULD** be reserved for [W3C trace context](https://www.w3.org/TR/trace-context/) to guarantee interop with existing MCP implementations and OpenTelemetry tooling:
+Clients may propagate fields to the agent for correlation purposes, using a namespaced key such as `com.example/requestId`. The following root-level keys in `_meta` are reserved, as in MCP, for interop with MCP implementations and OpenTelemetry tooling. When present, their values **MUST** use the corresponding W3C format:
 
-- `traceparent`
-- `tracestate`
-- `baggage`
+- `traceparent` and `tracestate`: [W3C Trace Context](https://www.w3.org/TR/trace-context/)
+- `baggage`: [W3C Baggage](https://www.w3.org/TR/baggage/)
 
 Implementations **MUST NOT** add any custom fields at the root of a type that's part of the specification. All possible names are reserved for future protocol versions.
 
@@ -144,7 +143,7 @@ the stored `_meta` becomes:
 
 A key set to `null` never holds stored data, including on the first update for an entity, so a key cannot store a literal JSON `null`; an extension that needs one can wrap it, for example `{ "value": null }`. Stored metadata with no keys is the same as no metadata. Because each top-level key is replaced whole, the implementation that owns a key, such as an extension using a namespaced key, can set, replace, or remove it without knowing the other keys. This does not resolve conflicts between writers: updates to the same key apply in receive order, and `_meta: null` clears every key.
 
-Replay and resynchronization apply these patches exactly as live delivery does and never reset metadata implicitly. An update that replaces another field, such as a message update with `content`, leaves the `_meta` keys it does not mention. To send the current metadata of an entity the Client may already hold, the Agent removes stale keys: it either sets each one to `null` alongside the current keys, or sends `_meta: null` and then the current object in a later update. The second form is not atomic, even within a JSON-RPC batch, so the Client may briefly hold no metadata. Send `_meta: null`, not `{}`, when the current metadata is empty. Intermediaries that combine updates **MUST** keep removals and clears.
+Replay and resynchronization apply these patches exactly as live delivery does and never reset metadata implicitly. An update that replaces another field, such as a message update with `content`, leaves the `_meta` keys it does not mention. To send the current metadata of an entity the Client may already hold, the Agent removes stale keys: it either sets each one to `null` alongside the current keys, or sends `_meta: null` and then the current object in a later update. The second form is not atomic, so the Client may briefly hold no metadata. Send `_meta: null`, not `{}`, when the current metadata is empty. Intermediaries that combine updates **MUST** keep removals and clears.
 
 Other `_meta` fields are not patches, including the `_meta` of `plan_update`. Metadata on requests, responses, notification params, chunks, content items, snapshots, and other nested objects describes only the object that carries it, and a key set to `null` there is ordinary data. Do not copy such metadata into a patch unchanged, for example from a `session/list` entry into a `session_info_update`: its `null` key values would become removals. Put data about a single notification, rather than the entity, in the `session/update` notification's `params._meta`.
 
@@ -158,7 +157,7 @@ Ignoring an unknown property means not interpreting it. Implementations are not 
 
 ## Extension Methods
 
-The protocol reserves any method name starting with an underscore (`_`) for custom extensions. This allows implementations to add new functionality without the risk of conflicting with future protocol versions.
+The protocol reserves any method name starting with an underscore (`_`) for custom extensions. This allows implementations to add new functionality without the risk of conflicting with future protocol versions. Names starting with `$/` are reserved for protocol-level messages such as [`$/cancel_request`](/protocol/v2/cancellation), and all other names are reserved for ACP.
 
 Extension methods follow standard [JSON-RPC 2.0](https://www.jsonrpc.org/specification) semantics:
 
@@ -224,7 +223,7 @@ Custom notifications are regular JSON-RPC notifications that start with an under
 }
 ```
 
-Unlike with custom requests, implementations **SHOULD** ignore unrecognized notifications.
+Unlike with custom requests, implementations **SHOULD** ignore any notification they don't recognize, whether it is custom or from a later ACP version.
 
 ## Enum and Tagged-Union Variants
 
@@ -235,7 +234,12 @@ ACP also reserves `_`-prefixed values for implementation-specific extensions in 
 - Extensions **MUST NOT** define custom non-underscore values.
 - Implementations **MUST NOT** treat unknown non-underscore values as custom extensions.
 
-This rule applies only where the schema defines a fallback path. Closed discriminators can still reject unknown values when the receiver cannot safely continue without understanding the variant.
+This rule applies only where the schema defines a fallback path. Most enums and tagged unions have one. The following are closed, and receivers reject values outside them:
+
+- `ElicitationSchema.type`, which is always `object`.
+- Embedded resource contents, which are text or blob contents, as in MCP.
+- Select config option `options`, which are a flat list of values or a list of groups.
+- The elicitation scope, which is either `sessionId` or `requestId`.
 
 When storing, replaying, proxying, or forwarding data, implementations **SHOULD** preserve unknown values and any raw tagged-union payloads. When displaying an unknown value, implementations **SHOULD** fall back to generic UI behavior that matches the field's purpose.
 

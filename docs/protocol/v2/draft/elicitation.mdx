@@ -51,8 +51,12 @@ This deliberately differs from MCP 2026-07-28, where an
 empty elicitation capability retains the original form-only meaning. ACP
 requires each supported mode to be explicit.
 
+An Agent that forwards elicitation for an MCP server **MUST NOT** copy the Client's capability object to that server unchanged. It advertises each mode the Client supports explicitly, and omits the MCP `elicitation` capability when the Client advertises no modes.
+
 Agents **MUST NOT** request a mode the Client has not advertised. Agents
 **SHOULD** provide a graceful fallback when the required mode is unavailable.
+
+If an Agent sends `elicitation/create` anyway, a Client with no `elicitation` capability (omitted or `null`) responds with `-32601`, as for any [capability-gated method](/protocol/v2/draft/error#unknown-methods) it did not advertise. A Client that advertised `elicitation` but not the requested mode responds with `-32602` (Invalid params).
 
 ## Creating an elicitation
 
@@ -135,8 +139,7 @@ optional `required`, `title`, and `description`. Each property is one of:
 
 Every property may also have `title` and `description`. `pattern` uses
 ECMA-262 regular expression syntax, as in JSON Schema. Clients treat an unknown
-`format` as plain text. Accepted `content` maps each property name to a string,
-number, boolean, or array of strings.
+`format` as plain text. Accepted `content` maps each answered property name to its value: a string for text and single-select properties, a number for `number` and `integer`, a boolean for `boolean`, and an array of strings for multi-select. Unanswered properties are omitted, not set to `null`. Custom or future property types may use other JSON values.
 
 Clients **SHOULD** validate submitted values before responding, and Agents
 **SHOULD** validate them again.
@@ -179,7 +182,7 @@ fall back to form mode; it **MUST** use another safe flow or fail the operation.
 An `accept` response means the user consented to open the URL. It does not mean
 the external interaction completed.
 
-URL mode is not a substitute for authorizing the Client's access to the Agent.
+URL mode is not a substitute for authorizing the Client's access to the Agent. An Agent can still use it during `auth/login` to sign in to its own provider.
 Agents **MUST NOT** send credentials or tokens obtained through URL mode back
 over ACP or place them in Client or model context.
 
@@ -195,8 +198,7 @@ Agents **MUST** handle an unknown action as `cancel`.
 
 The `content` field is optional on `accept`; receivers treat omission and `null`
 equivalently. It is only meaningful for `accept`; receivers ignore it for
-`decline` and `cancel`. For an accepted form elicitation, `content` **SHOULD**
-conform to the requested schema. For an accepted URL elicitation, clients
+`decline` and `cancel`. For an accepted form elicitation, `content` **SHOULD** conform to the requested schema. Receivers accept any JSON value in `content` and validate it against the schema, so an unexpected value invalidates only that property, not the whole response. For an accepted URL elicitation, clients
 normally omit `content` because the interaction happens out of band.
 
 Agents **MUST NOT** assume an elicitation succeeds. They **MUST** handle
@@ -212,10 +214,7 @@ connection, and the Client **MUST** treat it as opaque. The Agent **MAY** send
 `elicitation/complete` after the external interaction finishes. It **MUST**
 send that notification only to the same Client that received the original
 request and include the original `elicitationId`. Clients **MUST** ignore
-unknown or already-completed IDs.
-
-Requests using a mode the Client has not advertised produce JSON-RPC `-32602`
-(Invalid params).
+unknown or already-completed IDs. On receiving it, Clients **MAY** retry the original operation, update the UI, or otherwise continue. They **SHOULD** still let the user retry or cancel if the notification never arrives.
 
 ## Session Cancellation
 
@@ -264,8 +263,7 @@ rules to ACP.
 - Clients **SHOULD NOT** render a URL as clickable in any elicitation field
   except the `url` field of a URL-mode request, subject to the restrictions
   above.
-- The Agent **MUST** verify that the authenticated user who started the
-  elicitation is the same user who completes the external interaction.
+- When the Agent has an authenticated user, it **MUST** verify that the user who started the elicitation is the same user who completes the external interaction. Without one, such as during `auth/login`, the Agent **MUST** tie completion to the elicitation it issued and the connection it issued it on, for example with an unguessable single-use `state` value in the URL, and **MUST NOT** apply the result to a different connection.
 
 See the [schema reference](/protocol/v2/draft/schema#elicitation%2Fcreate) for
 the complete request and response types.

@@ -197,7 +197,6 @@
             "pages": [
               "rfds/session-fork",
               "rfds/proxy-chains",
-              "rfds/diff-delete",
               "rfds/custom-llm-endpoint",
               "rfds/plan-operations",
               "rfds/end-turn-token-usage",
@@ -230,7 +229,8 @@
                   "rfds/v2/session-resume-replay",
                   "rfds/v2/diff-file-states",
                   "rfds/v2/terminal-output",
-                  "rfds/v2/meta-patches"
+                  "rfds/v2/meta-patches",
+                  "rfds/v2/background-work"
                 ]
               }
             ]

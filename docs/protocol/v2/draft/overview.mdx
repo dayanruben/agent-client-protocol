@@ -16,9 +16,9 @@ Unlike base JSON-RPC, request IDs **MUST** be a string or an integer, never
 `null`. An error response has `id: null` only when the request ID could not be
 determined.
 
-ACP follows JSON-RPC 2.0 batch behavior. See
-[Transports](/protocol/v2/draft/transports#json-rpc-batch-messages) for batch
-handling requirements.
+Both sides send requests, and each side chooses IDs for its own requests independently, so the same ID can be in use in both directions. A sender **MUST NOT** reuse an ID while a request with that ID is still awaiting a response.
+
+Unlike base JSON-RPC, ACP does not use batches. See [Transports](/protocol/v2/draft/transports#no-batches).
 
 ## Message Flow
 
@@ -57,7 +57,7 @@ Agents are programs that use generative AI to autonomously modify code. They typ
 
 ### Baseline Methods
 
-Some baseline methods belong to optional surfaces. An Agent that returns one or more valid entries in `authMethods` **MUST** implement both `auth/login` and `auth/logout`. If `authMethods` is omitted or empty, Clients **MUST NOT** call either method. The `session/*` methods require `capabilities.session`.
+Some baseline methods belong to optional surfaces. An Agent that returns a non-empty `authMethods` list **MUST** implement both `auth/login` and `auth/logout`. If `authMethods` is omitted or empty, Clients **MUST NOT** call either method. The `session/*` methods require `capabilities.session`.
 
 <ResponseField
   name="initialize"
@@ -214,7 +214,7 @@ Either side can send [`$/cancel_request`](/protocol/v2/draft/cancellation) to ca
 
 ## Argument requirements
 
-- All file paths in the protocol **MUST** be absolute.
+- All file paths in the protocol **MUST** be absolute, in the native syntax of the machine the Agent runs on (for example `/home/user/project`, `C:\Users\user\project`, or `\\server\share\project`), and are not URIs.
 - Line numbers are 1-based
 
 ## Error Handling
@@ -244,6 +244,21 @@ The protocol provides built-in mechanisms for adding custom functionality while 
 - Advertise custom capabilities during initialization
 
 Learn about [protocol extensibility](/protocol/v2/draft/extensibility) to understand how to use these mechanisms.
+
+## Unstable Features
+
+The draft schema also defines experimental features that may change or be removed before they stabilize. Each is negotiated separately, as described in [Experimental Features and Negotiation](/protocol/v2/draft/extensibility#experimental-features-and-negotiation). Where the draft pages don't describe a feature yet, its RFD is the reference.
+
+| Feature              | Methods and updates                                           | Negotiation                    | Details                                                                                                                     |
+| -------------------- | ------------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| LLM providers        | `providers/list`, `providers/set`, `providers/disable`        | Agent `providers` capability   | [Initialization](/protocol/v2/draft/initialization#agent-capabilities), [RFD](/rfds/custom-llm-endpoint)                    |
+| Session fork         | `session/fork`                                                | Agent `session.fork`           | [RFD](/rfds/session-fork)                                                                                                   |
+| MCP over ACP         | `mcp/message` in both directions, `acp` MCP server transport  | Agent `session.mcp.acp`        | [RFD](/rfds/mcp-over-acp)                                                                                                   |
+| Subagents            | `subagent_update`, `session_message`, `session_message_chunk` | None; Clients must handle them | [Session-directed messages](/protocol/v2/draft/prompt-lifecycle#session-directed-messages-unstable), [RFD](/rfds/subagents) |
+| Client system prompt | `systemPrompt` on session setup                               | Agent `session.systemPrompt`   | [System Prompt](/protocol/v2/draft/session-setup#system-prompt-unstable), [RFD](/rfds/client-system-prompt)                 |
+| Plan operations      | `markdown` and `file` plans, `plan_removed`                   | None; Clients must handle them | [Unstable Plan Operations](/protocol/v2/draft/agent-plan#unstable-plan-operations), [RFD](/rfds/plan-operations)            |
+| End-turn usage       | `usage` on the idle `state_update`                            | None                           | [End-Turn Token Usage](/protocol/v2/draft/prompt-lifecycle#end-turn-token-usage-unstable)                                   |
+| Unknown state        | `unknown` foreground state                                    | None                           | [Session States](/protocol/v2/draft/prompt-lifecycle#session-states)                                                        |
 
 ## Next Steps
 

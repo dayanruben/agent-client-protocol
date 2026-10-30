@@ -16,9 +16,9 @@ Unlike base JSON-RPC, request IDs **MUST** be a string or an integer, never
 `null`. An error response has `id: null` only when the request ID could not be
 determined.
 
-ACP follows JSON-RPC 2.0 batch behavior. See
-[Transports](/protocol/v2/transports#json-rpc-batch-messages) for batch
-handling requirements.
+Both sides send requests, and each side chooses IDs for its own requests independently, so the same ID can be in use in both directions. A sender **MUST NOT** reuse an ID while a request with that ID is still awaiting a response.
+
+Unlike base JSON-RPC, ACP does not use batches. See [Transports](/protocol/v2/transports#no-batches).
 
 ## Message Flow
 
@@ -57,7 +57,7 @@ Agents are programs that use generative AI to autonomously modify code. They typ
 
 ### Baseline Methods
 
-Some baseline methods belong to optional surfaces. An Agent that returns one or more valid entries in `authMethods` **MUST** implement both `auth/login` and `auth/logout`. If `authMethods` is omitted or empty, Clients **MUST NOT** call either method. The `session/*` methods require `capabilities.session`.
+Some baseline methods belong to optional surfaces. An Agent that returns a non-empty `authMethods` list **MUST** implement both `auth/login` and `auth/logout`. If `authMethods` is omitted or empty, Clients **MUST NOT** call either method. The `session/*` methods require `capabilities.session`.
 
 <ResponseField
   name="initialize"
@@ -204,7 +204,7 @@ Either side can send [`$/cancel_request`](/protocol/v2/cancellation) to cancel a
 
 ## Argument requirements
 
-- All file paths in the protocol **MUST** be absolute.
+- All file paths in the protocol **MUST** be absolute, in the native syntax of the machine the Agent runs on (for example `/home/user/project`, `C:\Users\user\project`, or `\\server\share\project`), and are not URIs.
 - Line numbers are 1-based
 
 ## Error Handling

@@ -120,7 +120,7 @@ pub struct InitializeResponse {
     /// Authentication methods supported by the agent.
     ///
     /// Optional. Omitted or empty means the agent does not advertise the
-    /// authentication method surface. Supplying one or more valid methods means
+    /// authentication method surface. Supplying one or more methods means
     /// the agent MUST support both `auth/login` and `auth/logout`.
     #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_>>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true)))]
@@ -160,7 +160,7 @@ impl InitializeResponse {
 
     /// Authentication methods supported by the agent.
     ///
-    /// Supplying one or more valid methods means the agent MUST support both
+    /// Supplying one or more methods means the agent MUST support both
     /// `auth/login` and `auth/logout`.
     #[must_use]
     pub fn auth_methods(mut self, auth_methods: Vec<AuthMethod>) -> Self {
@@ -1241,6 +1241,9 @@ pub struct ResumeSessionRequest {
     /// The ID of the session to resume.
     pub session_id: SessionId,
     /// The working directory for this session. Must be an absolute path.
+    ///
+    /// Clients MUST send the session's working directory. Agents MAY reject a different directory
+    /// with `-32602`, and MAY normalize paths when comparing.
     pub cwd: AbsolutePath,
     /// Additional workspace roots to activate for this session. Each path must be absolute.
     ///
@@ -1253,6 +1256,9 @@ pub struct ResumeSessionRequest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub additional_directories: Vec<AbsolutePath>,
     /// List of MCP servers to connect to for this session.
+    ///
+    /// The complete set of Client-provided servers; omitted and `[]` mean none. Agents SHOULD
+    /// NOT restore servers from earlier requests.
     #[serde_as(deserialize_as = "DefaultOnNull")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-null" = true)))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1592,8 +1598,8 @@ impl ResumeSessionResponse {
 /// before responding successfully to `session/close`. Closing an idle session
 /// does not itself require another idle update.
 ///
-/// Closing may also cancel pending `session/prompt` requests, including queued
-/// prompts. If closing prevents a prompt's user message from being inserted, the
+/// Closing also cancels pending `session/prompt` requests whose messages have not
+/// been inserted, including held prompts. If closing prevents a prompt's user message from being inserted, the
 /// Agent MUST answer that request with `-32800` (Request Cancelled). If the message
 /// has already been inserted, the Agent MUST respond successfully with its
 /// `messageId`. Prompt responses need not precede the close response.
@@ -1743,6 +1749,9 @@ crate::serde_util::default_on_null! {
     pub struct ListSessionsRequest {
         /// Filter sessions by working directory. Must be an absolute path.
         ///
+        /// Only sessions whose `cwd` is this same directory match; subdirectories and
+        /// `additionalDirectories` don't. Agents MAY normalize paths when comparing.
+        ///
         /// Omitted and `null` are equivalent and mean sessions are not filtered by working directory.
         #[serde(default)]
         pub cwd: Option<AbsolutePath>,
@@ -1812,7 +1821,7 @@ pub struct ListSessionsResponse {
     pub sessions: Vec<SessionInfo>,
     /// Opaque cursor token. If present, pass this in the next request's cursor parameter
     /// to fetch the next page. Omitted and `null` are equivalent and mean there are no more
-    /// results.
+    /// results. An empty string is a valid cursor, not the end of results.
     #[serde(default)]
     pub next_cursor: Option<SessionListCursor>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -1963,7 +1972,7 @@ pub struct SessionInfo {
     /// Additional workspace roots reported for this session. Each path must be absolute.
     ///
     /// When present, this is the complete ordered additional-root list reported
-    /// by the Agent. Omitted, `null`, and empty values are equivalent: the response
+    /// by the Agent. Omitted and empty values are equivalent: the response
     /// reports no additional roots.
     #[serde_as(deserialize_as = "DefaultOnNull")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-null" = true)))]
@@ -2171,9 +2180,9 @@ pub struct SessionConfigSelectGroup {
     pub group_id: SessionConfigGroupId,
     /// Human-readable label for this group.
     pub name: String,
-    /// The set of option values in this group.
+    /// The set of option values in this group. MUST contain at least one value.
     #[serde_as(deserialize_as = "DefaultOnError<VecSkipError<_>>")]
-    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true)))]
+    #[cfg_attr(feature = "schemars", schemars(length(min = 1), extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true)))]
     pub options: Vec<SessionConfigSelectOption>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
@@ -2222,9 +2231,13 @@ impl SessionConfigSelectGroup {
 #[non_exhaustive]
 pub enum SessionConfigSelectOptions {
     /// A flat list of options with no grouping.
-    Ungrouped(Vec<SessionConfigSelectOption>),
+    Ungrouped(
+        #[cfg_attr(feature = "schemars", schemars(length(min = 1)))] Vec<SessionConfigSelectOption>,
+    ),
     /// A list of options grouped under headers.
-    Grouped(Vec<SessionConfigSelectGroup>),
+    Grouped(
+        #[cfg_attr(feature = "schemars", schemars(length(min = 1)))] Vec<SessionConfigSelectGroup>,
+    ),
 }
 
 impl From<Vec<SessionConfigSelectOption>> for SessionConfigSelectOptions {
@@ -3299,10 +3312,8 @@ impl HttpHeader {
 pub struct SystemPrompt {
     /// How the Agent combines `content` with its own instructions.
     ///
-    /// Required on the wire, so every request states its mode. In Rust,
-    /// Unknown
-    /// values are preserved; Agents MUST return an error
-    /// for modes they do not support.
+    /// Required. Agents MUST return an error for a mode they do not support rather than
+    /// treating it as `append` or `override`.
     pub mode: SystemPromptMode,
     /// The system prompt content.
     ///
@@ -3428,6 +3439,10 @@ pub struct PromptRequest {
     /// When available, `resource` is preferred
     /// as it avoids extra round-trips and allows the message to include
     /// pieces of context from sources the agent may not have access to.
+    ///
+    /// Clients MUST NOT send an empty array. Agents MAY reject one with `-32602` without
+    /// inserting it.
+    #[cfg_attr(feature = "schemars", schemars(length(min = 1)))]
     pub prompt: Vec<ContentBlock>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
@@ -3466,7 +3481,7 @@ impl PromptRequest {
 
 /// Response acknowledging that a user prompt was inserted into the ACP conversation.
 ///
-/// This response does not indicate that the prompt was merely received or queued, nor that the
+/// This response does not indicate that the prompt was merely received or held, nor that the
 /// agent has finished processing it.
 /// Processing and completion are reported through `state_update` session updates.
 ///
@@ -3540,9 +3555,7 @@ pub enum StopReason {
     /// The active work ended because the agent reached the maximum number of
     /// allowed agent requests before returning idle.
     MaxTurnRequests,
-    /// The active work ended because the agent refused to continue. The user
-    /// prompt and everything that comes after it won't be included in the next
-    /// prompt, so this should be reflected in the UI.
+    /// The active work ended because the agent refused to continue.
     Refusal,
     /// The user or client chose to stop the work: via `session/cancel`, by
     /// closing the session, or through an interaction the agent offers, such
@@ -3699,7 +3712,7 @@ fn other_stop_reason_schema(schema: &mut Schema) {
 ///
 /// This capability is not part of the spec yet, and may be removed or changed at any point.
 ///
-/// Token usage information for completed session work.
+/// Token usage for the foreground work that just completed, not cumulative for the session.
 #[cfg(feature = "unstable_end_turn_token_usage")]
 #[serde_as]
 #[skip_serializing_none]
@@ -3708,27 +3721,27 @@ fn other_stop_reason_schema(schema: &mut Schema) {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct Usage {
-    /// Sum of all token types across session.
+    /// Sum of all token types for the completed work.
     pub total_tokens: u64,
-    /// Total input tokens.
+    /// Input tokens for the completed work.
     pub input_tokens: u64,
-    /// Total output tokens.
+    /// Output tokens for the completed work.
     pub output_tokens: u64,
-    /// Total thought/reasoning tokens
+    /// Thought/reasoning tokens for the completed work.
     ///
     /// Omitted and `null` are equivalent and mean the count is not reported.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub thought_tokens: Option<u64>,
-    /// Total cache read tokens.
+    /// Cache read tokens for the completed work.
     ///
     /// Omitted and `null` are equivalent and mean the count is not reported.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub cached_read_tokens: Option<u64>,
-    /// Total cache write tokens.
+    /// Cache write tokens for the completed work.
     ///
     /// Omitted and `null` are equivalent and mean the count is not reported.
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -3763,21 +3776,21 @@ impl Usage {
         }
     }
 
-    /// Total thought/reasoning tokens
+    /// Thought/reasoning tokens for the completed work.
     #[must_use]
     pub fn thought_tokens(mut self, thought_tokens: impl IntoOption<u64>) -> Self {
         self.thought_tokens = thought_tokens.into_option();
         self
     }
 
-    /// Total cache read tokens.
+    /// Cache read tokens for the completed work.
     #[must_use]
     pub fn cached_read_tokens(mut self, cached_read_tokens: impl IntoOption<u64>) -> Self {
         self.cached_read_tokens = cached_read_tokens.into_option();
         self
     }
 
-    /// Total cache write tokens.
+    /// Cache write tokens for the completed work.
     #[must_use]
     pub fn cached_write_tokens(mut self, cached_write_tokens: impl IntoOption<u64>) -> Self {
         self.cached_write_tokens = cached_write_tokens.into_option();

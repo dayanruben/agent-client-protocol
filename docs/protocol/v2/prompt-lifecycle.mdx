@@ -190,7 +190,9 @@ The Client sends a user message with `session/prompt`:
 <ParamField path="prompt" type="ContentBlock[]" required>
     The contents of the user message, e.g. text, images, files, etc.
 
-    Clients **MUST** restrict types of content according to the [Prompt Capabilities](/protocol/v2/initialization#session-prompt-capabilities) established during [initialization](/protocol/v2/initialization). Agents **MUST** reject content types they don't support with `-32602`.
+    Clients **MUST NOT** send an empty `prompt` array. Agents **MAY** reject one with `-32602` without inserting it.
+
+    Clients **MUST** restrict types of content according to the [Prompt Capabilities](/protocol/v2/initialization#session-prompt-capabilities) established during [initialization](/protocol/v2/initialization). Agents **MUST** reject a prompt containing a content type they did not advertise or don't understand with `-32602`, without inserting it. Custom content types need a [custom capability](/protocol/v2/extensibility#advertising-custom-capabilities), such as an entry in `capabilities.session.prompt._meta`.
 
     <Card icon="comments" horizontal href="/protocol/v2/content">
       Learn more about Content
@@ -249,13 +251,19 @@ The Client uses the JSON-RPC response ID to identify its submission, then associ
 
 Insertion is not a promise of durable storage or model consumption. Every inserted input, including a locally handled command, is reported live, but Agents are not required to persist it or retain it for any minimum period. If the message is retained and replayed, the Agent **MUST** use the same ID. See [Resuming Sessions](/protocol/v2/session-setup#resuming-sessions).
 
-A successful prompt response is not an `idle` signal. Session work and notifications continue independently of the completed prompt request. If the response is lost, the submission's outcome remains uncertain: replay may omit live-only or discarded messages, and a retry can create another submission.
+A successful prompt response is not an `idle` signal. Session work and notifications continue independently of the completed prompt request. The response has no fixed order relative to other session updates: the `user_message` acknowledgment, Agent output, and even the `idle` `state_update` that ends the resulting work may arrive before or after it. Clients **MUST NOT** infer ordering between them. If the response is lost, the submission's outcome remains uncertain: replay may omit live-only or discarded messages, and a retry can create another submission.
 
 The same insertion boundary applies when [closing the session](/protocol/v2/session-setup#closing-active-sessions) cancels a pending prompt: if closing prevents insertion, the request receives `-32800` (Request Cancelled); if the message has already been inserted, it receives a successful `messageId` response. Prompt responses need not precede the close response.
 
 #### Insertion and ordering
 
 `running` reports foreground work, not insertion. It may precede insertion, the prompt response, and user-message updates, for example while a foreground hook runs. It does not acknowledge a pending prompt's insertion.
+
+#### Prompts During Active Work
+
+Clients **MAY** send `session/prompt` in any state, including while foreground work is `running` or `requires_action`. The Agent either inserts the prompt right away or holds it and inserts it later. Held prompts are inserted in the order they were received. What inserting during active work means, such as steering the current turn or starting the next one, is up to the Agent. Agents **MUST NOT** reject a prompt only because foreground work is active.
+
+A held prompt's response stays pending until the prompt is inserted. The Client can withdraw it with [`$/cancel_request`](/protocol/v2/cancellation), and [`session/cancel`](#cancellation) and `session/close` answer prompts that haven't been inserted with `-32800`. Future capabilities may let Agents advertise steering or queueing behavior.
 
 #### Prompts that are never inserted
 
@@ -357,7 +365,7 @@ The Agent can report the model's text response as an `agent_message` update with
 
 The Agent **MUST** include an opaque `messageId` on message updates and message chunks.
 
-User, agent, and thought messages can each be reported either as a message update with a full `content` array or as streamed chunks. `user_message`, `agent_message`, and `agent_thought` updates are upserts keyed by `messageId`: omitted `content` leaves the existing message content unchanged, `content: null` clears it, and concrete `content` arrays replace the previous content. Chunk updates with the same `messageId` append content.
+User, agent, and thought messages can each be reported either as a message update with a full `content` array or as streamed chunks. `user_message`, `agent_message`, and `agent_thought` updates are upserts keyed by `messageId`: omitted `content` leaves the existing message content unchanged (or empty for a new `messageId`), `content: null` clears it, and concrete `content` arrays replace the previous content. Chunk updates with the same `messageId` append content.
 
 A chunk for a `messageId` the Client hasn't seen creates the message with empty content, then appends to it. Clients apply message updates and chunks in the order they are received for each `messageId`:
 
@@ -653,7 +661,7 @@ The Agent **MAY** also report current session context and cumulative cost state 
 }
 ```
 
-`used` and `size` are required and non-null token counts for the current session context. `cost` is optional and, if present, `amount` and `currency` are required. `currency` is an ISO 4217 currency code like `"USD"`.
+`used` and `size` are required and non-null token counts for the current session context. `cost` is a patch field: omitting it leaves the last reported cost unchanged, `null` clears it, and a value replaces it, including when the currency differs. A value requires `amount` and `currency`. `currency` is the unit of `amount`: an ISO 4217 currency code such as `"USD"` for money, or another unit such as `"credits"`.
 
 ### 4. Report Completion
 
@@ -935,8 +943,7 @@ another foreground interval then begins, it reports an active state again,
 even when the next interval starts immediately. Consecutive completed turns
 therefore have an idle boundary, not a continuous `running` state. Completing
 an individual prompt, command, or tool call while other foreground activity
-continues does not require an idle boundary. This does not require Agents to
-support prompts while work is active.
+continues does not require an idle boundary. For prompts sent while work is active, see [Prompts During Active Work](#prompts-during-active-work).
 
 Handling an accepted prompt, including a local slash command that performs no
 model work, **MUST** use the foreground lifecycle. A local command handled from
@@ -992,7 +999,7 @@ Clients **MAY** cancel the session's foreground work at any time by sending a `s
 
 `session/cancel` covers foreground work and prompts the Agent has not yet inserted. The Agent **MUST** answer those prompts with `-32800`, as described in [request cancellation](/protocol/v2/cancellation). Once a message is inserted, its prompt request still succeeds with its `messageId`; cancellation does not undo that insertion. Background work is not covered, but the Agent **MAY** stop it too.
 
-The Client **SHOULD** preemptively mark all non-finished tool calls pertaining to the current active work as `cancelled` as soon as it sends the `session/cancel` notification.
+The Client **SHOULD** preemptively mark all non-finished tool calls pertaining to the current active work as `cancelled` as soon as it sends the `session/cancel` notification. This mark is a local display hint: the Agent gives those tool calls their [final status](/protocol/v2/tool-calls#status), and its updates replace the mark.
 
 The Client **MUST** respond to pending `session/request_permission` requests in
 the cancelled session with the `cancelled` outcome. Requests already answered
@@ -1028,7 +1035,3 @@ Agents **MUST** catch these errors and report the semantically meaningful `cance
 The Agent **MAY** send `session/update` notifications with content or tool call updates after receiving the `session/cancel` notification, but it **MUST** ensure that it does so before sending the idle `state_update` session update that reports cancellation.
 
 The Client **SHOULD** still accept tool call updates received after sending `session/cancel`.
-
----
-
-After the Agent reports `idle`, the Client may send another `session/prompt` to continue the conversation, building on the established session context.

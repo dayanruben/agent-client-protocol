@@ -1097,9 +1097,8 @@ fn default_object_type() -> ElicitationSchemaType {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ElicitationSchema {
-    /// Type discriminator. Always `"object"`. Omitted means `"object"`; any other value is
-    /// rejected.
-    #[serde(rename = "type", default = "default_object_type")]
+    /// Type discriminator. Always `"object"`; any other value is rejected.
+    #[serde(rename = "type")]
     pub type_: ElicitationSchemaType,
     /// Optional title for the schema.
     ///
@@ -1109,7 +1108,6 @@ pub struct ElicitationSchema {
     #[serde(default)]
     pub title: Option<String>,
     /// Property definitions (must be primitive types).
-    #[serde(default)]
     pub properties: BTreeMap<String, ElicitationPropertySchema>,
     /// List of required property names.
     ///
@@ -2053,6 +2051,11 @@ pub enum ElicitationContentValue {
     Boolean(bool),
     /// String array value accepted in elicitation response content.
     StringArray(Vec<String>),
+    /// Any other JSON value, such as the value of a custom or future property type.
+    ///
+    /// Preserved as sent. Agents validate it against the requested schema like any
+    /// other value.
+    Other(serde_json::Value),
 }
 
 impl From<String> for ElicitationContentValue {
@@ -2162,6 +2165,39 @@ impl CompleteElicitationNotification {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn content_values_accept_other_shapes() {
+        let wire = json!({
+            "name": "Ada",
+            "age": 36,
+            "ratio": 0.5,
+            "agree": true,
+            "tags": ["a", "b"],
+            "_custom": { "lat": 1.0, "lng": 2.0 },
+            "mixed": ["a", 1]
+        });
+        let content: BTreeMap<String, ElicitationContentValue> =
+            serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(
+            content["name"],
+            ElicitationContentValue::String("Ada".into())
+        );
+        assert_eq!(content["age"], ElicitationContentValue::Integer(36));
+        assert_eq!(
+            content["tags"],
+            ElicitationContentValue::StringArray(vec!["a".into(), "b".into()])
+        );
+        assert_eq!(
+            content["_custom"],
+            ElicitationContentValue::Other(json!({ "lat": 1.0, "lng": 2.0 }))
+        );
+        assert_eq!(
+            content["mixed"],
+            ElicitationContentValue::Other(json!(["a", 1]))
+        );
+        assert_eq!(serde_json::to_value(&content).unwrap(), wire);
+    }
 
     #[test]
     fn form_mode_request_serialization() {
@@ -2582,10 +2618,16 @@ mod tests {
     }
 
     #[test]
-    fn schema_root_type_defaults_when_omitted_and_rejects_other_values() {
-        let omitted: ElicitationSchema =
-            serde_json::from_value(json!({ "properties": {} })).unwrap();
-        assert_eq!(omitted.type_, ElicitationSchemaType::Object);
+    fn schema_root_requires_object_type_and_properties() {
+        let schema: ElicitationSchema =
+            serde_json::from_value(json!({ "type": "object", "properties": {} })).unwrap();
+        assert_eq!(schema.type_, ElicitationSchemaType::Object);
+        for missing in [json!({ "properties": {} }), json!({ "type": "object" })] {
+            assert!(
+                serde_json::from_value::<ElicitationSchema>(missing.clone()).is_err(),
+                "{missing}"
+            );
+        }
         for bad in [json!("array"), json!(42), json!(null)] {
             assert!(
                 serde_json::from_value::<ElicitationSchema>(
@@ -2935,18 +2977,17 @@ mod tests {
     }
 
     #[test]
-    fn response_accept_rejects_nested_object_content() {
-        assert!(
-            serde_json::from_value::<CreateElicitationResponse>(json!({
-                "action": "accept",
-                "content": {
-                    "profile": {
-                        "name": "Alice"
-                    }
+    fn response_accept_preserves_nested_object_content() {
+        let wire = json!({
+            "action": "accept",
+            "content": {
+                "profile": {
+                    "name": "Alice"
                 }
-            }))
-            .is_err()
-        );
+            }
+        });
+        let response: CreateElicitationResponse = serde_json::from_value(wire.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&response).unwrap(), wire);
     }
 
     #[test]

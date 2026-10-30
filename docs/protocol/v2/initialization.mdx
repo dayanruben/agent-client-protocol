@@ -79,9 +79,19 @@ The Agent **MUST** respond with the chosen [protocol version](#protocol-version)
 }
 ```
 
-`authMethods` is optional. Returning one or more valid entries advertises the Agent's authentication surface and means the Agent **MUST** implement both `auth/login` and `auth/logout`. If `authMethods` is omitted or empty, Clients **MUST NOT** call either method.
+`authMethods` is optional. Returning a non-empty list advertises the Agent's authentication surface and means the Agent **MUST** implement both `auth/login` and `auth/logout`. If `authMethods` is omitted or empty, Clients **MUST NOT** call either method.
 
 `capabilities.auth` is separate from this method surface. It advertises authentication-related extensions and does not change the availability rules for `auth/login` or `auth/logout`.
+
+## Before Initialization Completes
+
+Initialization completes when the Agent responds successfully to `initialize`. Until then:
+
+- Clients **MUST NOT** send requests other than `initialize`. Agents reject them with `-32600` and ignore notifications. See [Requests Before Initialization](/protocol/v2/error#requests-before-initialization).
+- Agents **MUST NOT** send requests or notifications.
+- If `initialize` fails, the connection is still uninitialized, and the Client **MAY** send `initialize` again, for example after correcting invalid params.
+
+After initialization completes, the Client can repeat `initialize` only as described in [Repeating Initialization](#repeating-initialization).
 
 ## Protocol version
 
@@ -124,7 +134,9 @@ The Client **MUST** check that it supports the version in a successful response.
 
 #### Repeating Initialization
 
-When the Agent selects a lower version than requested, it may have ignored parts of the Client's request, such as capabilities. The Client **MAY** then send `initialize` again with the selected version and that version's parameters. It **MUST** wait for the first response and send the repeat before any other request. The Agent **MUST** accept it and treat the latest `initialize` as authoritative. `initialize` **MUST NOT** be repeated after any other request.
+When the Agent selects a lower version than requested, it may have ignored parts of the Client's request, such as capabilities. The Client **MAY** then send `initialize` again with the selected version and that version's parameters.
+
+The Client **MAY** repeat `initialize` any number of times before its first other request, waiting for each response before sending the next. The Agent handles each one like the first and treats the latest successful `initialize` as authoritative. A repeat that fails leaves the previous successful initialization in effect. `initialize` **MUST NOT** be repeated after any other request.
 
 Agents that implement only v1 may not accept a repeated `initialize`. To change its parameters with such an Agent, the Client opens a new connection.
 

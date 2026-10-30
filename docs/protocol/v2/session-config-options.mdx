@@ -127,7 +127,9 @@ During [Session Setup](/protocol/v2/session-setup) the Agent **MAY** return a li
   or an array of groups; values and groups are not mixed in the same array. For
   a `select` option, Agents **MUST** offer at least one value, **MUST** keep
   each `value` unique within the option, including across groups, and
-  `currentValue` **MUST** be one of them.
+  `currentValue` **MUST** be one of them. Each group **MUST** contain at least
+  one value. Clients **SHOULD** hide a group that ends up empty, for example
+  after skipping values they couldn\'t parse.
 </ResponseField>
 
 ### SessionConfigSelectOption
@@ -192,7 +194,7 @@ Each config option **MAY** include a `category` field. Categories are semantic m
   correctness. Clients **MUST** handle missing or unknown categories gracefully.
 </Warning>
 
-Category names beginning with `_` are free for custom use (e.g., `_my_custom_category`). Category names that do not begin with `_` are reserved for the ACP spec.
+Category names beginning with `_` are free for custom use (e.g., `_com.example/category`). Category names that do not begin with `_` are reserved for the ACP spec.
 
 | Category        | Description                                                              |
 | --------------- | ------------------------------------------------------------------------ |
@@ -229,7 +231,9 @@ Option `type` values can be custom or future variants. Custom option types **MUS
 
 The current value of a config option can be changed at any point during a session.
 
-Agents that advertise config options for a session **MUST** support `session/set_config_option` for it. Clients **MUST NOT** call it otherwise and **MUST** only send an advertised `configId`. Agents **MUST** reject an unknown `configId` or invalid value, including an unsupported value `type`, with `-32602` and leave the configuration unchanged.
+Agents that advertise config options for a session **MUST** support `session/set_config_option` for it. Clients **MUST NOT** call it otherwise and **MUST** only send an advertised `configId`. Agents **MUST** reject an unknown `configId` or invalid value, including an unsupported value `type` or a `type` that doesn't match the option, with `-32602` and leave the configuration unchanged.
+
+Whether a change made while foreground work is active applies to that work or only to later work is up to the Agent. The response's `configOptions` is the complete list as of the response, and Clients replace their list with it. It may report a `currentValue` different from the one requested, for example when the Agent adjusted the value or another change applied concurrently. Clients apply responses and `config_option_update` notifications in the order received, each replacing the whole list.
 
 ### From the Client
 
@@ -369,9 +373,7 @@ The Agent **MUST** respond with the complete list of all configuration options a
 
 ### From the Agent
 
-Agents **SHOULD** send a `config_option_update` session notification to attached
-Clients whenever configuration state changes, including changes requested by a
-Client through `session/set_config_option`, to keep observers in sync.
+Agents **SHOULD** send a `config_option_update` session notification on each connection where the session is [active](/protocol/v2/session-setup#session-lifecycle) whenever configuration state changes, including changes requested through `session/set_config_option`.
 
 The response remains the source of truth for the requesting Client, which may
 also receive a duplicate notification. Agents **SHOULD** send that duplicate before

@@ -952,6 +952,8 @@ impl CompactionSummaryChunk {
 /// unconfirmed; it does not report idle or cancellation. A child whose capabilities are
 /// unset permits no Client-initiated session mutations.
 ///
+/// `cwd` and `additionalDirectories` report where the Agent placed the child;
+/// while unset, each inherits the immediate parent's effective value.
 /// The title and description provide the parent's display metadata for the
 /// child. Agents SHOULD mirror known child state changes in the parent's
 /// `state` using the same `StateUpdate` snapshot as the
@@ -1004,6 +1006,21 @@ pub struct SubagentUpdate {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
     pub state: MaybeUndefined<StateUpdate>,
+    /// The child's working directory. Must be an absolute path.
+    ///
+    /// Optional and nullable. Omitted means unchanged; `null` clears the
+    /// reported value. While unset, the child inherits its immediate parent's
+    /// effective working directory.
+    #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
+    pub cwd: MaybeUndefined<AbsolutePath>,
+    /// Additional workspace roots for the child. Each path must be absolute.
+    ///
+    /// Optional and nullable. Omitted means unchanged; `null` clears the
+    /// reported value. While unset, the child inherits its immediate parent's
+    /// effective additional directories, independently of `cwd`. A concrete
+    /// array replaces the whole list; `[]` reports no additional directories.
+    #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
+    pub additional_directories: MaybeUndefined<Vec<AbsolutePath>>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted leaves the stored metadata unchanged; `null`
     /// clears it. An object patches the stored metadata by top-level key: keys it omits are
@@ -1033,6 +1050,8 @@ impl SubagentUpdate {
             description: MaybeUndefined::Undefined,
             capabilities: MaybeUndefined::Undefined,
             state: MaybeUndefined::Undefined,
+            cwd: MaybeUndefined::Undefined,
+            additional_directories: MaybeUndefined::Undefined,
             meta: MaybeUndefined::Undefined,
         }
     }
@@ -1065,6 +1084,27 @@ impl SubagentUpdate {
     #[must_use]
     pub fn state(mut self, state: impl IntoMaybeUndefined<StateUpdate>) -> Self {
         self.state = state.into_maybe_undefined();
+        self
+    }
+
+    /// Sets, clears, or leaves unchanged the child's working directory.
+    ///
+    /// While unset, the child inherits its parent's working directory.
+    #[must_use]
+    pub fn cwd(mut self, cwd: impl IntoMaybeUndefined<AbsolutePath>) -> Self {
+        self.cwd = cwd.into_maybe_undefined();
+        self
+    }
+
+    /// Replaces, clears, or leaves unchanged the child's additional directories.
+    ///
+    /// While unset, the child inherits its parent's additional directories.
+    #[must_use]
+    pub fn additional_directories(
+        mut self,
+        additional_directories: impl IntoMaybeUndefined<Vec<AbsolutePath>>,
+    ) -> Self {
+        self.additional_directories = additional_directories.into_maybe_undefined();
         self
     }
 
@@ -1462,13 +1502,13 @@ pub struct UsageUpdate {
     pub used: u64,
     /// Total context window size in tokens.
     pub size: u64,
-    /// Cumulative session cost (optional).
+    /// Cumulative session cost.
     ///
-    /// Omitted and `null` are equivalent and mean no cost is reported.
-    #[serde_as(deserialize_as = "DefaultOnError")]
+    /// Omitted leaves the last reported cost unchanged; `null` clears it; a value replaces it.
+    #[serde_as(deserialize_as = "DefaultOnError<MaybeUndefined<_>>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
-    #[serde(default)]
-    pub cost: Option<Cost>,
+    #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
+    pub cost: MaybeUndefined<Cost>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT make assumptions about values at these keys.
@@ -1488,15 +1528,15 @@ impl UsageUpdate {
         Self {
             used,
             size,
-            cost: None,
+            cost: MaybeUndefined::Undefined,
             meta: None,
         }
     }
 
-    /// Cumulative session cost (optional).
+    /// Sets, clears, or leaves unchanged the cumulative session cost.
     #[must_use]
-    pub fn cost(mut self, cost: impl IntoOption<Cost>) -> Self {
-        self.cost = cost.into_option();
+    pub fn cost(mut self, cost: impl IntoMaybeUndefined<Cost>) -> Self {
+        self.cost = cost.into_maybe_undefined();
         self
     }
 
@@ -1933,8 +1973,8 @@ fn other_state_update_schema(schema: &mut Schema) {
 pub struct Cost {
     /// Total cumulative cost for session.
     pub amount: f64,
-    /// ISO 4217 currency code (e.g., "USD", "EUR").
-    #[cfg_attr(feature = "schemars", schemars(pattern(r"^[A-Z]{3}$")))]
+    /// Unit of `amount`: an ISO 4217 currency code (e.g., "USD", "EUR") for money, or another
+    /// unit such as "credits".
     pub currency: String,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
@@ -2027,7 +2067,7 @@ impl ContentChunk {
 /// Only `messageId` is required. `content` has patch semantics:
 /// an omitted field leaves existing message content unchanged, `null` clears the
 /// value, and a concrete array replaces the previous value. For a new
-/// `messageId`, omitted fields use client defaults. `content` is replaced as a
+/// `messageId`, omitted `content` starts empty. `content` is replaced as a
 /// whole array; send `[]` or `null` to clear it.
 ///
 /// Message updates and chunks are applied in the order they are received. When
@@ -2101,7 +2141,7 @@ impl UserMessage {
 /// Only `messageId` is required. `content` has patch semantics:
 /// an omitted field leaves existing message content unchanged, `null` clears the
 /// value, and a concrete array replaces the previous value. For a new
-/// `messageId`, omitted fields use client defaults. `content` is replaced as a
+/// `messageId`, omitted `content` starts empty. `content` is replaced as a
 /// whole array; send `[]` or `null` to clear it.
 ///
 /// Message updates and chunks are applied in the order they are received. When
@@ -2175,7 +2215,7 @@ impl AgentMessage {
 /// Only `messageId` is required. `content` has patch semantics:
 /// an omitted field leaves existing thought content unchanged, `null` clears the
 /// value, and a concrete array replaces the previous value. For a new
-/// `messageId`, omitted fields use client defaults. `content` is replaced as a
+/// `messageId`, omitted `content` starts empty. `content` is replaced as a
 /// whole array; send `[]` or `null` to clear it.
 ///
 /// Message updates and chunks are applied in the order they are received. When
@@ -2384,7 +2424,8 @@ pub struct OtherAvailableCommand {
     /// future ACP variants.
     #[serde(rename = "type")]
     pub type_: String,
-    /// Command name.
+    /// Command name without the leading `/`. MUST NOT contain whitespace and MUST be unique
+    /// within the command list.
     pub name: String,
     /// Human-readable description of what the command does.
     pub description: String,
@@ -2472,7 +2513,9 @@ fn other_available_command_schema(schema: &mut Schema) {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct Command {
-    /// Command name (e.g., `create_plan`, `research_codebase`).
+    /// Command name without the leading `/` (e.g., `create_plan`, `research_codebase`).
+    ///
+    /// MUST NOT contain whitespace and MUST be unique within the command list.
     pub name: String,
     /// Human-readable description of what the command does.
     pub description: String,
@@ -2532,7 +2575,7 @@ impl Command {
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum AvailableCommandInput {
-    /// All text that was typed after the command name is provided as input.
+    /// All text after the command name and the whitespace following it is provided as input.
     #[serde(rename = "text")]
     Text(TextCommandInput),
     /// Custom or future command input specification.
@@ -3928,6 +3971,50 @@ mod tests {
 
     #[cfg(feature = "unstable_subagents")]
     #[test]
+    fn subagent_directories_use_strict_patch_semantics() {
+        use serde_json::json;
+
+        let update = SubagentUpdate::new("child")
+            .cwd("/home/user/project/.worktrees/investigator")
+            .additional_directories(vec![]);
+        let wire = json!({
+            "sessionId": "child",
+            "cwd": "/home/user/project/.worktrees/investigator",
+            "additionalDirectories": []
+        });
+        assert_eq!(serde_json::to_value(&update).unwrap(), wire);
+        assert_eq!(
+            serde_json::from_value::<SubagentUpdate>(wire).unwrap(),
+            update
+        );
+
+        let inherited: SubagentUpdate =
+            serde_json::from_value(json!({"sessionId": "child"})).unwrap();
+        assert!(inherited.cwd.is_undefined());
+        assert!(inherited.additional_directories.is_undefined());
+
+        let cleared_wire = json!({
+            "sessionId": "child", "cwd": null, "additionalDirectories": null
+        });
+        let cleared: SubagentUpdate = serde_json::from_value(cleared_wire.clone()).unwrap();
+        assert!(cleared.cwd.is_null());
+        assert!(cleared.additional_directories.is_null());
+        assert_eq!(serde_json::to_value(cleared).unwrap(), cleared_wire);
+
+        for malformed in [
+            json!({"sessionId": "child", "cwd": false}),
+            json!({"sessionId": "child", "additionalDirectories": "/tmp/wt"}),
+            json!({"sessionId": "child", "additionalDirectories": ["/tmp/wt", false]}),
+        ] {
+            assert!(
+                serde_json::from_value::<SubagentUpdate>(malformed.clone()).is_err(),
+                "{malformed}"
+            );
+        }
+    }
+
+    #[cfg(feature = "unstable_subagents")]
+    #[test]
     fn subagent_notification_keeps_parent_and_child_ids_nested() {
         use serde_json::json;
 
@@ -4843,7 +4930,18 @@ mod tests {
             panic!("expected usage update");
         };
 
-        assert_eq!(update.cost, None);
+        assert_eq!(update.cost, MaybeUndefined::Null);
+
+        let SessionUpdate::UsageUpdate(update) = serde_json::from_value(json!({
+            "sessionUpdate": "usage_update",
+            "used": 53000,
+            "size": 200_000
+        }))
+        .unwrap() else {
+            panic!("expected usage update");
+        };
+
+        assert_eq!(update.cost, MaybeUndefined::Undefined);
     }
 
     #[test]

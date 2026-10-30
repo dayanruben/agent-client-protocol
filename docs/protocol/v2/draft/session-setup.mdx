@@ -37,7 +37,7 @@ sequenceDiagram
         Agent-->>Client: session/resume response
     end
 
-    Note over Client,Agent: Session attached. Foreground state synchronized
+    Note over Client,Agent: Session active. Foreground state synchronized
 ```
 
 <br />
@@ -46,7 +46,7 @@ sequenceDiagram
 
 A session exists from `session/new` until the Agent discards it. Agents choose how long to keep sessions: for example, they may not store a session that was never prompted, may expire old sessions, or may remove one through [`session/delete`](/protocol/v2/draft/session-delete). `session/list` and `session/resume` only see sessions the Agent still has, and resuming one it no longer has fails with `-32002`.
 
-On a connection, a session is **active** from a successful `session/new` or `session/resume` until `session/close` or the end of the connection. Agents **SHOULD NOT** discard a session while it is active, except through `session/delete`, which closes it first.
+On a connection, a session is **active** from a successful `session/new`, `session/resume`, or, when supported, `session/fork` (for the new session) until `session/close` or the end of the connection. Agents **SHOULD NOT** discard a session while it is active, except through `session/delete`, which closes it first.
 
 - Session-scoped requests such as `session/prompt` and `session/set_config_option` require an active session. Otherwise the Agent responds with `-32002`; see [Unknown Sessions](/protocol/v2/draft/error#unknown-sessions). Agents ignore `session/cancel` for a session that isn't active.
 - Closing a session ends it on the connection but doesn't discard it. Whether a closed session stays listed and resumable depends on how long the Agent keeps it.
@@ -99,6 +99,8 @@ may arrive before or after the `session/new` response. Clients **MUST NOT**
 overwrite an already-reported state when the response arrives. An optional
 initial idle notification is a snapshot, not a completed turn.
 
+Agents **SHOULD** put initial state in the `session/new` response, such as `configOptions` and `availableCommands`, rather than sending notifications before it. Agents **SHOULD NOT** send session-scoped requests, such as permission requests or elicitations, before the response, because the Client cannot yet show them for that session. While a `session/new` is pending, Clients **MAY** buffer notifications for a `sessionId` they don't recognize and apply them in order once the response arrives, or drop them. Agents cannot rely on such notifications being seen.
+
 `session/resume` does not imply idle: an existing session may still be running
 or waiting for user action. See [Current-State Synchronization](#current-state-synchronization).
 
@@ -132,7 +134,7 @@ Agents **MAY** include initial [configuration options](/protocol/v2/draft/sessio
 
 `configOptions` and `availableCommands` are optional. Each is the complete current list for the session: omission or `[]` means none, and empty lists are omitted when serializing. Agents **MUST NOT** send `null` for these fields.
 
-When a `session/new` or `session/resume` response arrives, Clients replace the lists they hold for the session with the response's lists, including lists from updates received before the response. Later `config_option_update` and `available_commands_update` notifications each replace the complete list, including `[]` to clear it.
+When a `session/new`, `session/resume`, or, when supported, `session/fork` response arrives, Clients replace the lists they hold for the session with the response's lists, including lists from updates received before the response. Later `config_option_update` and `available_commands_update` notifications each replace the complete list, including `[]` to clear it.
 
 For a fork, `availableCommands` advertises commands available in the newly created session, not the source session.
 
@@ -176,7 +178,7 @@ with:
 When `replayFrom` is omitted or `null`, the Agent **MUST NOT** replay the
 conversation history via `session/update` notifications before responding. It
 restores the session context, reconnects to the requested MCP servers, and
-returns once the session is attached and its current foreground state has been
+returns once the session is active and its current foreground state has been
 synchronized. The required current-state snapshot is live synchronization, not
 history replay. Updates that report in-progress work, such as the content of a message that is still streaming, are live updates, not history replay.
 
@@ -225,7 +227,7 @@ Replay does not include:
 - [Notices](/protocol/v2/draft/prompt-lifecycle#session-notices), which are live-only and **SHOULD NOT** be replayed. If the condition is still relevant after resuming, the Agent may send a new notice.
 - Pending permission requests and elicitations. See [Current-State Synchronization](#current-state-synchronization).
 
-Agents need not replay historical `usage_update`, `session_info_update`, `config_option_update`, or `available_commands_update` notifications, because current values are synchronized after replay.
+Agents need not replay historical `usage_update`, `session_info_update`, `config_option_update`, or `available_commands_update` notifications, since they describe past values rather than current ones. See [Current-State Synchronization](#current-state-synchronization).
 
 Agents are not required to persist every inserted user message or retain it for
 any minimum period. Live-only messages, including locally handled commands, may
@@ -283,12 +285,10 @@ message inserted by `session/prompt` **MUST** use the ID returned in that
 prompt response, including after reconnecting or restarting the Agent. Replaying a command reports its message; it does not
 execute the command again.
 
-Agents **SHOULD** preserve agent and thought message IDs, `toolCallId`,
-`terminalId`, and `planId` across replay when possible, but these IDs are not
+Agents **SHOULD** preserve the IDs of all other replayed [entities](/protocol/v2/draft/prompt-lifecycle#entity-ids), such as agent and thought message IDs, `toolCallId`, `terminalId`, `planId`, and `compactionId`, across replay when possible, but these IDs are not
 guaranteed to remain stable across reconnects or Agent restarts. Clients **MUST
 NOT** rely on them to deduplicate replay against previously received history. A
-full replay is authoritative: Clients **SHOULD** rebuild the session's
-messages, tool calls, terminals, and plans from it rather than merging it into
+full replay is authoritative: Clients **SHOULD** rebuild all of the session's entities, such as messages, tool calls, terminals, plans, and compactions, from it rather than merging it into
 existing state by ID.
 
 `user_message`, `agent_message`, and `agent_thought` updates
@@ -358,6 +358,8 @@ history replay and before responding, even when `replayFrom` is omitted or
 `null`. This synchronizes current state rather than replaying historical
 configuration or metadata changes.
 
+Agents that report usage **MAY** likewise send a current `usage_update` after any requested history replay and before responding.
+
 ## Closing Active Sessions
 
 Agents that support the `session` method surface **MUST** support
@@ -384,11 +386,11 @@ with the session ID:
 
 The Agent **MUST** cancel any ongoing work for that session as if
 [`session/cancel`](/protocol/v2/draft/prompt-lifecycle#cancellation) had been called, then free the
-resources associated with the session.
+resources associated with the session. The Client answers pending permission requests and elicitations as it would after `session/cancel`. Unlike cancellation, closing also stops the session's background work.
 
 When closing cancels active foreground work, the Agent **MUST** send the final updates for that work and the idle `state_update` with `stopReason: "cancelled"` before responding successfully to `session/close`. Closing an idle session does not itself require another idle update.
 
-Closing may also cancel pending `session/prompt` requests, including queued prompts. If closing prevents a prompt's user message from being inserted, the Agent **MUST** answer that request with `-32800` (Request Cancelled). If the message has already been inserted, the Agent **MUST** respond successfully with its `messageId`, as described in [Prompt Accepted](/protocol/v2/draft/prompt-lifecycle#2-prompt-accepted). Prompt responses need not precede the close response.
+Closing also cancels pending `session/prompt` requests whose messages have not been inserted, including [held prompts](/protocol/v2/draft/prompt-lifecycle#prompts-during-active-work). If closing prevents a prompt's user message from being inserted, the Agent **MUST** answer that request with `-32800` (Request Cancelled). If the message has already been inserted, the Agent **MUST** respond successfully with its `messageId`, as described in [Prompt Accepted](/protocol/v2/draft/prompt-lifecycle#2-prompt-accepted). Prompt responses need not precede the close response. After the close response, the Agent sends no other messages for the session on that connection.
 
 On success, the Agent responds with an empty result object:
 
@@ -436,6 +438,8 @@ When present, `additionalDirectories` has the following behavior:
 - on `session/resume`, Clients **MUST** send the full intended additional-root list again; that list may differ from any previous or reported list as long as the request `cwd` matches the session's `cwd`, and omitting the field or providing an empty array does not restore stored roots implicitly
 
 Clients **MUST** only send `additionalDirectories` when the Agent advertises `session.additionalDirectories`.
+
+Agents that advertise the capability **MUST** reject a request with `-32602` if any entry is not an absolute path, and **MAY** reject entries that don't exist or aren't directories. Agents **MAY** ignore duplicate entries and entries equal to `cwd`, so the list reported in [`SessionInfo`](/protocol/v2/draft/session-list) can differ from the request. Agents that don't advertise the capability ignore the field.
 
 ## System Prompt (unstable)
 
@@ -515,10 +519,12 @@ Clients use this ID to:
 
 The `cwd` (current working directory) parameter establishes the primary file system context for the session. This directory:
 
-- **MUST** be an absolute path
+- **MUST** be an absolute path. Agents reject a request with a relative `cwd` with `-32602`.
 - **MUST** be used for the session regardless of where the Agent subprocess was spawned
 - **MUST** remain the base for relative-path resolution
 - **MUST** be part of the session's effective root set
+
+On `session/resume`, Clients **MUST** send the session's working directory. Agents **MAY** reject a different directory with `-32602`. Agents **MAY** normalize paths when comparing, for example ignoring a trailing separator.
 
 When `session.additionalDirectories` is in use, the session's effective root set is `[cwd, ...additionalDirectories]`. This root set **SHOULD** serve as a boundary for tool operations on the file system.
 
@@ -535,6 +541,10 @@ The root set declares the session's scope. It confines shell commands only when 
 The [Model Context Protocol (MCP)](https://modelcontextprotocol.io) allows Agents to access external tools and data sources. When creating a session, Clients **MAY** include connection details for MCP servers that the Agent should connect to.
 
 MCP servers can be connected to using different transports. Agents advertise supported transports during initialization using `session.mcp.stdio`, `session.mcp.http`, and any extension-specific transport capabilities. Agents **MUST** reject a request with a transport they don't support with `-32602`, including a transport they did not advertise and v1's `sse`.
+
+Each server `name` **MUST** be unique within `mcpServers`. Agents reject duplicates with `-32602`.
+
+On `session/resume`, `mcpServers` is the complete set of Client-provided servers for the session; omitted and `[]` mean none. Agents **SHOULD NOT** restore servers from earlier `session/new` or `session/resume` requests. MCP servers the Agent is configured with independently of ACP are unaffected.
 
 ### Transport Types
 
@@ -591,6 +601,8 @@ Example stdio transport configuration:
   ]
 }
 ```
+
+Agents **SHOULD** launch stdio servers with the session's `cwd` as the working directory. `env` entries are added to the environment the Agent would otherwise give the process, replacing variables with the same name. Each `env` entry **MUST** have a unique `name`.
 
 #### HTTP Transport
 
