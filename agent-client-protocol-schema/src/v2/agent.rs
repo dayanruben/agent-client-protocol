@@ -2995,7 +2995,8 @@ pub struct McpServerHttp {
     /// URL to the MCP server.
     #[cfg_attr(feature = "schemars", schemars(url))]
     pub url: String,
-    /// HTTP headers to set when making requests to the MCP server.
+    /// HTTP headers to set when making requests to the MCP server. Headers the MCP transport
+    /// defines are owned by the transport, and Agents use the transport's values for them.
     #[serde_as(deserialize_as = "DefaultOnNull")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-null" = true)))]
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -3024,7 +3025,8 @@ impl McpServerHttp {
         }
     }
 
-    /// HTTP headers to set when making requests to the MCP server.
+    /// HTTP headers to set when making requests to the MCP server. Headers the MCP transport
+    /// defines are owned by the transport, and Agents use the transport's values for them.
     #[must_use]
     pub fn headers(mut self, headers: Vec<HttpHeader>) -> Self {
         self.headers = headers;
