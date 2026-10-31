@@ -1,7 +1,7 @@
 //! Tool calls represent actions that language models request agents to perform.
 //!
-//! When an LLM determines it needs to interact with external systems—like reading files,
-//! running code, or fetching data—it generates tool calls that the agent executes on its behalf.
+//! Examples include reading a file or running a command. The agent executes the tool call on
+//! the model's behalf and reports its progress to the client.
 //!
 /// See protocol docs: [Tool Calls](https://agentclientprotocol.com/protocol/v2/tool-calls)
 use std::{collections::BTreeMap, sync::Arc};
@@ -94,12 +94,20 @@ pub struct ToolCallUpdate {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
     pub raw_output: MaybeUndefined<serde_json::Value>,
+    /// Client-initiated controls this tool call currently supports, such as cancellation.
+    ///
+    /// Omission leaves the capabilities unchanged, `null` clears them, and an object replaces
+    /// the whole previous value. A new tool call starts with none.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
+    #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
+    pub capabilities: MaybeUndefined<ToolCallCapabilities>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Omitted leaves the stored metadata unchanged; `null`
+    /// metadata to their interactions. Omitted leaves the stored metadata unchanged. `null`
     /// clears it. An object patches the stored metadata by top-level key: keys it omits are
     /// unchanged, a key set to `null` is removed, and any other value replaces that key's
     /// stored value without merging nested objects. Beyond this patch rule, implementations
-    /// MUST NOT make assumptions about values at these keys.
+    /// MUST NOT assign meaning to keys they do not recognize.
     ///
     /// See protocol docs: [Metadata Patches](https://agentclientprotocol.com/protocol/v2/extensibility#metadata-patches)
     #[serde_as(deserialize_as = "DefaultOnError<MaybeUndefined<_>>")]
@@ -113,7 +121,7 @@ pub struct ToolCallUpdate {
 }
 
 impl ToolCallUpdate {
-    /// Builds [`ToolCallUpdate`] with the required fields set; optional fields start unset or empty.
+    /// Builds [`ToolCallUpdate`] with the required fields set. Optional fields start unset or empty.
     #[must_use]
     pub fn new(tool_call_id: impl Into<ToolCallId>) -> Self {
         Self {
@@ -126,6 +134,7 @@ impl ToolCallUpdate {
             locations: MaybeUndefined::Undefined,
             raw_input: MaybeUndefined::Undefined,
             raw_output: MaybeUndefined::Undefined,
+            capabilities: MaybeUndefined::Undefined,
             meta: MaybeUndefined::Undefined,
         }
     }
@@ -188,9 +197,19 @@ impl ToolCallUpdate {
         self
     }
 
+    /// Sets, clears, or leaves unchanged the Client-initiated controls.
+    #[must_use]
+    pub fn capabilities(
+        mut self,
+        capabilities: impl IntoMaybeUndefined<ToolCallCapabilities>,
+    ) -> Self {
+        self.capabilities = capabilities.into_maybe_undefined();
+        self
+    }
+
     /// Patches, clears, or leaves unchanged tool-call metadata.
     ///
-    /// A concrete object patches stored metadata by top-level key; see
+    /// A concrete object patches stored metadata by top-level key. See
     /// [`apply_meta_update`].
     #[must_use]
     pub fn meta(mut self, meta: impl IntoMaybeUndefined<Meta>) -> Self {
@@ -229,7 +248,109 @@ impl ToolCallUpdate {
         if !update.raw_output.is_undefined() {
             self.raw_output = update.raw_output;
         }
+        if !update.capabilities.is_undefined() {
+            self.capabilities = update.capabilities;
+        }
         apply_meta_update(&mut self.meta, update.meta);
+    }
+}
+
+/// Client-initiated controls a tool call currently supports.
+///
+/// A malformed value falls back to no controls, so the Client never sends a request the
+/// Agent did not advertise.
+///
+/// See protocol docs: [Cancelling Tool Calls](https://agentclientprotocol.com/protocol/v2/tool-calls#cancelling-tool-calls)
+#[serde_as]
+#[skip_serializing_none]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ToolCallCapabilities {
+    /// Permits the Client to cancel this tool call with `tool_call/cancel`.
+    ///
+    /// Omitted and `null` are equivalent and mean unsupported. An object (including `{}`)
+    /// means supported. Agents SHOULD stop advertising it once the tool call reaches a final status.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
+    #[serde(default)]
+    pub cancel: Option<ToolCallCancelCapabilities>,
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
+    /// Implementations MUST NOT assign meaning to keys they do not recognize.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
+    #[serde(default)]
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+impl ToolCallCapabilities {
+    /// Builds an empty capability set. Cancellation is not advertised.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets or removes permission to cancel this tool call.
+    #[must_use]
+    pub fn cancel(mut self, cancel: impl IntoOption<ToolCallCancelCapabilities>) -> Self {
+        self.cancel = cancel.into_option();
+        self
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
+    /// do not recognize.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
+    }
+}
+
+/// Capability to cancel a tool call with `tool_call/cancel`.
+///
+/// Supplying `{}` advertises support. An omitted or `null` `cancel` does not.
+#[serde_as]
+#[skip_serializing_none]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ToolCallCancelCapabilities {
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
+    /// Implementations MUST NOT assign meaning to keys they do not recognize.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
+    #[serde(default)]
+    #[serde(rename = "_meta")]
+    pub meta: Option<Meta>,
+}
+
+impl ToolCallCancelCapabilities {
+    /// Builds an empty capability object advertising cancellation support.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
+    /// do not recognize.
+    ///
+    /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
+    #[must_use]
+    pub fn meta(mut self, meta: impl IntoOption<Meta>) -> Self {
+        self.meta = meta.into_option();
+        self
     }
 }
 
@@ -252,7 +373,7 @@ pub struct ToolCallContentChunk {
     pub content: ToolCallContent,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
-    /// Implementations MUST NOT make assumptions about values at these keys.
+    /// Implementations MUST NOT assign meaning to keys they do not recognize.
     /// This metadata is scoped to the chunk and does not patch stored metadata.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
@@ -264,7 +385,7 @@ pub struct ToolCallContentChunk {
 }
 
 impl ToolCallContentChunk {
-    /// Builds [`ToolCallContentChunk`] with the required fields set; optional fields start unset or empty.
+    /// Builds [`ToolCallContentChunk`] with the required fields set. Optional fields start unset or empty.
     #[must_use]
     pub fn new(tool_call_id: impl Into<ToolCallId>, content: impl Into<ToolCallContent>) -> Self {
         Self {
@@ -275,8 +396,8 @@ impl ToolCallContentChunk {
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys. This field is chunk-scoped.
+    /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
+    /// do not recognize. This field is chunk-scoped.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
@@ -359,12 +480,15 @@ pub enum ToolKind {
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ToolCallStatus {
-    /// The tool call hasn't started running yet because the input is either
-    /// streaming or we're awaiting approval.
+    /// The tool call hasn't started running yet, for example because its input is
+    /// streaming, it is awaiting approval, or it is scheduled to run later.
     #[default]
     Pending,
     /// The tool call is currently running.
     InProgress,
+    /// The tool call has started, is not running now, and will not continue until
+    /// something resumes it. It may return to `in_progress` any number of times.
+    Paused,
     /// The tool call completed successfully.
     Completed,
     /// The tool call failed with an error.
@@ -510,7 +634,7 @@ pub struct Content {
     pub content: ContentBlock,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
-    /// Implementations MUST NOT make assumptions about values at these keys.
+    /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -521,7 +645,7 @@ pub struct Content {
 }
 
 impl Content {
-    /// Builds [`Content`] with the required fields set; optional fields start unset or empty.
+    /// Builds [`Content`] with the required fields set. Optional fields start unset or empty.
     #[must_use]
     pub fn new(content: impl Into<ContentBlock>) -> Self {
         Self {
@@ -531,8 +655,8 @@ impl Content {
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
+    /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
+    /// do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
@@ -573,7 +697,7 @@ pub struct Diff {
     pub patch: Option<DiffPatch>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
-    /// Implementations MUST NOT make assumptions about values at these keys.
+    /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -608,8 +732,8 @@ impl Diff {
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
+    /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
+    /// do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
@@ -633,7 +757,7 @@ pub struct DiffPatch {
     pub text: String,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
-    /// Implementations MUST NOT make assumptions about values at these keys.
+    /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -655,8 +779,8 @@ impl DiffPatch {
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
+    /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
+    /// do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
@@ -746,7 +870,7 @@ pub struct DiffChange {
     pub operation: DiffChangeOperation,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
-    /// Implementations MUST NOT make assumptions about values at these keys.
+    /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -757,7 +881,7 @@ pub struct DiffChange {
 }
 
 impl DiffChange {
-    /// Builds [`DiffChange`] with the required fields set; optional fields start unset or empty.
+    /// Builds [`DiffChange`] with the required fields set. Optional fields start unset or empty.
     #[must_use]
     pub fn new(operation: DiffChangeOperation) -> Self {
         Self {
@@ -821,8 +945,8 @@ impl DiffChange {
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
+    /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
+    /// do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
@@ -868,7 +992,7 @@ pub struct DiffPathChange {
 }
 
 impl DiffPathChange {
-    /// Builds [`DiffPathChange`] with the required fields set; optional fields start unset or empty.
+    /// Builds [`DiffPathChange`] with the required fields set. Optional fields start unset or empty.
     #[must_use]
     pub fn new(path: impl Into<AbsolutePath>) -> Self {
         Self { path: path.into() }
@@ -888,7 +1012,7 @@ pub struct DiffPathPairChange {
 }
 
 impl DiffPathPairChange {
-    /// Builds [`DiffPathPairChange`] with the required fields set; optional fields start unset or empty.
+    /// Builds [`DiffPathPairChange`] with the required fields set. Optional fields start unset or empty.
     #[must_use]
     pub fn new(old_path: impl Into<AbsolutePath>, path: impl Into<AbsolutePath>) -> Self {
         Self {
@@ -990,14 +1114,14 @@ pub struct ToolCallLocation {
     /// The absolute file path being accessed or modified.
     pub path: AbsolutePath,
     /// Optional 1-based line number within the file. Omitted and `null` are equivalent and
-    /// mean no specific line; `0` is invalid.
+    /// mean no specific line. `0` is invalid.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub line: Option<std::num::NonZeroU32>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
-    /// Implementations MUST NOT make assumptions about values at these keys.
+    /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -1008,7 +1132,7 @@ pub struct ToolCallLocation {
 }
 
 impl ToolCallLocation {
-    /// Builds [`ToolCallLocation`] with the required fields set; optional fields start unset or empty.
+    /// Builds [`ToolCallLocation`] with the required fields set. Optional fields start unset or empty.
     #[must_use]
     pub fn new(path: impl Into<AbsolutePath>) -> Self {
         Self {
@@ -1029,8 +1153,8 @@ impl ToolCallLocation {
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
+    /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
+    /// do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
@@ -1052,6 +1176,46 @@ mod tests {
             serde_json::from_value(serde_json::json!({ "path": "/a.rs", "line": 3 })).unwrap();
         assert_eq!(location.line.map(std::num::NonZeroU32::get), Some(3));
         assert_eq!(ToolCallLocation::new("/a.rs").line(0).line, None);
+    }
+
+    #[test]
+    fn toolcall_capabilities_patch_and_tolerate_malformed_values() {
+        use serde_json::json;
+        let update = ToolCallUpdate::new("call_012")
+            .capabilities(ToolCallCapabilities::new().cancel(ToolCallCancelCapabilities::new()));
+        assert_eq!(
+            serde_json::to_value(&update).unwrap(),
+            json!({ "toolCallId": "call_012", "capabilities": { "cancel": {} } })
+        );
+
+        let mut stored = update;
+        stored.apply_update(ToolCallUpdate::new("call_012"));
+        assert!(stored.capabilities.is_value());
+        stored.apply_update(ToolCallUpdate::new("call_012").capabilities(MaybeUndefined::Null));
+        assert!(stored.capabilities.is_null());
+
+        for bad in [json!("yes"), json!(1)] {
+            let parsed: ToolCallUpdate =
+                serde_json::from_value(json!({ "toolCallId": "call_012", "capabilities": bad }))
+                    .unwrap();
+            assert!(parsed.capabilities.is_undefined());
+        }
+        let parsed: ToolCallCapabilities =
+            serde_json::from_value(json!({ "cancel": "yes" })).unwrap();
+        assert_eq!(parsed.cancel, None);
+    }
+
+    #[test]
+    fn paused_is_a_known_tool_call_status() {
+        use serde_json::json;
+        assert_eq!(
+            serde_json::to_value(ToolCallStatus::Paused).unwrap(),
+            json!("paused")
+        );
+        assert_eq!(
+            serde_json::from_value::<ToolCallStatus>(json!("paused")).unwrap(),
+            ToolCallStatus::Paused
+        );
     }
 
     use super::*;

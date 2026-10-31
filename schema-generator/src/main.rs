@@ -7,11 +7,19 @@ use agent_client_protocol_schema::v1::{
     ClientNotification, ClientRequest, ClientResponse, JsonRpcMessage, Notification,
     PROTOCOL_LEVEL_METHOD_NAMES, ProtocolLevelNotification, Request, Response,
 };
+#[cfg(all(feature = "unstable", not(feature = "unstable_protocol_v2")))]
+use agent_client_protocol_schema::v1::{
+    PROXY_METHOD_NAMES, ProxyNotification, ProxyRequest, ProxyResponse,
+};
 #[cfg(feature = "unstable_protocol_v2")]
 use agent_client_protocol_schema::v2::{
     AGENT_METHOD_NAMES, AgentNotification, AgentRequest, AgentResponse, CLIENT_METHOD_NAMES,
     ClientNotification, ClientRequest, ClientResponse, JsonRpcMessage, Notification,
     PROTOCOL_LEVEL_METHOD_NAMES, ProtocolLevelNotification, Request, Response,
+};
+#[cfg(all(feature = "unstable", feature = "unstable_protocol_v2"))]
+use agent_client_protocol_schema::v2::{
+    PROXY_METHOD_NAMES, ProxyNotification, ProxyRequest, ProxyResponse,
 };
 use schemars::{
     JsonSchema,
@@ -73,6 +81,18 @@ enum ClientOutgoingMessage {
     Notification(Notification<ClientNotification>),
 }
 
+/// All messages that a conductor and its proxies send each other.
+#[cfg(feature = "unstable")]
+#[derive(Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+#[schemars(inline)]
+#[allow(clippy::large_enum_variant)]
+enum ProxyMessage {
+    Request(Request<ProxyRequest>),
+    Response(Response<ProxyResponse>),
+    Notification(Notification<ProxyNotification>),
+}
+
 #[expect(dead_code)]
 #[derive(JsonSchema)]
 #[serde(untagged)]
@@ -82,6 +102,8 @@ enum AcpTypes {
     Agent(JsonRpcMessage<AgentOutgoingMessage>),
     Client(JsonRpcMessage<ClientOutgoingMessage>),
     ProtocolLevel(JsonRpcMessage<Notification<ProtocolLevelNotification>>),
+    #[cfg(feature = "unstable")]
+    Proxy(JsonRpcMessage<ProxyMessage>),
 }
 
 fn main() {
@@ -167,12 +189,17 @@ fn write_schema(schema_value: &serde_json::Value, schema_dir: &Path, docs_protoc
     let schema_protocol_version = ProtocolVersion::V1;
 
     // Create a combined metadata object
-    let metadata = serde_json::json!({
+    #[cfg_attr(not(feature = "unstable"), expect(unused_mut))]
+    let mut metadata = serde_json::json!({
         "version": schema_protocol_version,
         "agentMethods": AGENT_METHOD_NAMES,
         "clientMethods": CLIENT_METHOD_NAMES,
         "protocolMethods": PROTOCOL_LEVEL_METHOD_NAMES,
     });
+    #[cfg(feature = "unstable")]
+    {
+        metadata["proxyMethods"] = serde_json::to_value(PROXY_METHOD_NAMES).unwrap();
+    }
 
     let meta_file: &str = match (
         cfg!(feature = "unstable_protocol_v2"),
@@ -754,6 +781,46 @@ mod schema_annotation_tests {
         }
     }
 
+    #[cfg(feature = "unstable")]
+    #[test]
+    fn generated_unstable_schema_has_separate_proxy_side() {
+        let schema = root_schema_value();
+        let proxy = root_variant_schema(&schema, "Proxy");
+        for (union, members) in [
+            (
+                "ProxyRequest",
+                &["InitializeProxyRequest", "ProxySuccessorRequest"][..],
+            ),
+            (
+                "ProxyResponse",
+                &["InitializeProxyResponse", "ProxySuccessorResponse"][..],
+            ),
+            ("ProxyNotification", &["ProxySuccessorNotification"][..]),
+        ] {
+            assert!(
+                schema_contains_ref(proxy, &format!("#/$defs/{union}")),
+                "missing {union} in Proxy"
+            );
+            for member in members {
+                assert!(
+                    schema_contains_ref(def_schema(&schema, union), &format!("#/$defs/{member}")),
+                    "missing {member} in {union}"
+                );
+                assert_eq!(
+                    def_schema(&schema, member)["x-side"].as_str(),
+                    Some("proxy"),
+                    "{member} must be on the proxy side"
+                );
+            }
+        }
+        for union in ["ClientRequest", "AgentRequest"] {
+            assert!(
+                !schema_contains_ref(def_schema(&schema, union), "#/$defs/ProxySuccessorRequest"),
+                "{union} must not include proxy messages"
+            );
+        }
+    }
+
     #[cfg(feature = "unstable_protocol_v2")]
     #[test]
     fn generated_v2_schema_excludes_json_rpc_batch_messages() {
@@ -1038,7 +1105,7 @@ mod schema_annotation_tests {
             .unwrap_or_else(|| panic!("missing schema definition {def_name}"))
     }
 
-    #[cfg(feature = "unstable_protocol_v2")]
+    #[cfg(any(feature = "unstable", feature = "unstable_protocol_v2"))]
     fn root_variant_schema<'a>(schema: &'a Value, title: &str) -> &'a Value {
         schema
             .get("anyOf")
@@ -1162,6 +1229,7 @@ mod markdown_generator {
             let mut agent_types: BTreeMap<String, Vec<(String, Value)>> = BTreeMap::new();
             let mut client_types: BTreeMap<String, Vec<(String, Value)>> = BTreeMap::new();
             let mut protocol_types: BTreeMap<String, Vec<(String, Value)>> = BTreeMap::new();
+            let mut proxy_types: BTreeMap<String, Vec<(String, Value)>> = BTreeMap::new();
             let mut referenced_types: Vec<(String, Value)> = Vec::new();
 
             for (name, def) in &self.definitions {
@@ -1180,6 +1248,7 @@ mod markdown_generator {
                         "agent" => &mut agent_types,
                         "client" => &mut client_types,
                         "protocol" => &mut protocol_types,
+                        "proxy" => &mut proxy_types,
                         "both" => {
                             let entry = (name.clone(), def.clone());
                             agent_types
@@ -1259,6 +1328,25 @@ and control access to resources."
                     side_docs.client_method_doc(&method),
                     types,
                 );
+            }
+
+            if !proxy_types.is_empty() {
+                writeln!(&mut self.output, "## Proxy").unwrap();
+                writeln!(&mut self.output).unwrap();
+                writeln!(
+                    &mut self.output,
+                    "Defines the messages that a conductor and the proxies it manages send each other.
+
+Ordinary clients and agents never send or receive these messages. A conductor sends
+`proxy/initialize` to each proxy and forwards messages between proxies with
+`proxy/successor`."
+                )
+                .unwrap();
+                writeln!(&mut self.output).unwrap();
+
+                for (method, types) in proxy_types {
+                    self.generate_method(None, &method, side_docs.proxy_method_doc(&method), types);
+                }
             }
             {
                 writeln!(&mut self.output, "## Protocol Level").unwrap();
@@ -2241,6 +2329,7 @@ starting with '$/' it is free to ignore the notification."
         agent: HashMap<String, String>,
         client: HashMap<String, String>,
         protocol: HashMap<String, String>,
+        proxy: HashMap<String, String>,
     }
 
     impl SideDocs {
@@ -2257,6 +2346,10 @@ starting with '$/' it is free to ignore the notification."
                 "session/list" => self.agent.get("ListSessionsRequest").unwrap(),
                 "session/delete" => self.agent.get("DeleteSessionRequest").unwrap(),
                 "session/fork" => self.agent.get("ForkSessionRequest").unwrap(),
+                "session/archive" => self.agent.get("ArchiveSessionRequest").unwrap(),
+                "session/unarchive" => self.agent.get("UnarchiveSessionRequest").unwrap(),
+                "session/status" => self.agent.get("SessionStatusRequest").unwrap(),
+                "session/set_title" => self.agent.get("SetSessionTitleRequest").unwrap(),
                 "session/resume" => self.agent.get("ResumeSessionRequest").unwrap(),
                 "session/set_mode" => self.agent.get("SetSessionModeRequest").unwrap(),
                 "session/set_config_option" => {
@@ -2269,8 +2362,11 @@ starting with '$/' it is free to ignore the notification."
                     .or_else(|| self.agent.get("CancelNotification"))
                     .unwrap(),
                 "session/close" => self.agent.get("CloseSessionRequest").unwrap(),
+                "tool_call/cancel" => self.agent.get("CancelToolCallRequest").unwrap(),
+                "terminal/cancel" => self.agent.get("CancelTerminalRequest").unwrap(),
                 "logout" => self.agent.get("LogoutRequest").unwrap(),
                 "auth/logout" => self.agent.get("LogoutAuthRequest").unwrap(),
+                "auth/status" => self.agent.get("AuthStatusRequest").unwrap(),
                 "mcp/message" => self.agent.get("MessageMcpNotification").unwrap(),
                 _ => panic!("Introduced a method? Add it here :)"),
             }
@@ -2297,7 +2393,16 @@ starting with '$/' it is free to ignore the notification."
                 "elicitation/complete" => {
                     self.client.get("CompleteElicitationNotification").unwrap()
                 }
+                "auth/status_update" => self.client.get("AuthStatusUpdateNotification").unwrap(),
                 "mcp/message" => self.client.get("MessageMcpRequest").unwrap(),
+                _ => panic!("Introduced a method? Add it here :)"),
+            }
+        }
+
+        fn proxy_method_doc(&self, method_name: &str) -> &String {
+            match method_name {
+                "proxy/initialize" => self.proxy.get("InitializeProxyRequest").unwrap(),
+                "proxy/successor" => self.proxy.get("ProxySuccessorRequest").unwrap(),
                 _ => panic!("Introduced a method? Add it here :)"),
             }
         }
@@ -2403,6 +2508,24 @@ starting with '$/' it is free to ignore the notification."
                             && let Some(name) = variant["name"].as_str()
                         {
                             side_docs.client.insert(
+                                name.to_string(),
+                                variant["docs"].as_str().unwrap_or_default().to_string(),
+                            );
+                        }
+                    }
+                }
+
+                if matches!(
+                    item["name"].as_str(),
+                    Some("ProxyRequest" | "ProxyNotification")
+                ) && is_current_protocol_item(item)
+                    && let Some(variants) = item["inner"]["enum"]["variants"].as_array()
+                {
+                    for variant_id in variants {
+                        if let Some(variant) = doc["index"][variant_id.to_string()].as_object()
+                            && let Some(name) = variant["name"].as_str()
+                        {
+                            side_docs.proxy.insert(
                                 name.to_string(),
                                 variant["docs"].as_str().unwrap_or_default().to_string(),
                             );

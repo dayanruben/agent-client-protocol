@@ -19,6 +19,8 @@ mod ext;
 mod mcp;
 mod plan;
 mod protocol_level;
+#[cfg(feature = "unstable_proxy_chains")]
+mod proxy;
 mod rpc;
 #[cfg(feature = "schemars")]
 pub(crate) mod schema_util;
@@ -37,6 +39,8 @@ pub use ext::*;
 pub use mcp::*;
 pub use plan::*;
 pub use protocol_level::*;
+#[cfg(feature = "unstable_proxy_chains")]
+pub use proxy::*;
 pub use rpc::*;
 pub use serde_json::value::RawValue;
 pub use terminal::*;
@@ -131,8 +135,8 @@ impl<T: ?Sized + AsRef<OsStr>> crate::IntoMaybeUndefined<AbsolutePath> for &T {
 }
 /// A unique identifier for a conversation session between a client and agent.
 ///
-/// Sessions maintain their own context, conversation history, and state,
-/// allowing multiple independent interactions with the same agent.
+/// Each session has its own context, conversation history, and state, so one
+/// agent can run several independent sessions.
 ///
 /// See protocol docs: [Session ID](https://agentclientprotocol.com/protocol/v2/session-setup#session-id)
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]

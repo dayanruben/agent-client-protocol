@@ -15,11 +15,12 @@ use crate::IntoOption;
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CancelRequestNotification {
-    /// The ID of the request to cancel.
+    /// The ID of the request to cancel: a request that the sender of this notification issued.
+    /// Receivers match it only against requests they received from that sender.
     pub request_id: RequestId,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
-    /// Implementations MUST NOT make assumptions about values at these keys.
+    /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -30,7 +31,7 @@ pub struct CancelRequestNotification {
 }
 
 impl CancelRequestNotification {
-    /// Builds [`CancelRequestNotification`] with the required notification fields set; optional fields start unset or empty.
+    /// Builds [`CancelRequestNotification`] with the required notification fields set. Optional fields start unset or empty.
     #[must_use]
     pub fn new(request_id: impl Into<RequestId>) -> Self {
         Self {
@@ -40,8 +41,8 @@ impl CancelRequestNotification {
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
-    /// metadata to their interactions. Implementations MUST NOT make assumptions about values at
-    /// these keys.
+    /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
+    /// do not recognize.
     ///
     /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
     #[must_use]
