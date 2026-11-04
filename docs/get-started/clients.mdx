@@ -124,6 +124,7 @@ The following projects implement ACP directly, connect ACP agents to other envir
 - [Paca](https://github.com/Paca-AI/paca) — self-hosted, AI-native project management where humans and ACP agents share the same board and sprints
 - [Threadlines](https://github.com/Threadlines/threadlines) - open-source desktop app for coding agents, with a live browser, terminal, and source control beside each thread. Runs Cursor, Antigravity and fx over ACP, plus agents from the ACP registry, alongside Codex and Claude Code, and several agents can share one thread (macOS, Windows, Linux)
 - [Fello](https://github.com/Zythum/fello) — open-source, agent-neutral desktop AI workspace for ACP agents and OpenAI-compatible APIs, with chat, files, terminals, diffs, project memory, MCP tools, WebUI remote access, and WeChat iLink (macOS, Windows, Linux)
+- [Happier](https://github.com/happier-dev/happier) - open-source, end-to-end encrypted, cross-device app to orchestrate Claude Code, Codex and other ACP agents on your own machines from desktop, phone and web
 
 ## Notebook and data tools
 
@@ -201,3 +202,4 @@ These connectors bridge ACP into other environments and transport layers:
 - [acpdbg](https://github.com/phimage/acpdbg) — bridges LLDB crashes (C/C++/Rust/Swift) to any ACP coding agent for root-cause analysis and live debugging
 - [Octop](https://github.com/TencentCloud/Octop) — self-hosted multi-user AI assistant with bidirectional ACP support for IDE and terminal agents
 - [a2acode](https://github.com/kanywst/a2acode) — serves any ACP agent over the [A2A](https://a2aprotocol.ai/) protocol so other agents can delegate coding work to it, carrying tool calls, diffs, plans and cost across, and turning `session/request_permission` into an A2A `input-required` pause the remote caller answers
+- [Remote ACP Bridge](https://github.com/brstic/remote-acp) — desktop app (Tauri, Rust) that lets websites you approve send tasks to your local ACP agents such as Codex and Claude Code over an outbound-only relay, with per-site consent, local permission prompts and a project-folder firewall; includes a TypeScript SDK for websites
