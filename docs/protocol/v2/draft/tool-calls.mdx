@@ -122,6 +122,8 @@ also a valid arbitrary JSON value: omission leaves the stored value unchanged,
 patch representation cannot distinguish storing a literal JSON `null` from
 clearing the field.
 
+The Agent **MAY** also report a tool call that the model did not request, for [background work](/protocol/v2/draft/prompt-lifecycle#background-work) that has no other tool call.
+
 ## Updating
 
 As tools execute, Agents send updates to report progress and results.
@@ -418,7 +420,7 @@ Custom or future status values can be used when Clients can display a generic pr
 
 Clients **SHOULD** show `in_progress` as active, `pending` as waiting or scheduled, and `paused` as paused. Statuses never go back to `pending`: a scheduled wakeup goes from `pending` to `completed` when it fires, and the work it triggers is new foreground work. `in_progress` and `paused` may alternate any number of times. How work is paused and resumed is up to the Agent.
 
-`completed`, `failed`, and `cancelled` are final. When foreground work ends, whether it finished, was [cancelled](/protocol/v2/draft/prompt-lifecycle#cancellation), or failed, the Agent **SHOULD** give each of that work's unfinished tool calls a final status. Tool calls in the session's [`background`](/protocol/v2/draft/prompt-lifecycle#background-work) list are not part of that work. If a tool call's [permission request](#requesting-permission) is rejected or answered with `cancelled`, the Agent reports the tool call as `cancelled` or `failed` rather than leaving it `pending`.
+`completed`, `failed`, and `cancelled` are final. If work goes on after its tool call is final, the Agent reports it on a new tool call. When foreground work ends, whether it finished, was [cancelled](/protocol/v2/draft/prompt-lifecycle#cancellation), or failed, the Agent **SHOULD** give each of that work's unfinished tool calls a final status. Tool calls in the session's [`background`](/protocol/v2/draft/prompt-lifecycle#background-work) list are not part of that work. If a tool call's [permission request](#requesting-permission) is rejected or answered with `cancelled`, the Agent reports the tool call as `cancelled` or `failed` rather than leaving it `pending`.
 
 ### Cancelling tool calls
 
@@ -722,6 +724,31 @@ update or symlink target change:
 ```
 
 Clients **SHOULD** show affected paths from `changes`, not from `patch` headers.
+
+### Sessions (unstable)
+
+**Draft only.** A session content item links the tool call to another session
+it operates on, such as a [subagent](/rfds/subagents) it spawned or waits on:
+
+```json
+{
+  "type": "session",
+  "sessionId": "sess_child_1"
+}
+```
+
+<ParamField path="sessionId" type="string" required>
+  The referenced session. It must already be known through ordinary session
+  setup or a `subagent_update` announcement.
+</ParamField>
+
+Optional nullable `_meta` is scoped to this content item. Omission and `null`
+both mean that no item metadata was provided. A tool call can reference several
+sessions. The reference is display-only. It does not establish ownership,
+enable Client-initiated controls on the referenced session, or report that
+session's work state. The task a parent
+sends a child is reported as a [session-directed message](/protocol/v2/draft/prompt-lifecycle#session-directed-messages-unstable),
+not through a tool call.
 
 ## Following the Agent
 
