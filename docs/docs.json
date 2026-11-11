@@ -54,6 +54,7 @@
             "pages": [
               "get-started/introduction",
               "get-started/architecture",
+              "get-started/related-protocols",
               "get-started/agents",
               "get-started/clients",
               "get-started/registry"
@@ -203,7 +204,8 @@
               "rfds/get-auth-state",
               "rfds/session-status",
               "rfds/session-set-title",
-              "rfds/session-archive"
+              "rfds/session-archive",
+              "rfds/session-options"
             ]
           },
           {
