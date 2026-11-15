@@ -6,12 +6,26 @@ rss: true
 
 This page tracks lifecycle changes for ACP Requests for Dialog. For broader ACP announcements, see [Updates](/updates).
 
+<Update label="November 14, 2026" tags={["Draft"]}>
+## Agent Skills RFD moves to Draft stage
+
+The RFD for Agent Skills in ACP v2 has moved to Draft. Agents advertise skills as `skill` entries in `availableCommands` to Clients that advertise the `session.commands.skill` capability. Clients invoke a skill with a `skill` content block. Please review the [RFD](/rfds/agent-skills) and provide feedback.
+
+</Update>
+
 <Update label="November 13, 2026" tags={["Preview"]}>
 ## Subagent Sessions RFD moves to Preview stage
 
 The Subagent Sessions RFD has moved to Preview. The schema covers ACP v1 and
 v2. Please review the [RFD](/rfds/subagents), and provide Agent/Client interoperability feedback before
 stabilization.
+
+</Update>
+
+<Update label="November 13, 2026" tags={["Draft"]}>
+## Prompt Suggestions RFD moves to Draft stage
+
+The RFD for a `prompt_suggestions_update` session update has moved to Draft. Agents use it to send prompts they predict the user will send next. Clients that advertise the `promptSuggestions` capability offer them in the composer. Please review the [RFD](/rfds/prompt-suggestions) and provide feedback.
 
 </Update>
 
