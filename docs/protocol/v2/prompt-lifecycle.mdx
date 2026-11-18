@@ -21,7 +21,7 @@ Agents send `session/update` notifications to report streamed content, tool acti
 | `agent_message`             | Creates or updates an Agent message identified by `messageId`.                                                                         |
 | `agent_thought_chunk`       | A streamed chunk of the Agent's reasoning.                                                                                             |
 | `agent_thought`             | Creates or updates an Agent reasoning message identified by `messageId`.                                                               |
-| `subagent_update`           | Announces an owned child session or updates its display metadata, working directories, capabilities, and mirrored work-state snapshot. |
+| `subagent_update`           | Announces a [child session](/protocol/v2/subagents) or updates its labels, working directories, capabilities, and mirrored work state. |
 | `session_message`           | Creates or updates a [message addressed to another session](#session-directed-messages).                                               |
 | `session_message_chunk`     | Appends content to a [session-directed message](#session-directed-messages).                                                           |
 | `state_update`              | A snapshot of the Agent's [foreground activity](#session-states).                                                                      |
@@ -134,12 +134,12 @@ when observed. Clients must not synthesize an incoming entry from an outgoing
 one or forward the content themselves. Neither view acknowledges completed
 recipient processing.
 
-The task a parent gives a subagent, including the first one that starts its
+A message from a parent to a subagent, including the first one that starts its
 work, is a session-directed message. Agents **SHOULD** report it as an
 incoming `session_message` in the child's transcript, with `senderSessionId`
 set to the parent, and **SHOULD NOT** report it as a `user_message`. Clients
 can then render it as a message from the parent session rather than from the
-user. See [Delegated tasks](/rfds/subagents#delegated-tasks).
+user. See [Messages from a parent to a child](/protocol/v2/subagents#messages-from-a-parent-to-a-child).
 
 When the Agent has no evidence of who sent a message the child received, it
 omits `senderSessionId` and **MUST NOT** assume the parent. It links two views
@@ -184,7 +184,7 @@ Background work is session-owned work running independently of foreground work. 
 
 - **Terminals.** A process that keeps running after its tool call returns control to the model, such as a backgrounded shell or dev server, is a [terminal](/protocol/v2/tool-calls#display-only-terminals). It is live until its `terminal_update` reports `exitStatus`. While it is listed, the Agent **SHOULD** keep its output current whenever it can read the process output. Output is not a liveness signal: a Client **MUST NOT** treat a terminal as hung or exited because its output is missing or stale.
 - **Tool calls.** Work without a process of its own, such as a watcher, a workflow, or a scheduled wakeup, keeps reporting [status](/protocol/v2/tool-calls#status) on its tool call. `pending` and `paused` tool calls are still live.
-- **Subagent sessions.** A background child keeps reporting through its [subagent](/rfds/subagents) association and `state`.
+- **Subagent sessions.** A background [child session](/protocol/v2/subagents#work-state) keeps reporting its `state`, on its own `state_update` and on its parent's `subagent_update`.
 
 Work without a process stays on the tool call that started it. When the Agent knows that a tool call's work continues after the call returns control to the model, it **SHOULD** keep that tool call `pending`, `in_progress`, or `paused` and list it, instead of giving it a final status. Some background work has no such tool call. No tool call started it, such as a task that a hook started, or the Agent learned of the work only after its tool call reached a final status. The Agent **MAY** start a tool call of its own for such work, with a title that describes the work, and list it. It sends that tool call like any other, before the first list that names it, even while the session is `idle`. The Agent does not reopen a tool call that has a final status. It starts a new one instead.
 
@@ -322,6 +322,12 @@ The Client sends a user message with `session/prompt`:
     </Card>
 
 </ParamField>
+<ParamField path="idempotencyKey" type="IdempotencyKey">
+    A key the Client generates to identify this submission. With a key, the Client can send the request again without the user message being inserted twice.
+
+    Omitted and `null` are equivalent and mean no key. When present, the value is a string of 1 to 255 characters. See [Retrying a prompt](#retrying-a-prompt).
+
+</ParamField>
 
 ### 2. Prompt accepted
 
@@ -374,7 +380,9 @@ The Client uses the JSON-RPC response ID to identify its submission, then associ
 
 Insertion is not a promise of durable storage or model consumption. Every inserted input, including a locally handled command, is reported live, but Agents are not required to persist it or retain it for any minimum period. If the message is retained and replayed, the Agent **MUST** use the same ID. See [Resuming Sessions](/protocol/v2/session-setup#resuming-sessions).
 
-A successful prompt response is not an `idle` signal. Session work and notifications continue independently of the completed prompt request. The response has no fixed order relative to other session updates: the `user_message` acknowledgment, Agent output, and even the `idle` `state_update` that ends the resulting work may arrive before or after it. Clients **MUST NOT** infer ordering between them. If the response is lost, the submission's outcome remains uncertain: replay may omit live-only or discarded messages, and a retry can create another submission.
+A successful prompt response is not an `idle` signal. Session work and notifications continue independently of the completed prompt request. The response has no fixed order relative to other session updates: the `user_message` acknowledgment, Agent output, and even the `idle` `state_update` that ends the resulting work may arrive before or after it. Clients **MUST NOT** infer ordering between them.
+
+If the response is lost, the Client cannot learn the submission's outcome from the session, because replay may omit live-only or discarded messages. A prompt sent with an `idempotencyKey` can be sent again with the same key. Without a key, a retry can create another submission. See [Retrying a prompt](#retrying-a-prompt).
 
 The same insertion boundary applies when [closing the session](/protocol/v2/session-setup#closing-active-sessions) cancels a pending prompt: if closing prevents insertion, the request receives `-32800` (Request Cancelled). If the message has already been inserted, it receives a successful `messageId` response. Prompt responses need not precede the close response.
 
@@ -386,13 +394,78 @@ The same insertion boundary applies when [closing the session](/protocol/v2/sess
 
 Clients **MAY** send `session/prompt` in any state, including while foreground work is `running` or `requires_action`. The Agent either inserts the prompt right away or holds it and inserts it later. Held prompts are inserted in the order they were received. What inserting during active work means, such as steering the current turn or starting the next one, is up to the Agent. Agents **MUST NOT** reject a prompt only because foreground work is active.
 
-A held prompt's response stays pending until the prompt is inserted. The Client can withdraw it with [`$/cancel_request`](/protocol/v2/cancellation), and [`session/cancel`](#cancellation) and `session/close` answer prompts that haven't been inserted with `-32800`. Future capabilities may let Agents advertise steering or queueing behavior.
+A held prompt's response stays pending until the prompt is inserted. Until then, the Client can drop it in two ways:
+
+- [`session/cancel`](#cancellation) and `session/close` drop every prompt the Agent has not inserted. The Agent answers each of them with `-32800`. Both also stop the foreground work.
+- [`$/cancel_request`](/protocol/v2/cancellation) for the prompt's request is best effort, because request cancellation is optional for the receiver. An Agent that honors it answers with `-32800` and does not insert the message. Otherwise the prompt is inserted as usual, and the response carries its `messageId`.
+
+Once a prompt is inserted, the Client cannot withdraw it. It stops the work the prompt started with `session/cancel`.
+
+A guaranteed way to remove one held prompt is left to future capabilities, which may also let Agents advertise steering or queueing behavior.
 
 #### Prompts that are never inserted
 
 If a request is rejected before insertion, including by a hook or early failure, the Agent **MUST** return a JSON-RPC error response and **MUST NOT** emit user-message updates for that submission. [Request cancellation](/protocol/v2/cancellation) before insertion uses `-32800`.
 
 The [foreground lifecycle](#foreground-and-background-work) applies independently of the request outcome: report `idle` when no foreground work remains, not merely because a prompt was rejected. A failed foreground hook can therefore require both a prompt error response and an idle update. If no foreground work started, rejection requires no state transition.
+
+#### Retrying a prompt
+
+A Client that never receives the response to a `session/prompt` request cannot tell whether the message was inserted. `session/prompt` is the one [keyed](/protocol/v2/overview#retrying-requests) method. To be able to send the request again, the Client includes an `idempotencyKey`:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 7,
+  "method": "session/prompt",
+  "params": {
+    "sessionId": "sess_abc123def456",
+    "idempotencyKey": "0b6f3c1e-8d2a-4c57-9a41-5e2f7d90c3ab",
+    "prompt": [
+      {
+        "type": "text",
+        "text": "Run the database migration"
+      }
+    ]
+  }
+}
+```
+
+- Agents that advertise `capabilities.session` **MUST** support the key. There is no separate capability.
+- The field is optional. Omitted and `null` are equivalent and mean no key. The Agent then handles the prompt without duplicate detection.
+- When present, the key is an opaque, case-sensitive string of 1 to 255 characters. The Agent **MUST** reject any other value with `-32602` (Invalid params) and **MUST NOT** treat it as omitted.
+- The Client generates the key. Clients **SHOULD** use a UUID ([RFC 9562](https://www.rfc-editor.org/rfc/rfc9562)) or another random value with at least as much entropy. Clients **SHOULD NOT** derive the key from user content or put sensitive data in it.
+- One key identifies one submission. The Client creates the key when the user submits the input and stores it with the pending input. It sends the same key on every attempt, including after it reconnects or restarts. It uses a new key for a new submission, including when the user sends the same text again on purpose.
+- Clients **MUST NOT** send the same key with a different prompt.
+- Each attempt is its own JSON-RPC request with its own `id`.
+
+The Agent looks the key up in the session:
+
+| What the Agent has recorded for the key                                                               | What the Agent does                                                                                      |
+| ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Nothing                                                                                               | Handles the prompt as usual. When the user message is inserted, it records the key with it.              |
+| A message that was inserted with this key                                                             | Doesn't insert a message. Responds with that message's `messageId`.                                      |
+| A prompt with this key that is not inserted yet, such as a [held prompt](#prompts-during-active-work) | Doesn't hold a second prompt. Answers this request when it answers the first one, with the same outcome. |
+
+- **The response.** A retry gets the original `messageId` and nothing else. The Agent doesn't start a second round of work for the message. Whether it continues work that stopped before it finished is up to the Agent. The Client learns the session's current activity from live updates or from the [`session/resume` snapshot](/protocol/v2/session-setup#current-state-synchronization).
+- **Errors leave the key unused.** An error response to `session/prompt` means the message was not inserted. The Agent records nothing, and the Client can send the same prompt with the same key again.
+- **A reused key.** The Agent **MUST NOT** insert a second message for a key it has recorded. If a request carries a recorded key with a different prompt, the Agent either answers as for a retry or, if it notices the difference, rejects the request with `-32602`. Agents are not required to compare prompts. After such a `-32602`, the key stays recorded for the first prompt.
+- **Cancelling.** An Agent that honors [`$/cancel_request`](/protocol/v2/cancellation) for any pending request with the key withdraws the prompt if it is not inserted yet. It then answers every pending request for that key with `-32800`. `session/cancel` and `session/close` answer held prompts as described in [Prompts during active work](#prompts-during-active-work).
+- **Keys stay private.** The Agent doesn't echo keys in session updates, `session/list` results, or replayed history. A key is not a credential. It only has meaning in a session the caller can already prompt.
+
+A key is scoped to the session named by `sessionId`. The same key string in another session names an unrelated submission.
+
+A key lasts as long as the message it belongs to:
+
+- For a prompt whose inserted message the Agent retains, the Agent **MUST** recognize the key for as long as it retains the message. This holds across connections and Agent restarts.
+- For a prompt whose message the Agent doesn't retain, such as a [locally handled command](/protocol/v2/slash-commands#running-commands), the Agent **MUST** recognize the key while the session stays active on a connection. After that it **MAY** forget it.
+- Once the Agent no longer has the message or the session, it **MAY** forget the key. A prompt with a forgotten key is a new submission.
+
+Agents **SHOULD** store the key in the same step as the message, for example as part of the message's ID. If a restart loses a message that was never written to the stored session, the key is lost with it, and the retry inserts the message.
+
+A key is not tied to the connection that first carried it. The Agent recognizes it on any connection where the session is active. After reconnecting, the Client calls `initialize` and `session/resume`, then sends the prompt again. Clients **SHOULD** resend a pending prompt as soon as they have resumed the session. A Client that has held a prompt for a long time, such as since a previous day, **SHOULD** show it to the user instead of resending it. By then the Agent may have discarded the message.
+
+An intermediary that forwards `session/prompt` forwards `idempotencyKey` unchanged.
 
 ### 3. Agent reports output
 
@@ -786,6 +859,8 @@ The Agent **MAY** also report current session context and cumulative cost state 
 
 `used` and `size` are required and non-null token counts for the current session context. `cost` is a patch field: omitting it leaves the last reported cost unchanged, `null` clears it, and a value replaces it, including when the currency differs. A value requires `amount` and `currency`. `currency` is the unit of `amount`: an ISO 4217 currency code such as `"USD"` for money, or another unit such as `"credits"`.
 
+When a session has [child sessions](/protocol/v2/subagents#usage-and-cost), its `cost` includes the costs of its descendants.
+
 ### 4. Report completion
 
 When foreground work ends, the Agent **MUST** report `idle` with a `state_update` notification and **SHOULD** include the corresponding [`StopReason`](#stop-reasons):
@@ -983,7 +1058,7 @@ Clients detect a lost connection or an exited Agent process themselves. No updat
 whether or not a prompt started it. It is not an event for an individual prompt,
 model call, permission request, or elicitation.
 
-For exposed subagents, Agents **SHOULD** also mirror the same snapshot in the
+For exposed [subagents](/protocol/v2/subagents#work-state), Agents **SHOULD** also mirror the same snapshot in the
 immediate parent's `subagent_update.state`. This keeps the parent's roster and
 the child's own stream informed about one logical state. Duplicate snapshots
 do not represent additional work or usage.
@@ -1143,9 +1218,11 @@ Clients **MAY** cancel the session's foreground work at any time by sending a `s
 
 `session/cancel` covers foreground work and prompts received before it that the Agent has not yet inserted. The Agent **MUST** answer the covered prompts with `-32800`, as described in [request cancellation](/protocol/v2/cancellation). A `session/prompt` received after `session/cancel` is not cancelled by it. Once a message is inserted, its prompt request still succeeds with its `messageId`. Cancellation does not undo that insertion. Work in the latest [`background`](#background-work) list is not covered and keeps running. The Agent **MAY** stop background activity it does not list.
 
+For a [child session](/protocol/v2/subagents#cancellation), the Client sends `session/cancel` only while the child advertises `capabilities.cancel`. Cancelling a session also cancels the child work that the cancelled work is waiting on.
+
 The Client **SHOULD** preemptively mark all non-finished tool calls pertaining to the current active work as `cancelled` as soon as it sends the `session/cancel` notification. It **SHOULD** skip tool calls in the latest `background` list and tool calls that reference a listed terminal. This mark is a local display hint: the Agent gives those tool calls their [final status](/protocol/v2/tool-calls#status), and its updates replace the mark.
 
-When the Agent stops the cancelled foreground work, it **MUST** stop waiting for that work's pending `session/request_permission` requests and treat them as not approved. It **SHOULD** cancel each of them with [`$/cancel_request`](/protocol/v2/cancellation) so the Client can dismiss the prompt. The Client **MAY** answer a request it knows belongs to the cancelled work with the `cancelled` outcome without waiting for `$/cancel_request`. Permission requests for work in the latest `background` list are not affected. For elicitation requests, see [Elicitation Cancellation](/protocol/v2/elicitation#session-cancellation).
+When the Agent stops the cancelled foreground work, it **MUST** stop waiting for that work's pending `session/request_permission` requests and treat them as not approved. It **MUST** cancel each of them with [`$/cancel_request`](/protocol/v2/cancellation). Only the Agent knows which work a request belongs to, so it decides which requests these are. A Client that receives it for a pending permission request **SHOULD** dismiss the prompt and answer with the `cancelled` outcome. The Client **MAY** answer a request it knows belongs to the cancelled work with the `cancelled` outcome without waiting for `$/cancel_request`. Permission requests for work in the latest `background` list are not affected. For elicitation requests, see [Elicitation Cancellation](/protocol/v2/elicitation#session-cancellation).
 
 When the Agent receives this notification, it **SHOULD** stop all language model requests and all tool call invocations of the cancelled foreground work as soon as possible.
 

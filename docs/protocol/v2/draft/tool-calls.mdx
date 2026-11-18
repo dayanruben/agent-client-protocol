@@ -323,7 +323,7 @@ The Client responds with the user's decision:
 
 Clients **MAY** automatically allow or reject permission requests according to the user settings.
 
-A permission request cancelled with [`$/cancel_request`](/protocol/v2/draft/cancellation), for example after [`session/cancel`](/protocol/v2/draft/prompt-lifecycle#cancellation), is answered with the `"cancelled"` outcome:
+When the Agent cancels a pending permission request with [`$/cancel_request`](/protocol/v2/draft/cancellation), for example after [`session/cancel`](/protocol/v2/draft/prompt-lifecycle#cancellation), the Client **SHOULD** dismiss the prompt and answer with the `"cancelled"` outcome:
 
 ```json
 {
@@ -418,9 +418,9 @@ Tool calls progress through different statuses during their lifecycle:
 
 Custom or future status values can be used when Clients can display a generic progress state. Custom status values **MUST** begin with `_`. Unknown non-underscore statuses are reserved for future ACP variants. Clients treat a tool call with an unrecognized status as still in progress.
 
-Clients **SHOULD** show `in_progress` as active, `pending` as waiting or scheduled, and `paused` as paused. Statuses never go back to `pending`: a scheduled wakeup goes from `pending` to `completed` when it fires, and the work it triggers is new foreground work. `in_progress` and `paused` may alternate any number of times. How work is paused and resumed is up to the Agent.
+Clients **SHOULD** show `in_progress` as active, `pending` as waiting or scheduled, and `paused` as paused. An Agent does not move a tool call back to `pending`. This includes `"status": null`, which resets the status to `pending`. A scheduled wakeup goes from `pending` to `completed` when it fires, and the work it triggers is new foreground work. `in_progress` and `paused` may alternate any number of times. How work is paused and resumed is up to the Agent.
 
-`completed`, `failed`, and `cancelled` are final. If work goes on after its tool call is final, the Agent reports it on a new tool call. When foreground work ends, whether it finished, was [cancelled](/protocol/v2/draft/prompt-lifecycle#cancellation), or failed, the Agent **SHOULD** give each of that work's unfinished tool calls a final status. Tool calls in the session's [`background`](/protocol/v2/draft/prompt-lifecycle#background-work) list are not part of that work. If a tool call's [permission request](#requesting-permission) is rejected or answered with `cancelled`, the Agent reports the tool call as `cancelled` or `failed` rather than leaving it `pending`.
+`completed`, `failed`, and `cancelled` are final: the work has ended, and the Agent does not change the status again. If work goes on after its tool call is final, the Agent reports it on a new tool call. A Client applies each `tool_call_update` as the upsert that [Reporting](#reporting) describes, so the status it shows is the latest one it received. When foreground work ends, whether it finished, was [cancelled](/protocol/v2/draft/prompt-lifecycle#cancellation), or failed, the Agent **SHOULD** give each of that work's unfinished tool calls a final status. Tool calls in the session's [`background`](/protocol/v2/draft/prompt-lifecycle#background-work) list are not part of that work. If a tool call's [permission request](#requesting-permission) is rejected or answered with `cancelled`, the Agent reports the tool call as `cancelled` or `failed` rather than leaving it `pending`.
 
 ### Cancelling tool calls
 
@@ -454,7 +454,7 @@ The Client cancels the tool call with a `tool_call/cancel` request:
 ```
 
 - The Client **MUST NOT** send it unless the tool call currently advertises `capabilities.cancel`.
-- `sessionId` is the session that reports the tool call. For a [subagent](/rfds/subagents)'s tool call, that is the child session: the tool call's own `cancel` enables the request even when the child doesn't advertise `cancel`.
+- `sessionId` is the session that reports the tool call. For a [subagent](/protocol/v2/draft/subagents#restricted-methods)'s tool call, that is the child session: the tool call's own `cancel` enables the request even when the child doesn't advertise `cancel`.
 - The Agent responds with an empty result once it has accepted the cancellation. The response does not mean the work has stopped. The Agent confirms that with a `tool_call_update` to a final status, normally `cancelled`, and may send `completed` or `failed` if the work finished first.
 - The Agent responds with `-32602` if the tool call is unknown, already final, or not cancellable. This includes a request that the Client sends again after the first one was accepted and the tool call has since reached a final status. The `tool_call_update` with that status reports the outcome.
 - Cancelling a tool call does not change the foreground state by itself. This works for foreground tool calls too, so a user can stop one long-running step without cancelling the rest of the work.
@@ -600,7 +600,7 @@ A terminal may keep running after its tool call returns control to the model, as
 The Agent **SHOULD** stop advertising `cancel` once the terminal reports `exitStatus`. The Client stops the process with a `terminal/cancel` request with the `sessionId` and `terminalId`:
 
 - The Client **MUST NOT** send it unless the terminal currently advertises `capabilities.cancel`.
-- `sessionId` is the session that reports the terminal. For a [subagent](/rfds/subagents)'s terminal, that is the child session: the terminal's own `cancel` enables the request even when the child doesn't advertise `cancel`.
+- `sessionId` is the session that reports the terminal. For a [subagent](/protocol/v2/draft/subagents#restricted-methods)'s terminal, that is the child session: the terminal's own `cancel` enables the request even when the child doesn't advertise `cancel`.
 - The Agent responds with an empty result once it has accepted the cancellation. The response does not mean the process has stopped. The Agent confirms that with a `terminal_update` that sets `exitStatus`.
 - The Agent responds with `-32602` if the terminal is unknown, has already exited, or is not cancellable. This includes a request that the Client sends again after the first one was accepted and the process has since exited. The `terminal_update` that sets `exitStatus` reports the outcome.
 - Cancelling stops the process but does not release the terminal: its output remains available for display and replay. It does not change the foreground state or the status of any tool call that references the terminal.
@@ -612,7 +612,7 @@ Input, resize, and other interactive control remain out of scope.
 File modifications shown as diffs. A diff always includes structured file
 changes and can optionally include renderable patch text.
 
-`changes` is authoritative for affected absolute paths and operations. `patch`,
+`changes` is authoritative for affected absolute paths and operations. Agents **MUST** include at least one entry in `changes`. `patch`,
 when present, provides renderable text for some or all of those changes and **MUST**
 be consistent with `changes`: it describes only those paths and operations. Agents
 **SHOULD** provide `patch` whenever feasible. Clients **MUST** handle diffs where
@@ -728,7 +728,7 @@ Clients **SHOULD** show affected paths from `changes`, not from `patch` headers.
 ### Sessions
 
 A session content item links the tool call to another session
-it operates on, such as a [subagent](/rfds/subagents) it spawned or waits on:
+it operates on, such as a [subagent](/protocol/v2/draft/subagents) it spawned or waits on:
 
 ```json
 {
@@ -746,7 +746,7 @@ Optional nullable `_meta` is scoped to this content item. Omission and `null`
 both mean that no item metadata was provided. A tool call can reference several
 sessions. The reference is display-only. It does not establish ownership,
 enable Client-initiated controls on the referenced session, or report that
-session's work state. The task a parent
+session's work state. A message a parent
 sends a child is reported as a [session-directed message](/protocol/v2/draft/prompt-lifecycle#session-directed-messages),
 not through a tool call.
 

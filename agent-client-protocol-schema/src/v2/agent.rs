@@ -20,6 +20,11 @@ use super::{
 };
 use crate::{IntoOption, ProtocolVersion};
 
+#[cfg(all(
+    feature = "unstable_session_fork",
+    feature = "unstable_session_cursors"
+))]
+use super::CursorId;
 #[cfg(feature = "unstable_session_status")]
 use super::StateUpdate;
 
@@ -1528,6 +1533,21 @@ impl NewSessionResponse {
 pub struct ForkSessionRequest {
     /// The ID of the session to fork.
     pub session_id: SessionId,
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// The session cursor to fork at. The new session's history is the source
+    /// session's history before the cursor.
+    ///
+    /// Optional. Omitted and `null` are equivalent and fork the whole session.
+    /// Clients MUST only send the ID of a cursor that the Agent announced on the
+    /// source session and that currently advertises `capabilities.fork`. The Agent
+    /// rejects any other ID with `-32602`. It does not fall back to forking the
+    /// whole session.
+    #[cfg(feature = "unstable_session_cursors")]
+    #[serde(default)]
+    pub cursor_id: Option<CursorId>,
     /// The working directory for this session. Must be an absolute path.
     pub cwd: AbsolutePath,
     /// Additional workspace roots to activate for this session. Each path must be absolute.
@@ -1595,6 +1615,8 @@ impl ForkSessionRequest {
     pub fn new(session_id: impl Into<SessionId>, cwd: impl Into<AbsolutePath>) -> Self {
         Self {
             session_id: session_id.into(),
+            #[cfg(feature = "unstable_session_cursors")]
+            cursor_id: None,
             cwd: cwd.into(),
             additional_directories: vec![],
             mcp_servers: vec![],
@@ -1603,6 +1625,21 @@ impl ForkSessionRequest {
             config_options: vec![],
             meta: None,
         }
+    }
+
+    /// **UNSTABLE**
+    ///
+    /// This capability is not part of the spec yet, and may be removed or changed at any point.
+    ///
+    /// The session cursor to fork at. Omitting it forks the whole session.
+    ///
+    /// Clients MUST only send the ID of a cursor that the Agent announced on the
+    /// source session and that currently advertises `capabilities.fork`.
+    #[cfg(feature = "unstable_session_cursors")]
+    #[must_use]
+    pub fn cursor_id(mut self, cursor_id: impl IntoOption<CursorId>) -> Self {
+        self.cursor_id = cursor_id.into_option();
+        self
     }
 
     /// Additional workspace roots to activate for this session. Each path must be absolute.
@@ -5037,6 +5074,128 @@ pub enum SystemPromptMode {
 
 // Prompt
 
+/// A key the Client generates to identify one `session/prompt` submission across attempts.
+///
+/// The key is an opaque, case-sensitive string of 1 to 255 characters. It is scoped to the
+/// session named by the request's `sessionId`.
+///
+/// See protocol docs: [Retrying a prompt](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#retrying-a-prompt)
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, Serialize, PartialEq, Eq, Hash, Display)]
+#[serde(transparent)]
+pub struct IdempotencyKey(
+    #[cfg_attr(feature = "schemars", schemars(length(min = 1, max = 255)))] Arc<str>,
+);
+
+impl IdempotencyKey {
+    /// The maximum length of a key, in characters.
+    pub const MAX_LENGTH: usize = 255;
+
+    /// Wraps a string as a typed [`IdempotencyKey`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`InvalidIdempotencyKey`] if the key is empty or longer than
+    /// [`Self::MAX_LENGTH`] characters.
+    pub fn new(key: impl Into<Arc<str>>) -> Result<Self, InvalidIdempotencyKey> {
+        let key = key.into();
+        if key.is_empty() {
+            return Err(InvalidIdempotencyKey::Empty);
+        }
+        // The limit counts characters, as JSON Schema `maxLength` does, not bytes.
+        if key.chars().nth(Self::MAX_LENGTH).is_some() {
+            return Err(InvalidIdempotencyKey::TooLong);
+        }
+        Ok(Self(key))
+    }
+
+    /// Generates a key from a random version 4 UUID ([RFC 9562]).
+    ///
+    /// Generate one key per submission, when the user submits the input, and store it
+    /// with the pending input. Every attempt for that submission sends the same key.
+    ///
+    /// [RFC 9562]: https://www.rfc-editor.org/rfc/rfc9562
+    #[cfg(feature = "uuid")]
+    #[must_use]
+    pub fn generate() -> Self {
+        uuid::Uuid::new_v4().into()
+    }
+
+    /// Returns the key as a string slice.
+    #[must_use]
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<str> for IdempotencyKey {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+#[cfg(feature = "uuid")]
+impl From<uuid::Uuid> for IdempotencyKey {
+    /// Uses the UUID's hyphenated lowercase form. It is 36 characters, so it is always a
+    /// valid key.
+    fn from(uuid: uuid::Uuid) -> Self {
+        Self(uuid.to_string().into())
+    }
+}
+
+impl TryFrom<String> for IdempotencyKey {
+    type Error = InvalidIdempotencyKey;
+
+    fn try_from(key: String) -> Result<Self, Self::Error> {
+        Self::new(key)
+    }
+}
+
+impl TryFrom<&str> for IdempotencyKey {
+    type Error = InvalidIdempotencyKey;
+
+    fn try_from(key: &str) -> Result<Self, Self::Error> {
+        Self::new(key)
+    }
+}
+
+impl std::str::FromStr for IdempotencyKey {
+    type Err = InvalidIdempotencyKey;
+
+    fn from_str(key: &str) -> Result<Self, Self::Err> {
+        Self::new(key)
+    }
+}
+
+// Deserialization validates the key, so a malformed value fails the request
+// instead of being treated as omitted.
+impl<'de> Deserialize<'de> for IdempotencyKey {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let key = Arc::<str>::deserialize(deserializer)?;
+        Self::new(key).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Error returned when a string is not a valid [`IdempotencyKey`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Display)]
+#[non_exhaustive]
+pub enum InvalidIdempotencyKey {
+    /// The key is an empty string.
+    #[display("idempotency key must not be empty")]
+    Empty,
+    /// The key is longer than [`IdempotencyKey::MAX_LENGTH`] characters.
+    #[display(
+        "idempotency key must be at most {} characters",
+        IdempotencyKey::MAX_LENGTH
+    )]
+    TooLong,
+}
+
+impl std::error::Error for InvalidIdempotencyKey {}
+
 /// Request parameters for sending a user prompt to the agent.
 ///
 /// Contains the user's message and any additional context.
@@ -5070,6 +5229,24 @@ pub struct PromptRequest {
     /// inserting it.
     #[cfg_attr(feature = "schemars", schemars(length(min = 1)))]
     pub prompt: Vec<ContentBlock>,
+    /// Identifies this submission, so the Client can send the request again without the
+    /// user message being inserted twice.
+    ///
+    /// Optional. Omitted and `null` are equivalent and mean no key. The Agent then handles
+    /// the prompt without duplicate detection.
+    ///
+    /// The Client generates the key and sends the same key on every attempt for the same
+    /// submission. The Agent inserts at most one user message for a key in a session, and
+    /// answers a retry with the `messageId` of the message it already inserted. Agents that
+    /// advertise `capabilities.session` MUST support the key.
+    ///
+    /// When present, the value is an opaque, case-sensitive string of 1 to 255 characters.
+    /// Agents MUST reject any other value with `-32602` (Invalid params) and MUST NOT treat
+    /// it as omitted.
+    ///
+    /// See protocol docs: [Retrying a prompt](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#retrying-a-prompt)
+    #[serde(default)]
+    pub idempotency_key: Option<IdempotencyKey>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
@@ -5089,8 +5266,22 @@ impl PromptRequest {
         Self {
             session_id: session_id.into(),
             prompt,
+            idempotency_key: None,
             meta: None,
         }
+    }
+
+    /// Identifies this submission, so the Client can send the request again without the
+    /// user message being inserted twice.
+    ///
+    /// The Client generates the key and sends the same key on every attempt for the same
+    /// submission. `None` means no key.
+    ///
+    /// See protocol docs: [Retrying a prompt](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#retrying-a-prompt)
+    #[must_use]
+    pub fn idempotency_key(mut self, idempotency_key: impl IntoOption<IdempotencyKey>) -> Self {
+        self.idempotency_key = idempotency_key.into_option();
+        self
     }
 
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
@@ -7925,46 +8116,42 @@ pub enum ClientRequest {
     ExtMethodRequest(Box<ExtRequest>),
 }
 
-impl ClientRequest {
-    /// Returns the corresponding method name of the request.
-    #[must_use]
-    pub fn method(&self) -> &str {
-        match self {
-            Self::InitializeRequest(_) => AGENT_METHOD_NAMES.initialize,
-            Self::LoginAuthRequest(_) => AGENT_METHOD_NAMES.auth_login,
-            #[cfg(feature = "unstable_llm_providers")]
-            Self::ListProvidersRequest(_) => AGENT_METHOD_NAMES.providers_list,
-            #[cfg(feature = "unstable_llm_providers")]
-            Self::SetProviderRequest(_) => AGENT_METHOD_NAMES.providers_set,
-            #[cfg(feature = "unstable_llm_providers")]
-            Self::DisableProviderRequest(_) => AGENT_METHOD_NAMES.providers_disable,
-            Self::LogoutAuthRequest(_) => AGENT_METHOD_NAMES.auth_logout,
-            #[cfg(feature = "unstable_auth_status")]
-            Self::AuthStatusRequest(_) => AGENT_METHOD_NAMES.auth_status,
-            Self::NewSessionRequest(_) => AGENT_METHOD_NAMES.session_new,
-            Self::ListSessionsRequest(_) => AGENT_METHOD_NAMES.session_list,
-            Self::DeleteSessionRequest(_) => AGENT_METHOD_NAMES.session_delete,
-            #[cfg(feature = "unstable_session_fork")]
-            Self::ForkSessionRequest(_) => AGENT_METHOD_NAMES.session_fork,
-            #[cfg(feature = "unstable_session_archive")]
-            Self::ArchiveSessionRequest(_) => AGENT_METHOD_NAMES.session_archive,
-            #[cfg(feature = "unstable_session_archive")]
-            Self::UnarchiveSessionRequest(_) => AGENT_METHOD_NAMES.session_unarchive,
-            #[cfg(feature = "unstable_session_status")]
-            Self::SessionStatusRequest(_) => AGENT_METHOD_NAMES.session_status,
-            #[cfg(feature = "unstable_session_options")]
-            Self::SessionOptionsRequest(_) => AGENT_METHOD_NAMES.session_options,
-            #[cfg(feature = "unstable_session_set_title")]
-            Self::SetSessionTitleRequest(_) => AGENT_METHOD_NAMES.session_set_title,
-            Self::ResumeSessionRequest(_) => AGENT_METHOD_NAMES.session_resume,
-            Self::CloseSessionRequest(_) => AGENT_METHOD_NAMES.session_close,
-            Self::CancelToolCallRequest(_) => AGENT_METHOD_NAMES.tool_call_cancel,
-            Self::CancelTerminalRequest(_) => AGENT_METHOD_NAMES.terminal_cancel,
-            Self::SetSessionConfigOptionRequest(_) => AGENT_METHOD_NAMES.session_set_config_option,
-            Self::PromptRequest(_) => AGENT_METHOD_NAMES.session_prompt,
-            Self::ExtMethodRequest(ext_request) => &ext_request.method,
-        }
+impl_request_dispatch! {
+    ClientRequest => AgentResponse {
+        InitializeRequest => InitializeResponse: AGENT_METHOD_NAMES.initialize,
+        LoginAuthRequest => LoginAuthResponse: AGENT_METHOD_NAMES.auth_login,
+        #[cfg(feature = "unstable_llm_providers")]
+        ListProvidersRequest => ListProvidersResponse: AGENT_METHOD_NAMES.providers_list,
+        #[cfg(feature = "unstable_llm_providers")]
+        SetProviderRequest => SetProviderResponse: AGENT_METHOD_NAMES.providers_set,
+        #[cfg(feature = "unstable_llm_providers")]
+        DisableProviderRequest => DisableProviderResponse: AGENT_METHOD_NAMES.providers_disable,
+        LogoutAuthRequest => LogoutAuthResponse: AGENT_METHOD_NAMES.auth_logout,
+        #[cfg(feature = "unstable_auth_status")]
+        AuthStatusRequest => AuthStatusResponse: AGENT_METHOD_NAMES.auth_status,
+        NewSessionRequest => NewSessionResponse: AGENT_METHOD_NAMES.session_new,
+        ListSessionsRequest => ListSessionsResponse: AGENT_METHOD_NAMES.session_list,
+        DeleteSessionRequest => DeleteSessionResponse: AGENT_METHOD_NAMES.session_delete,
+        #[cfg(feature = "unstable_session_fork")]
+        ForkSessionRequest => ForkSessionResponse: AGENT_METHOD_NAMES.session_fork,
+        #[cfg(feature = "unstable_session_archive")]
+        ArchiveSessionRequest => ArchiveSessionResponse: AGENT_METHOD_NAMES.session_archive,
+        #[cfg(feature = "unstable_session_archive")]
+        UnarchiveSessionRequest => UnarchiveSessionResponse: AGENT_METHOD_NAMES.session_unarchive,
+        #[cfg(feature = "unstable_session_status")]
+        SessionStatusRequest => SessionStatusResponse: AGENT_METHOD_NAMES.session_status,
+        #[cfg(feature = "unstable_session_options")]
+        SessionOptionsRequest => SessionOptionsResponse: AGENT_METHOD_NAMES.session_options,
+        #[cfg(feature = "unstable_session_set_title")]
+        SetSessionTitleRequest => SetSessionTitleResponse: AGENT_METHOD_NAMES.session_set_title,
+        ResumeSessionRequest => ResumeSessionResponse: AGENT_METHOD_NAMES.session_resume,
+        CloseSessionRequest => CloseSessionResponse: AGENT_METHOD_NAMES.session_close,
+        CancelToolCallRequest => CancelToolCallResponse: AGENT_METHOD_NAMES.tool_call_cancel,
+        CancelTerminalRequest => CancelTerminalResponse: AGENT_METHOD_NAMES.terminal_cancel,
+        SetSessionConfigOptionRequest => SetSessionConfigOptionResponse: AGENT_METHOD_NAMES.session_set_config_option,
+        PromptRequest => PromptResponse: AGENT_METHOD_NAMES.session_prompt,
     }
+    extension ExtMethodRequest(Box<ExtRequest>) => ExtMethodResponse;
 }
 
 /// All possible responses that an agent can send to a client.
@@ -8059,7 +8246,7 @@ pub enum ClientNotification {
     /// as possible.
     ///
     /// The Agent MUST stop waiting for pending `session/request_permission` requests of
-    /// the cancelled work and treat them as not approved. It SHOULD cancel each of them
+    /// the cancelled work and treat them as not approved. It MUST cancel each of them
     /// with `$/cancel_request`.
     ///
     /// After all ongoing operations have been successfully aborted and pending
@@ -8096,17 +8283,13 @@ pub enum ClientNotification {
     ExtNotification(Box<ExtNotification>),
 }
 
-impl ClientNotification {
-    /// Returns the corresponding method name of the notification.
-    #[must_use]
-    pub fn method(&self) -> &str {
-        match self {
-            Self::CancelSessionNotification(_) => AGENT_METHOD_NAMES.session_cancel,
-            #[cfg(feature = "unstable_mcp_over_acp")]
-            Self::MessageMcpNotification(_) => AGENT_METHOD_NAMES.mcp_message,
-            Self::ExtNotification(ext_notification) => &ext_notification.method,
-        }
+impl_message_dispatch! {
+    ClientNotification {
+        CancelSessionNotification => AGENT_METHOD_NAMES.session_cancel,
+        #[cfg(feature = "unstable_mcp_over_acp")]
+        MessageMcpNotification => AGENT_METHOD_NAMES.mcp_message,
     }
+    extension ExtNotification(Box<ExtNotification>);
 }
 
 #[cfg(test)]
@@ -10495,6 +10678,164 @@ mod test_serialization {
         );
     }
 
+    fn prompt_request_with_idempotency_key(key: &serde_json::Value) -> serde_json::Value {
+        serde_json::json!({
+            "sessionId": "sess-1",
+            "idempotencyKey": key,
+            "prompt": [{"type": "text", "text": "hello"}]
+        })
+    }
+
+    #[test]
+    fn prompt_request_idempotency_key_round_trips() {
+        use serde_json::json;
+
+        let key = "0b6f3c1e-8d2a-4c57-9a41-5e2f7d90c3ab";
+        let value = prompt_request_with_idempotency_key(&json!(key));
+
+        let request: PromptRequest = serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(
+            request.idempotency_key.as_ref().map(IdempotencyKey::as_str),
+            Some(key)
+        );
+        assert_eq!(serde_json::to_value(&request).unwrap(), value);
+
+        let built = PromptRequest::new("sess-1", vec![ContentBlock::from("hello")])
+            .idempotency_key(IdempotencyKey::new(key).unwrap());
+        assert_eq!(built, request);
+    }
+
+    #[test]
+    fn prompt_request_omitted_and_null_idempotency_key_mean_no_key() {
+        use serde_json::json;
+
+        let omitted = json!({
+            "sessionId": "sess-1",
+            "prompt": [{"type": "text", "text": "hello"}]
+        });
+        let request: PromptRequest = serde_json::from_value(omitted.clone()).unwrap();
+        assert_eq!(request.idempotency_key, None);
+        // No key is serialized as an omitted field, not as `null`.
+        assert_eq!(serde_json::to_value(&request).unwrap(), omitted);
+
+        let null: PromptRequest =
+            serde_json::from_value(prompt_request_with_idempotency_key(&json!(null))).unwrap();
+        assert_eq!(null, request);
+    }
+
+    #[test]
+    fn prompt_request_rejects_malformed_idempotency_key() {
+        use serde_json::json;
+
+        let too_long = "k".repeat(IdempotencyKey::MAX_LENGTH + 1);
+        for (name, key) in [
+            ("an empty string", json!("")),
+            ("a string over 255 characters", json!(too_long)),
+            ("a number", json!(7)),
+            ("a boolean", json!(true)),
+            ("an object", json!({"key": "k"})),
+            ("an array", json!(["k"])),
+        ] {
+            assert!(
+                serde_json::from_value::<PromptRequest>(prompt_request_with_idempotency_key(&key))
+                    .is_err(),
+                "{name} must fail the request instead of being treated as no key"
+            );
+        }
+    }
+
+    #[test]
+    fn idempotency_key_length_is_counted_in_characters() {
+        use serde_json::json;
+
+        assert_eq!(IdempotencyKey::new(""), Err(InvalidIdempotencyKey::Empty));
+        assert_eq!(IdempotencyKey::new("k").unwrap().as_str(), "k");
+
+        let longest = "k".repeat(IdempotencyKey::MAX_LENGTH);
+        assert_eq!(
+            IdempotencyKey::new(longest.as_str()).unwrap().as_str(),
+            longest
+        );
+        assert_eq!(
+            IdempotencyKey::new(format!("{longest}k")),
+            Err(InvalidIdempotencyKey::TooLong)
+        );
+
+        // 255 two-byte characters are 510 bytes and still within the limit.
+        let multibyte = "é".repeat(IdempotencyKey::MAX_LENGTH);
+        assert!(IdempotencyKey::new(multibyte.as_str()).is_ok());
+        assert!(
+            serde_json::from_value::<PromptRequest>(prompt_request_with_idempotency_key(&json!(
+                multibyte
+            )))
+            .is_ok()
+        );
+        assert_eq!(
+            IdempotencyKey::new(format!("{multibyte}é")),
+            Err(InvalidIdempotencyKey::TooLong)
+        );
+
+        assert_eq!("k".parse::<IdempotencyKey>().unwrap().to_string(), "k");
+        assert_eq!(
+            IdempotencyKey::try_from(String::new()),
+            Err(InvalidIdempotencyKey::Empty)
+        );
+        assert_eq!(
+            InvalidIdempotencyKey::TooLong.to_string(),
+            "idempotency key must be at most 255 characters"
+        );
+    }
+
+    #[cfg(feature = "uuid")]
+    #[test]
+    fn generated_idempotency_keys_are_distinct_valid_v4_uuids() {
+        let first = IdempotencyKey::generate();
+        let second = IdempotencyKey::generate();
+        assert_ne!(first, second);
+
+        for key in [&first, &second] {
+            let uuid = uuid::Uuid::parse_str(key.as_str()).unwrap();
+            assert_eq!(uuid.get_version_num(), 4);
+            // A generated key passes the same validation as any other key.
+            assert_eq!(IdempotencyKey::new(key.as_str()).as_ref(), Ok(key));
+            let request = PromptRequest::new("sess-1", vec![ContentBlock::from("hello")])
+                .idempotency_key(key.clone());
+            let value = serde_json::to_value(&request).unwrap();
+            assert_eq!(value["idempotencyKey"], key.as_str());
+            assert_eq!(
+                serde_json::from_value::<PromptRequest>(value).unwrap(),
+                request
+            );
+        }
+
+        assert_eq!(
+            IdempotencyKey::from(uuid::Uuid::nil()).as_str(),
+            "00000000-0000-0000-0000-000000000000"
+        );
+    }
+
+    #[cfg(feature = "schemars")]
+    #[test]
+    fn idempotency_key_schema_is_a_strict_bounded_string() {
+        use serde_json::json;
+
+        let key = serde_json::to_value(schemars::schema_for!(IdempotencyKey)).unwrap();
+        assert_eq!(key["type"], "string");
+        assert_eq!(key["minLength"], 1);
+        assert_eq!(key["maxLength"], json!(IdempotencyKey::MAX_LENGTH));
+
+        let request = serde_json::to_value(schemars::schema_for!(PromptRequest)).unwrap();
+        assert_eq!(request["required"], json!(["sessionId", "prompt"]));
+        let property = &request["properties"]["idempotencyKey"];
+        assert_eq!(
+            property["anyOf"],
+            json!([{"$ref": "#/$defs/IdempotencyKey"}, {"type": "null"}])
+        );
+        // The Agent acts on the key, so the schema must not mark it as tolerant
+        // of malformed values.
+        assert!(property.get("x-deserialize-default-on-error").is_none());
+    }
+
     fn assert_session_setup_lists_are_strict<T>(base: &serde_json::Value)
     where
         T: serde::de::DeserializeOwned + PartialEq + std::fmt::Debug,
@@ -10696,6 +11037,49 @@ mod test_serialization {
         assert_eq!(
             serde_json::to_value(&notification).unwrap(),
             json!({"state": "unauthenticated"})
+        );
+    }
+
+    #[cfg(all(
+        feature = "unstable_session_fork",
+        feature = "unstable_session_cursors"
+    ))]
+    #[test]
+    fn fork_session_request_cursor_id_is_optional_and_strict() {
+        let request = ForkSessionRequest::new("sess_abc123", "/home/user/project")
+            .cursor_id(CursorId::new("cur_1"));
+        let wire = json!({
+            "sessionId": "sess_abc123",
+            "cursorId": "cur_1",
+            "cwd": "/home/user/project"
+        });
+        assert_eq!(serde_json::to_value(&request).unwrap(), wire);
+        assert_eq!(
+            serde_json::from_value::<ForkSessionRequest>(wire).unwrap(),
+            request
+        );
+
+        // Omitted and `null` both fork the whole session.
+        for wire in [
+            json!({ "sessionId": "sess_abc123", "cwd": "/home/user/project" }),
+            json!({ "sessionId": "sess_abc123", "cwd": "/home/user/project", "cursorId": null }),
+        ] {
+            assert_eq!(
+                serde_json::from_value::<ForkSessionRequest>(wire)
+                    .unwrap()
+                    .cursor_id,
+                None
+            );
+        }
+
+        // A malformed cursor ID fails the request. It never forks the whole session.
+        assert!(
+            serde_json::from_value::<ForkSessionRequest>(json!({
+                "sessionId": "sess_abc123",
+                "cwd": "/home/user/project",
+                "cursorId": 7
+            }))
+            .is_err()
         );
     }
 }

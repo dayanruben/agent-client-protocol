@@ -69,7 +69,8 @@ pub struct ToolCallUpdate {
     /// Current execution status of the tool call.
     ///
     /// Omission leaves the status unchanged, `null` resets it to `pending`, and a value
-    /// replaces it. A new tool call starts as `pending`.
+    /// replaces it. A new tool call starts as `pending`. Agents do not move a tool call
+    /// back to `pending` once it has another status.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
@@ -739,11 +740,11 @@ impl Content {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct Diff {
-    /// Structured file changes described by this diff.
+    /// Structured file changes described by this diff. Agents MUST include at least one entry.
     ///
     /// Clients can use this field without parsing patch text to determine affected paths.
     #[serde_as(deserialize_as = "VecSkipError<_>")]
-    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-skip-invalid-items" = true)))]
+    #[cfg_attr(feature = "schemars", schemars(length(min = 1), extend("x-deserialize-skip-invalid-items" = true)))]
     pub changes: Vec<DiffChange>,
     /// Renderable patch text for some or all of the structured changes.
     ///
@@ -1711,6 +1712,19 @@ mod tests {
         };
         assert_eq!(diff.changes, vec![DiffChange::delete("/ok")]);
         assert_eq!(diff.patch, Some(DiffPatch::new(patch_text)));
+    }
+
+    #[cfg(feature = "schemars")]
+    #[test]
+    fn diff_schema_requires_at_least_one_change() {
+        let schema = serde_json::to_value(schemars::schema_for!(Diff)).unwrap();
+        assert_eq!(schema["properties"]["changes"]["minItems"], 1);
+    }
+
+    #[test]
+    fn diff_with_no_changes_still_deserializes() {
+        let diff: Diff = serde_json::from_value(serde_json::json!({ "changes": [] })).unwrap();
+        assert_eq!(diff.changes, Vec::<DiffChange>::new());
     }
 
     #[test]
