@@ -31,5 +31,13 @@
   "devDependencies": {
     "mint": "^4.3.23",
     "prettier": "^3.10.1"
+  },
+  "overrides": {
+    "@mintlify/cli": {
+      "sharp": "^0.35.5"
+    },
+    "@mintlify/package-builder": {
+      "js-yaml": "^4.3.2"
+    }
   }
 }

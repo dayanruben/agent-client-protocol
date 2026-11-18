@@ -50,3 +50,7 @@ ACP is a protocol intended for broad adoption across the ecosystem; we follow a 
 This project does not require a Contributor License Agreement (CLA). Instead, contributions are accepted under the following terms:
 
 > By contributing to this project, you agree that your contributions will be licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). You affirm that you have the legal right to submit your work, that you are not including code you do not have rights to, and that you understand contributions are made without requiring a Contributor License Agreement (CLA).
+
+## Fork dependency validation
+
+The Mintlify CLI dependencies use scoped security overrides for Sharp and js-yaml. Run `npm ci` from the repository root, then `npm exec -- mint validate` from `docs` to validate the documentation after updating the lockfile. Existing release and schema-upload jobs remain restricted to the canonical `agentclientprotocol` organization.
