@@ -102,7 +102,7 @@ may arrive before or after the `session/new` response. Clients **MUST NOT**
 overwrite an already-reported state when the response arrives. An optional
 initial idle notification is a snapshot, not a completed turn.
 
-Agents **SHOULD** put initial state in the `session/new` response rather than sending notifications before it. For `configOptions` and `availableCommands`, the response is required, as described below. Agents **SHOULD NOT** send session-scoped requests, such as permission requests or elicitations, before the response, because the Client cannot yet show them for that session. While a `session/new` is pending, Clients **MAY** buffer notifications for a `sessionId` they don't recognize and apply them in order once the response arrives, or drop them. Agents cannot rely on such notifications being seen.
+Agents **SHOULD** put initial state in the `session/new` response rather than sending notifications before it. For `configOptions` and `availableCommands`, the response is required, as described below. Agents **SHOULD NOT** send session-scoped requests, such as permission requests or elicitations, before the response, because the Client cannot yet show them for that session. While a `session/new` is pending, Clients **MAY** buffer notifications for a `sessionId` they don't recognize and apply them in order once the response arrives, or drop them. Agents cannot rely on such notifications being seen. An Agent whose new session is not `idle`, for example because it started work when the session was created, **MUST** send the session's `state_update` after the response.
 
 `session/resume` does not imply idle: an existing session may still be running
 or waiting for user action. See [Current-State Synchronization](#current-state-synchronization).
@@ -550,7 +550,7 @@ system-level instructions on `session/new` and `session/resume`.
 - Clients **MUST NOT** send an empty `content` array. Agents **MAY** reject one with `-32602` without creating or resuming the session
 - omitting the field or setting it to `null` on `session/new` means the Agent uses its default instructions
 - on `session/resume`, Clients **SHOULD** send the same `systemPrompt` they used when the session was created. When it is omitted, the Agent may keep a prompt it stored with the session or use its default. When it differs, the Agent **SHOULD** apply it, and **MAY** defer the change until it next rebuilds its prompt (for example, after compaction) when applying it immediately would discard prompt caches or preserved reasoning
-- if the Agent cannot apply a supplied `systemPrompt`, for example because of an unadvertised mode, an unsupported content block type, or content that exceeds its limits, it **MUST** return an error and **MUST NOT** create or resume the session. JSON-RPC `-32602` (Invalid params) is the **RECOMMENDED** error for malformed or unsupported values
+- if the Agent cannot apply a supplied `systemPrompt`, it **MUST** return an error and **MUST NOT** create or resume the session. When the cause is the value itself, such as an unadvertised mode, an unsupported content block type, or content that exceeds its limits, the error **MUST** be `-32602` (Invalid params)
 
 Clients **MUST** only send `systemPrompt` when the Agent advertises `session.systemPrompt`, and **MUST** only use `override` mode when the Agent also advertises `session.systemPrompt.mode.override`:
 

@@ -1060,6 +1060,9 @@ New sessions default to `idle` until a state update reports otherwise.
 Updates may arrive before or after this response. Clients MUST NOT overwrite
 an already-reported state when the response arrives.
 
+An Agent whose new session is not `idle` MUST send the session's
+`state_update` after this response.
+
 See protocol docs: [Creating a Session](https://agentclientprotocol.com/protocol/v2/draft/session-setup#creating-a-session)
 
 **Type:** Object
@@ -5484,14 +5487,6 @@ Optional. Omitted and `null` are equivalent and mean there is no minimum length 
 Must contain at least one option when present.
 Optional. Omitted and `null` are equivalent and mean no titled single-select choices are
 declared by `oneOf`.
-</ResponseField>
-<ResponseField name="pattern" type={"string | null"} >
-  Pattern the string must match, in ECMA-262 regular expression syntax.
-
-Optional. Omitted and `null` are equivalent and mean there is no pattern constraint.
-
-    - Format: `regex`
-
 </ResponseField>
 <ResponseField name="title" type={"string | null"} >
   Optional title for the property.
@@ -11505,14 +11500,6 @@ Optional. Omitted and `null` are equivalent and mean there is no minimum length 
 Must contain at least one option when present.
 Optional. Omitted and `null` are equivalent and mean no titled single-select choices are
 declared by `oneOf`.
-</ResponseField>
-<ResponseField name="pattern" type={"string | null"} >
-  Pattern the string must match, in ECMA-262 regular expression syntax.
-
-Optional. Omitted and `null` are equivalent and mean there is no pattern constraint.
-
-    - Format: `regex`
-
 </ResponseField>
 <ResponseField name="title" type={"string | null"} >
   Optional title for the property.

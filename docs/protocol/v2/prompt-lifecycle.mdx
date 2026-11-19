@@ -369,12 +369,22 @@ The Agent **MUST** also report the inserted user message through a `user_message
         {
           "type": "text",
           "text": "Can you analyze this code for potential issues?"
+        },
+        {
+          "type": "resource",
+          "resource": {
+            "uri": "file:///home/user/project/main.py",
+            "mimeType": "text/x-python",
+            "text": "def process_data(items):\n    for item in items:\n        print(item)"
+          }
         }
       ]
     }
   }
 }
 ```
+
+The Agent owns the inserted message. Its reported `content` usually repeats the submitted `prompt`, as it does here, but it can differ, for example when an adapter reports the message as its runtime recorded it. A Client **MAY** keep showing the prompt as it sent it, although a [replay](/protocol/v2/session-setup#replay-contents) carries the Agent's content.
 
 The Client uses the JSON-RPC response ID to identify its submission, then associates it with `(sessionId, messageId)`. If the message update arrived first, the Client reconciles with that existing message rather than creating a duplicate. Agents **MUST** assign distinct message IDs to distinct inserted submissions, even if their content is identical. Clients must not infer the association from content or arrival order.
 
@@ -1097,6 +1107,7 @@ New sessions default to `idle` until a state update reports otherwise. State
 updates may arrive before or after the `session/new` response. Clients
 **MUST NOT** overwrite an already-reported state when the response arrives.
 A separate initial idle notification is optional and does not represent completion.
+An Agent whose new session is not `idle` sends that state after the response. See [Initial session state](/protocol/v2/session-setup#initial-session-state).
 
 `session/resume` does not imply `idle`. The Agent **MUST** send a snapshot of
 foreground state after resuming, following any requested history replay and
@@ -1216,7 +1227,7 @@ Clients **MAY** cancel the session's foreground work at any time by sending a `s
 }
 ```
 
-`session/cancel` covers foreground work and prompts received before it that the Agent has not yet inserted. The Agent **MUST** answer the covered prompts with `-32800`, as described in [request cancellation](/protocol/v2/cancellation). A `session/prompt` received after `session/cancel` is not cancelled by it. Once a message is inserted, its prompt request still succeeds with its `messageId`. Cancellation does not undo that insertion. Work in the latest [`background`](#background-work) list is not covered and keeps running. The Agent **MAY** stop background activity it does not list.
+`session/cancel` covers foreground work and prompts received before it that the Agent has not yet inserted. The Agent **MUST** answer the covered prompts with `-32800`, as described in [request cancellation](/protocol/v2/cancellation). A `session/prompt` received after `session/cancel` is not cancelled by it. Once a message is inserted, its prompt request still succeeds with its `messageId`. Cancellation does not undo that insertion. Work in the latest [`background`](#background-work) list is not covered and keeps running. The Agent **MAY** stop background activity it does not list. To stop a listed tool call or terminal, the Client sends [`tool_call/cancel`](/protocol/v2/tool-calls#cancelling-tool-calls) or [`terminal/cancel`](/protocol/v2/tool-calls#cancelling-terminals) while that item advertises `capabilities.cancel`.
 
 For a [child session](/protocol/v2/subagents#cancellation), the Client sends `session/cancel` only while the child advertises `capabilities.cancel`. Cancelling a session also cancels the child work that the cancelled work is waiting on.
 
