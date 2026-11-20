@@ -66,11 +66,11 @@ An ID is unique among entities of the same type within a session, not across all
 
 The Agent **MUST NOT** reuse an ID for a different entity of the same type within a session. Clients **MUST** key entities by both type and ID. An update applies only to the entity of its own type: an `agent_thought` whose `messageId` matches an existing Agent message creates or updates a thought and leaves the message unchanged. Likewise, a field that references an entity identifies an entity of one specific type. For example, the `messageId` returned by `session/prompt` identifies a user message.
 
-An update or chunk for an ID the Client hasn't seen creates the entity with its defaults and then applies, so a chunk can arrive before any full update. Clients **MUST NOT** drop it. An entity's first update or chunk fixes its timeline position in receive order: it follows previously received timeline content and precedes content first received later. Later updates and chunks patch the entity in place without moving it, including after the session reports `idle`. Updates for different entities may interleave, and a new ID does not end any other entity. Clients that show an entity outside the timeline, such as a plan panel, may ignore its position.
+An update or chunk for an ID the Client hasn't seen creates the entity with its defaults and then applies, so a chunk can arrive before any full update. Clients **MUST NOT** drop it. An entity's first update or chunk fixes its timeline position in receive order: it follows previously received timeline content and precedes content first received later. Later updates and chunks apply to the entity in place without moving it, including after the session reports `idle`. Most updates patch the entity. A `plan_update` replaces the whole plan. Updates for different entities may interleave, and a new ID does not end any other entity. Clients that show an entity outside the timeline, such as a plan panel, **MAY** ignore its position.
 
 ### Session-directed messages
 
-The Agent may report outgoing and incoming messages between sessions,
+The Agent **MAY** report outgoing and incoming messages between sessions,
 separately from user-facing responses and tool calls. The outer
 `params.sessionId` identifies the transcript being updated. Every
 `session_message` or `session_message_chunk` requires `messageId`, scoped to
@@ -128,9 +128,9 @@ presentation and add links when the metadata arrives. Participant IDs follow the
 The two views have independent message IDs. Optional `senderMessageId` on the
 incoming view and `recipientMessageId` on the outgoing view name the other
 view's `messageId`, so a Client can go from either view to the other. They
-follow the participant-ID rules and can arrive in a later `session_message`. Clients must
-not link views by equal IDs alone. The Agent reports each side only
-when observed. Clients must not synthesize an incoming entry from an outgoing
+follow the participant-ID rules and can arrive in a later `session_message`. Clients
+**MUST NOT** link views by equal IDs alone. The Agent reports each side only
+when observed. Clients **MUST NOT** synthesize an incoming entry from an outgoing
 one or forward the content themselves. Neither view acknowledges completed
 recipient processing.
 
@@ -206,9 +206,9 @@ Background work is work the user can reason about: something the user or the mod
 ```
 
 - **It is a snapshot.** A concrete list replaces the previous one, and `[]` means no background work is running.
-- **Omitted or `null` means not reported**, not that nothing is running. An Agent that reports background work **MUST** include `background` on every `state_update` for the session. If a later snapshot omits it, or it is malformed, the Client treats background work as unknown until a list is reported again.
+- **Omitted or `null` means not reported**, not that nothing is running. An Agent that reports background work **MUST** include `background` on every `state_update` for the session. If a later snapshot omits it, the Client treats background work as unknown until a list is reported again.
 - **The Agent re-sends the state when the list changes.** When background work starts or ends, the Agent **SHOULD** send a repeated `state_update` with the current state and the updated list. A repeated snapshot is not a [state transition](#state-transitions), and a repeated `idle` without a new stop reason is not a new completion.
-- **Items are announced before they are listed and finalized before they are removed.** The Agent **MUST** send a `terminal_update` for a terminal, a `tool_call_update` for a tool call, or a `subagent_update` for a child, before the first snapshot that lists it. It **MUST** send a terminal's `exitStatus` or a tool call's final status before the snapshot that removes it.
+- **Items are announced before they are listed and finalized before they are removed.** The Agent **MUST** send a `terminal_update` for a terminal, a `tool_call_update` for a tool call, or a `subagent_update` for a child, before the first snapshot that lists it. When a terminal exits or a tool call ends, the Agent **MUST** send its `exitStatus` or final status before the snapshot that removes it.
 - **Known follow-up work is reported with the removal.** When finished background work starts new foreground work and the Agent knows this when it removes the item, the Agent **SHOULD** report `running` in the same snapshot that removes the item, or earlier. An Agent that only learns of the follow-up later, for example because the underlying agent decides after the work ends, reports `running` when that work starts. Clients cover that gap with the grace period described below.
 - **Only background work is listed, and only once.** A terminal or tool call that foreground work is waiting on is foreground work and is not listed. Process-backed work is listed as its terminal, and the Agent **MUST NOT** also list a tool call whose only live work is a listed terminal.
 - **Unknown items still count.** An item with an unknown `type` does not invalidate the list. It still means background work is running.
@@ -386,7 +386,7 @@ The Agent **MUST** also report the inserted user message through a `user_message
 
 The Agent owns the inserted message. Its reported `content` usually repeats the submitted `prompt`, as it does here, but it can differ, for example when an adapter reports the message as its runtime recorded it. A Client **MAY** keep showing the prompt as it sent it, although a [replay](/protocol/v2/session-setup#replay-contents) carries the Agent's content.
 
-The Client uses the JSON-RPC response ID to identify its submission, then associates it with `(sessionId, messageId)`. If the message update arrived first, the Client reconciles with that existing message rather than creating a duplicate. Agents **MUST** assign distinct message IDs to distinct inserted submissions, even if their content is identical. Clients must not infer the association from content or arrival order.
+The Client uses the JSON-RPC response ID to identify its submission, then associates it with `(sessionId, messageId)`. If the message update arrived first, the Client reconciles with that existing message rather than creating a duplicate. Agents **MUST** assign distinct message IDs to distinct inserted submissions, even if their content is identical. Clients **MUST NOT** infer the association from content or arrival order.
 
 Insertion is not a promise of durable storage or model consumption. Every inserted input, including a locally handled command, is reported live, but Agents are not required to persist it or retain it for any minimum period. If the message is retained and replayed, the Agent **MUST** use the same ID. See [Resuming Sessions](/protocol/v2/session-setup#resuming-sessions).
 
@@ -481,7 +481,7 @@ An intermediary that forwards `session/prompt` forwards `idempotencyKey` unchang
 
 When foreground work starts, the Agent **MUST** report its active state. Usually
 this is a `state_update` notification with `state: "running"`. Work that starts
-blocked on user action may report `requires_action` directly. When progress
+blocked on user action **MAY** report `requires_action` directly. When progress
 resumes after a reported `requires_action`, the Agent **MUST** report `running`:
 
 ```json
@@ -648,8 +648,8 @@ If the model requested tool calls, these are also reported immediately:
 
 #### Session notices
 
-No Client capability is required in v2. Clients that do not implement `notice`
-may preserve it through the [unknown-update
+No Client capability is required. Clients that do not implement `notice`
+**MAY** preserve it through the [unknown-update
 fallback](/protocol/v2/extensibility#enum-and-tagged-union-variants) and
 ignore it or present it generically. This does not give it replay semantics.
 This is [capability-free informational delivery](/protocol/v2/extensibility#experimental-features-and-negotiation),
@@ -703,13 +703,13 @@ removal event.
 Notices have no ID or Agent-managed lifecycle. Each occurrence is an
 independent live event, not conversation history, and **SHOULD NOT** be included
 in session replay. If a condition remains relevant after reconnecting, the
-Agent may emit a new notice.
+Agent **MAY** emit a new notice.
 
 #### Session compaction
 
-No Client capability is required in v2. Clients without compaction-specific
-handling may preserve, ignore, or generically display these informational updates
-under the [v2 negotiation rules](/protocol/v2/extensibility#experimental-features-and-negotiation).
+No Client capability is required. Clients without compaction-specific
+handling **MAY** preserve, ignore, or generically display these informational updates
+under the [negotiation rules](/protocol/v2/extensibility#experimental-features-and-negotiation).
 
 The Agent **MAY** report context compaction as one persistent, ID-addressed
 timeline entity. A single `compaction_update` with `status: "completed"` is
@@ -734,9 +734,12 @@ For example, an Agent can report that compaction has started:
 }
 ```
 
-`compactionId` and `status` are required and non-null on every
-`compaction_update`. The ID is an opaque, Agent-owned string, unique within the
-session, and **MUST NOT** be reused for another compaction.
+`compactionId` is required and non-null on every `compaction_update`. The ID is
+an opaque, Agent-owned string, unique within the session, and **MUST NOT** be
+reused for another compaction.
+
+`status` is a patch field: omitted leaves it unchanged, `null` resets it to
+`in_progress`, and a value replaces it.
 
 Clients initialize a first-seen compaction ID with status `in_progress` and unset
 optional fields, then apply the notification.
@@ -759,7 +762,7 @@ implementation-specific extensions. Other unknown values are reserved for
 future ACP statuses. Clients preserve unknown strings and present a generic
 state without inferring lifecycle or control behavior.
 
-If the retained summary is available incrementally, the Agent may append one
+If the retained summary is available incrementally, the Agent **MAY** append one
 [content block](/protocol/v2/content) at a time:
 
 ```json
@@ -784,7 +787,7 @@ If the retained summary is available incrementally, the Agent may append one
 Chunk `_meta` is optional and nullable, is scoped to that chunk, and has no
 patch semantics: omission and `null` both mean no chunk metadata.
 
-An update may omit `summary` to retain the streamed content. A
+An update **MAY** omit `summary` to retain the streamed content. A
 non-streaming Agent can instead supply the complete summary, and a streaming
 Agent can use the same field as an authoritative replacement of content received
 so far:
@@ -873,7 +876,7 @@ When a session has [child sessions](/protocol/v2/subagents#usage-and-cost), its 
 
 ### 4. Report completion
 
-When foreground work ends, the Agent **MUST** report `idle` with a `state_update` notification and **SHOULD** include the corresponding [`StopReason`](#stop-reasons):
+When foreground work ends, the Agent **MUST** report `idle` with a `state_update` notification and **SHOULD** include the corresponding [stop reason](#stop-reasons):
 
 ```json
 {
@@ -892,7 +895,7 @@ When foreground work ends, the Agent **MUST** report `idle` with a `state_update
 
 The Agent **MUST** send any pending updates for the foreground work that ended before sending its idle update. Background activity may continue to emit updates afterward.
 
-Agents **MAY** stop foreground work at any point by sending an idle `state_update` session update. They **SHOULD** include the corresponding [`StopReason`](#stop-reasons).
+Agents **MAY** stop foreground work at any point by sending an idle `state_update` session update. They **SHOULD** include the corresponding [stop reason](#stop-reasons).
 
 ### 5. Tool invocation and status reporting
 
@@ -949,7 +952,7 @@ Display-only terminal bytes use `terminal_output_chunk`, not
 Terminals](/protocol/v2/tool-calls#display-only-terminals) for their
 per-terminal byte ordering and snapshot semantics.
 
-Tools execute on the Agent. Clients may expose tools through MCP servers supplied during session setup. v2 does not define Client file-system or terminal-execution capabilities. Client interactions such as elicitation remain subject to their own negotiated capabilities.
+Tools execute on the Agent. Clients may expose tools through MCP servers supplied during session setup. The protocol does not define Client file-system or terminal-execution capabilities. Client interactions such as elicitation remain subject to their own negotiated capabilities.
 
 When the tool completes, the Agent sends another update with the final status and any content:
 
@@ -989,7 +992,7 @@ The cycle returns to [step 3](#3-agent-reports-output), continuing until the lan
 
 ## Stop reasons
 
-When an Agent stops foreground work, it **SHOULD** specify the corresponding `StopReason` on an idle `state_update` session update. If the Agent knows it is idle but cannot determine why the work stopped, it may omit the stop reason. Clients **MUST** recognize `idle` as the end of foreground work even when the stop reason is omitted, `null`, malformed, or unknown. Without a recognized stop reason, Clients cannot infer how the work ended.
+When an Agent stops foreground work, it **SHOULD** specify the corresponding `stopReason` on an idle `state_update` session update. If the Agent knows it is idle but cannot determine why the work stopped, it **MAY** omit the stop reason. Clients **MUST** recognize `idle` as the end of foreground work even when the stop reason is omitted, `null`, or unknown. Without a recognized stop reason, Clients cannot infer how the work ended.
 
 <ResponseField name="end_turn">
   The Agent has finished foreground work, including a locally handled command
@@ -1049,7 +1052,7 @@ When foreground work ends because something failed, the Agent **MUST** report `i
   omission and `null` both mean the Agent supplied no failure details.
 </ResponseField>
 
-`error` belongs to the `error` stop reason. Beside any other stop reason it is an unknown field. Clients may show `message` to the user and can handle `code` as they would for an error response: for example, `-32000` (authentication required) can prompt the user to authenticate before sending another prompt.
+`error` belongs to the `error` stop reason. Beside any other stop reason it is an unknown field. Clients **MAY** show `message` to the user and can handle `code` as they would for an error response: for example, `-32000` (authentication required) can prompt the user to authenticate before sending another prompt.
 
 Before reporting the failure, the Agent **SHOULD** give each tool call that the failed work left unfinished a terminal status, using `failed` for calls that did not complete. Listed [background work](#background-work), and tool calls that reference a listed terminal, are not part of the failed work and keep running. A failure does not undo the insertion or any side effects the work already had, such as tools that ran. Sending the prompt again submits a new message.
 
@@ -1071,7 +1074,7 @@ model call, permission request, or elicitation.
 For exposed [subagents](/protocol/v2/subagents#work-state), Agents **SHOULD** also mirror the same snapshot in the
 immediate parent's `subagent_update.state`. This keeps the parent's roster and
 the child's own stream informed about one logical state. Duplicate snapshots
-do not represent additional work or usage.
+do not represent additional work.
 
 <ResponseField name="running">Foreground work is in progress.</ResponseField>
 
@@ -1089,8 +1092,8 @@ do not represent additional work or usage.
 </ResponseField>
 
 Agents report `unknown` on actual loss of observability, not merely after
-silence. Clients must no longer present a prior `running` or `requires_action`
-as confirmed live activity, though they may retain the last-known state for
+silence. Clients **MUST** stop presenting a prior `running` or `requires_action`
+as confirmed live activity, though they **MAY** retain the last-known state for
 context. A subsequent `running`, `requires_action`, or `idle` replaces
 `unknown` for the same session. `unknown` is neither a work outcome nor a
 closure or cancellation, and does not resolve pending requests or automatically
@@ -1135,11 +1138,11 @@ implying that work started or ended while it was unobservable.
 | Any                            | The current state is reported again                                  | Unchanged (idempotent snapshot)                                            |
 
 `requires_action` is only for blocked foreground work. An outstanding request
-alone does not justify it, but foreground work that starts blocked may report
+alone does not justify it, but foreground work that starts blocked **MAY** report
 it directly without an artificial `running` first.
 
 Agents **MAY** repeat current-state snapshots. Clients **MUST** apply them
-idempotently: repeats do not start new work, end additional work, or add usage
+idempotently: repeats do not start new work or end additional work
 again. Repeated or resume idle snapshots may carry the last stop reason for
 context, without creating a new completion or cancellation.
 
@@ -1155,6 +1158,20 @@ and **MUST** use `cancelled` when confirming foreground cancellation.
 action. The session remains `running` if other foreground work can
 still progress, even if some permission requests or elicitations are pending.
 Clients present those requests independently of the aggregate state.
+
+```json
+{
+  "jsonrpc": "2.0",
+  "method": "session/update",
+  "params": {
+    "sessionId": "sess_abc123def456",
+    "update": {
+      "sessionUpdate": "state_update",
+      "state": "requires_action"
+    }
+  }
+}
+```
 
 With several outstanding requests, opening or resolving a request does not
 itself cause a transition. Once `requires_action` is reported, the Agent

@@ -741,6 +741,7 @@ pub struct OtherMultiSelectItems {
     pub type_: String,
     /// Additional fields from the unknown item schema payload.
     #[serde(flatten)]
+    // TODO(next major): use `IndexMap` to keep the key order, as the v2 type does.
     pub fields: BTreeMap<String, serde_json::Value>,
 }
 
@@ -983,7 +984,7 @@ pub enum ElicitationPropertySchema {
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
     ///
-    /// Clients that do not understand this property schema type should preserve
+    /// Clients that do not understand this property schema type SHOULD preserve
     /// the raw schema when storing, replaying, proxying, or forwarding
     /// elicitation requests. They MUST NOT render it as a known input control.
     #[serde(untagged)]
@@ -1011,6 +1012,7 @@ pub struct OtherElicitationPropertySchema {
     pub type_: String,
     /// Additional fields from the unknown property schema payload.
     #[serde(flatten)]
+    // TODO(next major): use `IndexMap` to keep the key order, as the v2 type does.
     pub fields: BTreeMap<String, serde_json::Value>,
 }
 
@@ -1139,8 +1141,9 @@ pub struct ElicitationSchema {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub title: Option<String>,
-    /// Property definitions (must be primitive types).
+    /// Property definitions (MUST be primitive types).
     #[serde(default)]
+    // TODO(next major): use `IndexMap` to keep the key order, as the v2 type does.
     pub properties: BTreeMap<String, ElicitationPropertySchema>,
     /// List of required property names.
     ///
@@ -1649,7 +1652,7 @@ pub enum ElicitationMode {
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
     ///
-    /// Clients that do not understand this mode should preserve the raw payload
+    /// Clients that do not understand this mode SHOULD preserve the raw payload
     /// when storing, replaying, proxying, or forwarding elicitation requests.
     /// They MUST NOT render it as a known elicitation mode.
     #[serde(untagged)]
@@ -1679,6 +1682,7 @@ pub struct OtherElicitationMode {
     pub scope: ElicitationScope,
     /// Additional fields from the unknown elicitation mode payload.
     #[serde(flatten)]
+    // TODO(next major): use `IndexMap` to keep the key order, as the v2 type does.
     pub fields: BTreeMap<String, serde_json::Value>,
 }
 
@@ -1925,7 +1929,7 @@ pub enum ElicitationAction {
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
     ///
-    /// Agents that do not understand this action should preserve the raw
+    /// Agents that do not understand this action SHOULD preserve the raw
     /// payload when storing, replaying, proxying, or forwarding elicitation
     /// responses. They MUST NOT treat it as a known elicitation action.
     #[serde(untagged)]
@@ -1952,6 +1956,7 @@ pub struct OtherElicitationAction {
     pub action: String,
     /// Additional fields from the unknown elicitation action payload.
     #[serde(flatten)]
+    // TODO(next major): use `IndexMap` to keep the key order, as the v2 type does.
     pub fields: BTreeMap<String, serde_json::Value>,
 }
 
@@ -2044,6 +2049,7 @@ impl From<OtherElicitationAction> for ElicitationAction {
 pub struct ElicitationAcceptAction {
     /// The user-provided content, if any, as an object matching the requested schema.
     #[serde(default)]
+    // TODO(next major): use `IndexMap` to keep the key order, as the v2 type does.
     pub content: Option<BTreeMap<String, ElicitationContentValue>>,
 }
 

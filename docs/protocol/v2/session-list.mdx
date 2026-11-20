@@ -32,7 +32,7 @@ sequenceDiagram
 
 <br />
 
-Agents that also advertise `session.additionalDirectories` may
+Agents that also advertise `session.additionalDirectories` **MAY**
 include `additionalDirectories` in returned `SessionInfo` objects to report
 additional workspace roots for listed sessions.
 
@@ -93,7 +93,7 @@ The Agent **MUST** respond with a list of sessions and optional pagination metad
       },
       {
         "sessionId": "sess_xyz789ghi012",
-        "cwd": "/home/user/another-project",
+        "cwd": "/home/user/project",
         "title": "Debug authentication flow",
         "updatedAt": "2025-10-28T16:45:30Z"
       },
@@ -109,7 +109,7 @@ The Agent **MUST** respond with a list of sessions and optional pagination metad
 ```
 
 <ResponseField name="sessions" type="SessionInfo[]" required>
-  Array of session information objects.
+  Array of session information objects. Agents **SHOULD** return the sessions with the most recent activity first.
 
   <Expandable title="SessionInfo">
     <ResponseField name="sessionId" type="string" required>
@@ -149,7 +149,7 @@ When no sessions match the criteria, the Agent **MUST** return an empty `session
 
 ## Pagination
 
-`session/list` uses cursor-based pagination. The request includes an optional `cursor`, and the response includes `nextCursor` when more results are available.
+`session/list` uses cursor-based pagination. The request includes an optional `cursor`, and the response includes `nextCursor` when more results are available. Clients keep the same `cwd` when following `nextCursor`.
 
 - Clients **MUST** treat a missing `nextCursor` as the end of results. Only an omitted or `null` `nextCursor` ends the results. An empty string is a valid cursor
 - Clients **MUST NOT** assume a fixed page size
@@ -159,10 +159,7 @@ When no sessions match the criteria, the Agent **MUST** return an empty `session
 
 ## Updating session metadata
 
-Agents **SHOULD** send a `session_info_update` notification via `session/update` on each connection where the session is [active](/protocol/v2/session-setup#session-lifecycle) whenever session metadata changes, including changes
-requested by a Client. The same response and notification ordering guidance as
-[`config_option_update`](/protocol/v2/session-config-options#from-the-agent)
-applies here.
+Agents **SHOULD** send a `session_info_update` notification via `session/update` on each connection where the session is [active](/protocol/v2/session-setup#session-lifecycle) whenever session metadata changes.
 
 ```json
 {

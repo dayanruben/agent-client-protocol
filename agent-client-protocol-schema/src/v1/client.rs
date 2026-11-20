@@ -6,6 +6,8 @@
 use std::{path::PathBuf, sync::Arc};
 
 use derive_more::{Display, From};
+#[cfg(any(feature = "unstable_subagents", feature = "unstable_session_cursors"))]
+use indexmap::IndexMap;
 #[cfg(all(
     feature = "schemars",
     any(feature = "unstable_subagents", feature = "unstable_session_cursors")
@@ -13,8 +15,6 @@ use derive_more::{Display, From};
 use schemars::Schema;
 use serde::{Deserialize, Serialize};
 use serde_with::{DefaultOnError, DefaultOnNull, VecSkipError, serde_as, skip_serializing_none};
-#[cfg(any(feature = "unstable_subagents", feature = "unstable_session_cursors"))]
-use std::collections::BTreeMap;
 
 #[cfg(feature = "unstable_auth_status")]
 use super::AuthStatusUpdateNotification;
@@ -1079,9 +1079,6 @@ impl CursorUpdate {
 ///
 /// The methods that currently accept a session cursor.
 ///
-/// A malformed value falls back to no capabilities, so the Client never passes a
-/// cursor to a method the Agent did not advertise.
-///
 /// See the [Session Cursors RFD](https://agentclientprotocol.com/rfds/session-cursors).
 #[cfg(feature = "unstable_session_cursors")]
 #[serde_as]
@@ -1445,15 +1442,15 @@ pub struct OtherCursorAnchor {
     /// The remaining fields of the unknown anchor payload, preserved verbatim,
     /// including `_meta`.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 #[cfg(feature = "unstable_session_cursors")]
 impl OtherCursorAnchor {
     /// Builds [`OtherCursorAnchor`] from an unknown discriminator and preserves the remaining extension fields.
     #[must_use]
-    pub fn new(type_: impl Into<String>, mut fields: BTreeMap<String, serde_json::Value>) -> Self {
-        fields.remove("type");
+    pub fn new(type_: impl Into<String>, mut fields: IndexMap<String, serde_json::Value>) -> Self {
+        fields.shift_remove("type");
         Self {
             type_: type_.into(),
             fields,
@@ -1467,9 +1464,9 @@ impl<'de> Deserialize<'de> for OtherCursorAnchor {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let type_ = fields
-            .remove("type")
+            .shift_remove("type")
             .ok_or_else(|| serde::de::Error::missing_field("type"))?;
         let serde_json::Value::String(type_) = type_ else {
             return Err(serde::de::Error::custom("`type` must be a string"));
@@ -1591,7 +1588,7 @@ pub struct SubagentUpdate {
     /// root set and as the default terminal working directory.
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
     pub cwd: MaybeUndefined<PathBuf>,
-    /// Additional workspace roots for the child. Each path must be absolute.
+    /// Additional workspace roots for the child. Each path MUST be absolute.
     ///
     /// Optional and nullable. Omitted means unchanged. `null` clears the
     /// reported value. While unset, the child inherits its immediate parent's
@@ -1816,7 +1813,7 @@ impl SessionCancelCapabilities {
 pub enum StateUpdate {
     /// Foreground work is in progress.
     Running(RunningStateUpdate),
-    /// The child is ready to process another prompt.
+    /// Foreground work is not in progress. The parent can give the child more work.
     Idle(IdleStateUpdate),
     /// Foreground work is blocked on user action.
     RequiresAction(RequiresActionStateUpdate),
@@ -1866,9 +1863,9 @@ impl RunningStateUpdate {
     }
 }
 
-/// The child is ready to process another prompt.
+/// Foreground work is not in progress. The parent can give the child more work.
 ///
-/// An omitted, `null`, or malformed `stopReason` means not reported.
+/// An omitted or `null` `stopReason` means not reported.
 #[cfg(feature = "unstable_subagents")]
 #[serde_as]
 #[skip_serializing_none]
@@ -1946,7 +1943,7 @@ fn idle_state_update_schema(schema: &mut Schema) {
         properties.insert(
             "stopReason".into(),
             serde_json::json!({
-                "description": "Why foreground work stopped. The value selects one of this type's variants, which may add fields of their own.\n\nOptional. Omitted or `null` both mean the agent is not reporting a stop reason; a malformed value is treated the same way.\n\nSee protocol docs: [Work state](https://agentclientprotocol.com/protocol/v1/subagents#work-state)",
+                "description": "Why foreground work stopped. The value selects one of this type's variants, which may add fields of their own.\n\nOptional. Omitted or `null` both mean the agent is not reporting a stop reason.\n\nSee protocol docs: [Work state](https://agentclientprotocol.com/protocol/v1/subagents#work-state)",
                 "type": ["string", "null"],
                 "x-deserialize-default-on-error": true
             }),
@@ -1978,8 +1975,7 @@ fn idle_state_update_schema(schema: &mut Schema) {
 ///
 /// Reason a child's foreground work stopped, reported on its idle state snapshot.
 ///
-/// Tagged by `stopReason` and flattened into [`IdleStateUpdate`], so the snapshot
-/// matches v2's idle `state_update`, including its handling of unknown values.
+/// Tagged by `stopReason` and flattened into [`IdleStateUpdate`].
 /// The known values are those of [`StopReason`](super::StopReason) plus `error`.
 /// A child has no prompt response of its own, so this snapshot is the only place
 /// to report that its work failed. The prompt response keeps
@@ -2074,7 +2070,7 @@ pub struct OtherStopReason {
     pub stop_reason: String,
     /// Remaining fields of the unknown stop reason.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 #[cfg(feature = "unstable_subagents")]
@@ -2083,7 +2079,7 @@ impl OtherStopReason {
     #[must_use]
     pub fn new(
         stop_reason: impl Into<String>,
-        mut fields: BTreeMap<String, serde_json::Value>,
+        mut fields: IndexMap<String, serde_json::Value>,
     ) -> Self {
         remove_idle_state_update_fields(&mut fields);
         Self {
@@ -2099,9 +2095,9 @@ impl<'de> Deserialize<'de> for OtherStopReason {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let stop_reason = fields
-            .remove("stopReason")
+            .shift_remove("stopReason")
             .ok_or_else(|| serde::de::Error::missing_field("stopReason"))?;
         let serde_json::Value::String(stop_reason) = stop_reason else {
             return Err(serde::de::Error::custom("`stopReason` must be a string"));
@@ -2131,10 +2127,10 @@ const KNOWN_STOP_REASONS: &[&str] = &[
 
 /// Keeps the idle snapshot's own fields out of an unknown stop reason's payload.
 #[cfg(feature = "unstable_subagents")]
-fn remove_idle_state_update_fields(fields: &mut BTreeMap<String, serde_json::Value>) {
-    fields.remove("stopReason");
-    fields.remove("usage");
-    fields.remove("_meta");
+fn remove_idle_state_update_fields(fields: &mut IndexMap<String, serde_json::Value>) {
+    fields.shift_remove("stopReason");
+    fields.shift_remove("usage");
+    fields.shift_remove("_meta");
 }
 
 #[cfg(all(feature = "unstable_subagents", feature = "schemars"))]
@@ -2248,15 +2244,15 @@ pub struct OtherStateUpdate {
     pub state: String,
     /// Remaining fields in the state object.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 #[cfg(feature = "unstable_subagents")]
 impl OtherStateUpdate {
     /// Builds a custom state, preserving its extension fields.
     #[must_use]
-    pub fn new(state: impl Into<String>, mut fields: BTreeMap<String, serde_json::Value>) -> Self {
-        fields.remove("state");
+    pub fn new(state: impl Into<String>, mut fields: IndexMap<String, serde_json::Value>) -> Self {
+        fields.shift_remove("state");
         Self {
             state: state.into(),
             fields,
@@ -2270,9 +2266,9 @@ impl<'de> Deserialize<'de> for OtherStateUpdate {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let state = fields
-            .remove("state")
+            .shift_remove("state")
             .ok_or_else(|| serde::de::Error::missing_field("state"))?;
         let serde_json::Value::String(state) = state else {
             return Err(serde::de::Error::custom("`state` must be a string"));
@@ -2687,8 +2683,7 @@ pub struct PromptSuggestionsUpdate {
     /// The suggestions the Client can offer, ordered most likely first.
     ///
     /// Required and non-null. An empty list withdraws the suggestions the
-    /// Client is offering. A Client skips an entry it cannot parse and keeps
-    /// the rest.
+    /// Client is offering.
     #[serde_as(deserialize_as = "VecSkipError<_>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-skip-invalid-items" = true)))]
     pub suggestions: Vec<PromptSuggestion>,
@@ -4815,9 +4810,9 @@ impl BooleanConfigOptionCapabilities {
 pub struct AuthCapabilities {
     /// Whether the client supports `terminal` authentication methods.
     ///
-    /// The client should set this to `true` only when it can reproduce the
+    /// The client SHOULD set this to `true` only when it can reproduce the
     /// configured agent invocation in an interactive terminal. When `true`, the
-    /// agent may include `terminal` entries in its authentication methods.
+    /// agent MAY include `terminal` entries in its authentication methods.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
@@ -4843,9 +4838,9 @@ impl AuthCapabilities {
 
     /// Whether the client supports `terminal` authentication methods.
     ///
-    /// The client should set this to `true` only when it can reproduce the
+    /// The client SHOULD set this to `true` only when it can reproduce the
     /// configured agent invocation in an interactive terminal. When `true`, the
-    /// agent may include `AuthMethod::Terminal` entries in its authentication
+    /// agent MAY include `AuthMethod::Terminal` entries in its authentication
     /// methods.
     #[must_use]
     pub fn terminal(mut self, terminal: bool) -> Self {

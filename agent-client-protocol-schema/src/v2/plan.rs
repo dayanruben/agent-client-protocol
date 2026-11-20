@@ -5,9 +5,10 @@
 //!
 //! See: [Agent Plan](https://agentclientprotocol.com/protocol/v2/agent-plan)
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use derive_more::{Display, From};
+use indexmap::IndexMap;
 #[cfg(feature = "schemars")]
 use schemars::Schema;
 use serde::{Deserialize, Serialize};
@@ -96,7 +97,7 @@ pub enum PlanUpdateContent {
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
     ///
-    /// Receivers that do not understand this content type should preserve the
+    /// Receivers that do not understand this content type SHOULD preserve the
     /// raw payload when storing, replaying, proxying, or forwarding plans, and
     /// otherwise ignore it or display it generically. It still replaces any earlier
     /// content for the same `planId`.
@@ -123,7 +124,7 @@ pub struct OtherPlanUpdateContent {
     pub plan_id: PlanId,
     /// Additional fields from the unknown plan update content payload.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 impl OtherPlanUpdateContent {
@@ -132,10 +133,10 @@ impl OtherPlanUpdateContent {
     pub fn new(
         type_: impl Into<String>,
         plan_id: impl Into<PlanId>,
-        mut fields: BTreeMap<String, serde_json::Value>,
+        mut fields: IndexMap<String, serde_json::Value>,
     ) -> Self {
-        fields.remove("type");
-        fields.remove("planId");
+        fields.shift_remove("type");
+        fields.shift_remove("planId");
         Self {
             type_: type_.into(),
             plan_id: plan_id.into(),
@@ -149,15 +150,15 @@ impl<'de> Deserialize<'de> for OtherPlanUpdateContent {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let type_ = fields
-            .remove("type")
+            .shift_remove("type")
             .ok_or_else(|| serde::de::Error::missing_field("type"))?;
         let serde_json::Value::String(type_) = type_ else {
             return Err(serde::de::Error::custom("`type` must be a string"));
         };
         let plan_id = fields
-            .remove("planId")
+            .shift_remove("planId")
             .ok_or_else(|| serde::de::Error::missing_field("planId"))?;
         let serde_json::Value::String(plan_id) = plan_id else {
             return Err(serde::de::Error::custom("`planId` must be a string"));
@@ -226,7 +227,7 @@ pub struct PlanItems {
     pub plan_id: PlanId,
     /// The list of tasks to be accomplished.
     ///
-    /// When updating an item-based plan, the agent must send a complete list of all entries
+    /// When updating an item-based plan, the agent MUST send a complete list of all entries
     /// with their current status. The client replaces that plan with each update.
     #[serde_as(deserialize_as = "VecSkipError<_>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-skip-invalid-items" = true)))]
@@ -400,6 +401,7 @@ impl PlanRemoved {
 #[non_exhaustive]
 pub struct PlanEntry {
     /// Human-readable description of what this task aims to accomplish.
+    /// May contain Markdown.
     pub content: String,
     /// The relative importance of this task.
     /// Used to indicate which tasks are most critical to the overall goal.

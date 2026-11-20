@@ -9,9 +9,8 @@ use crate::MaybeUndefined;
 /// Value attached to a given ACP type on the `_meta` field.
 ///
 /// The _meta property is reserved by ACP to allow clients and agents to attach
-/// additional metadata to their interactions. It is an object with string keys. Receivers treat
-/// any other value as omitted. Implementations MUST NOT assign meaning to keys they do not
-/// recognize.
+/// additional metadata to their interactions. It is an object with string keys.
+/// Implementations MUST NOT assign meaning to keys they do not recognize.
 ///
 /// See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)
 pub type Meta = serde_json::Map<String, serde_json::Value>;
@@ -44,7 +43,7 @@ pub fn apply_meta_update(stored: &mut MaybeUndefined<Meta>, update: MaybeUndefin
             };
             for (key, value) in patch {
                 if value.is_null() {
-                    meta.remove(&key);
+                    meta.shift_remove(&key);
                 } else {
                     meta.insert(key, value);
                 }
@@ -66,7 +65,7 @@ pub fn apply_meta_update(stored: &mut MaybeUndefined<Meta>, update: MaybeUndefin
 pub struct ExtRequest {
     /// Wire method name for this extension request.
     ///
-    /// Extension method names must start with `_`.
+    /// Extension method names MUST start with `_`.
     #[serde(skip)] // this is used for routing, but when serializing we only want the params
     pub method: Arc<str>,
     /// Raw JSON parameters for this extension message.
@@ -118,7 +117,7 @@ impl ExtResponse {
 pub struct ExtNotification {
     /// Wire method name for this extension notification.
     ///
-    /// Extension method names must start with `_`.
+    /// Extension method names MUST start with `_`.
     #[serde(skip)] // this is used for routing, but when serializing we only want the params
     pub method: Arc<str>,
     /// Raw JSON parameters for this extension message.
@@ -178,6 +177,16 @@ mod tests {
                 "acme.dev/added": []
             }))
         );
+    }
+
+    #[test]
+    fn meta_update_keeps_the_order_of_the_remaining_keys() {
+        let mut stored = meta(json!({ "zeta": 1, "alpha": 2, "mid": 3, "last": 4 }));
+        apply_meta_update(&mut stored, meta(json!({ "alpha": null })));
+        let MaybeUndefined::Value(stored) = stored else {
+            panic!("expected stored metadata");
+        };
+        assert_eq!(stored.keys().collect::<Vec<_>>(), ["zeta", "mid", "last"]);
     }
 
     #[test]

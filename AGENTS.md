@@ -29,6 +29,7 @@ All paths in the protocol should be absolute
 - For any nullable field, explicitly define whether it is required or optional and whether `null` is equivalent to an omitted key before running schema generation.
 - Use `DefaultOnError`/`VecSkipError` only when the fallback means less (no metadata, an unsupported capability, a missing display item). If the receiver acts on the value (runs, reads, connects, or applies something), keep it strict so a request fails with `-32602` instead of silently doing something else; use `DefaultOnNull` on such lists so `null` still means empty.
 - A malformed value for a known discriminator must not fall through to an untagged fallback variant.
+- `DefaultOnError`, `VecSkipError`, and the `x-deserialize-*` markers they add to the schema are SDK leniency toward non-conforming Clients and Agents. They are not protocol behavior and can change. Ignore them when you write or review the spec.
 
 ## Updating existing methods, their params, or output
 
@@ -46,6 +47,9 @@ These apply to the `docs/protocol` pages and to Rust doc comments, which become 
 - Use periods instead of semicolons or em dashes to join clauses. Use straight quotes.
 - Prefer plain words: "use", not "leverage" or "utilize"; "to", not "in order to".
 - Use sentence case for headings. Keep Agent, Client, and acronyms capitalized.
+- Don't say what a receiver does with a malformed value ("is treated as omitted", "is skipped", "falls back to"). Say what a conforming sender sends. Rules that reject a value, such as `-32602` for malformed params, are protocol behavior and stay.
+- Write a requirement with a capitalized keyword: MUST, MUST NOT, SHOULD, SHOULD NOT, or MAY. Use bold on the `docs/protocol` pages (`**MUST**`) and plain capitals in doc comments. A lowercase "must", "should", or "may" is not a requirement ([RFC 8174](https://datatracker.ietf.org/doc/html/rfc8174)). Use it only for advice, a possibility, or a description of data. Where a rule is stated in more than one place, use the same keyword in each.
+- Don't name the protocol version ("v1", "v2") in prose. State the rule on its own: "No Client capability is required", not "No Client capability is required in v2". The exceptions are the migration guide, which compares versions, and text about `protocolVersion` negotiation. Link targets, file paths, and examples are not prose.
 - v1 is stable: rewording must not add, remove, or change a requirement. Keep every **MUST**/**SHOULD**/**MAY** and its scope as it was, and don't state behavior the v1 spec doesn't already define. Draft v2 pages can change freely.
 
 Never write readme files related to the conversation unless explicitly asked to.

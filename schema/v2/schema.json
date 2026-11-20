@@ -95,7 +95,7 @@
           "description": "Method-specific notification parameters.",
           "anyOf": [
             {
-              "description": "General protocol-level notifications that all sides are expected to\nimplement.\n\nNotifications whose methods start with '$/' are messages which\nare protocol implementation dependent and might not be implementable in all\nclients or agents. For example if the implementation uses a single threaded\nsynchronous programming language then there is little it can do to react to\na `$/cancel_request` notification. If an agent or client receives\nnotifications starting with '$/' it is free to ignore the notification.\n\nNotifications do not expect a response.",
+              "description": "Protocol-level notifications, which either side can send.\n\nTheir methods start with `$/`. Acting on one is optional, because it might not\nbe implementable in every Client or Agent. For example, a single-threaded\nsynchronous implementation can do little to react to a `$/cancel_request`\nnotification. An Agent or Client MAY ignore a `$/` notification it cannot act on.\n\nNotifications do not expect a response.",
               "anyOf": [
                 {
                   "title": "CancelRequestNotification",
@@ -143,7 +143,7 @@
               "anyOf": [
                 {
                   "title": "RequestPermissionRequest",
-                  "description": "Requests permission from the user for an operation.\n\nCalled by the agent when it needs user authorization before executing\na potentially sensitive operation. The client should present the options\nto the user and return their decision.\n\nAfter `session/cancel`, the agent stops waiting for requests of the cancelled\nforeground work and MUST cancel them with `$/cancel_request`. The client\nanswers a cancelled request with the `cancelled` outcome.\n\nSee protocol docs: [Requesting Permission](https://agentclientprotocol.com/protocol/v2/tool-calls#requesting-permission)",
+                  "description": "Requests permission from the user for an operation.\n\nCalled by the agent when it needs user authorization before executing\na potentially sensitive operation. The client should present the options\nto the user and return their decision.\n\nAfter `session/cancel`, the agent stops waiting for requests of the cancelled\nforeground work and MUST cancel them with `$/cancel_request`. The client\nanswers a cancelled request with the `cancelled` outcome.\n\nAn error response is not approval, and neither is a connection that ends\nbefore the client answers. The agent MUST NOT treat either as approval.\n\nSee protocol docs: [Requesting Permission](https://agentclientprotocol.com/protocol/v2/tool-calls#requesting-permission)",
                   "allOf": [
                     {
                       "$ref": "#/$defs/RequestPermissionRequest"
@@ -287,7 +287,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future permission subject.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this subject type should preserve the raw\npayload when storing, replaying, proxying, or forwarding permission\nrequests, and otherwise display a generic permission prompt or decline it\naccording to policy.",
+          "description": "Custom or future permission subject.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this subject type SHOULD preserve the raw\npayload when storing, replaying, proxying, or forwarding permission\nrequests, and otherwise display a generic permission prompt or decline it\naccording to policy.",
           "type": "object",
           "properties": {
             "type": {
@@ -342,7 +342,7 @@
           "x-deserialize-default-on-error": true
         },
         "title": {
-          "description": "Human-readable title describing what the tool is doing.\n\nOmission leaves the title unchanged, `null` unsets it, and a string replaces it.\nA new tool call starts without a title.",
+          "description": "Human-readable plain-text title describing what the tool is doing.\n\nOmission leaves the title unchanged, `null` unsets it, and a string replaces it.\nA new tool call starts without a title.",
           "type": ["string", "null"],
           "x-deserialize-default-on-error": true
         },
@@ -590,7 +590,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future tool call content.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content type should preserve the\nraw payload when storing, replaying, proxying, or forwarding tool call\noutput, and otherwise ignore it or display it generically.",
+          "description": "Custom or future tool call content.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content type SHOULD preserve the\nraw payload when storing, replaying, proxying, or forwarding tool call\noutput, and otherwise ignore it or display it generically.",
           "type": "object",
           "properties": {
             "type": {
@@ -732,7 +732,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future content block.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content block type should preserve\nthe raw payload when storing, replaying, proxying, or forwarding content,\nand otherwise ignore it or display it generically. Agents MUST reject a\n`session/prompt` request with a content block type they do not support\nwith `-32602`.",
+          "description": "Custom or future content block.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content block type SHOULD preserve\nthe raw payload when storing, replaying, proxying, or forwarding content,\nand otherwise ignore it or display it generically. Agents MUST reject a\n`session/prompt` request with a content block type they do not support\nwith `-32602`.",
           "type": "object",
           "properties": {
             "type": {
@@ -990,7 +990,7 @@
           "x-deserialize-default-on-error": true
         },
         "sizes": {
-          "description": "Optional array of strings that specify sizes at which the icon can be used.\nEach string should be in `WxH` format (e.g., `\"48x48\"`, `\"96x96\"`) or\n`\"any\"` for scalable formats like SVG.\n\nIf not provided, the client should assume that the icon can be used at any size.\n\nOmitted and `null` are equivalent and mean no sizes are specified.",
+          "description": "Optional array of strings that specify sizes at which the icon can be used.\nEach string SHOULD be in `WxH` format (e.g., `\"48x48\"`, `\"96x96\"`) or\n`\"any\"` for scalable formats like SVG.\n\nIf not provided, the client SHOULD assume that the icon can be used at any size.\n\nOmitted and `null` are equivalent and mean no sizes are specified.",
           "type": ["array", "null"],
           "items": {
             "type": "string"
@@ -1663,7 +1663,7 @@
       "required": ["path"]
     },
     "ToolCallCapabilities": {
-      "description": "Client-initiated controls a tool call currently supports.\n\nA malformed value falls back to no controls, so the Client never sends a request the\nAgent did not advertise.\n\nSee protocol docs: [Cancelling Tool Calls](https://agentclientprotocol.com/protocol/v2/tool-calls#cancelling-tool-calls)",
+      "description": "Client-initiated controls a tool call currently supports.\n\nSee protocol docs: [Cancelling Tool Calls](https://agentclientprotocol.com/protocol/v2/tool-calls#cancelling-tool-calls)",
       "type": "object",
       "properties": {
         "cancel": {
@@ -1885,7 +1885,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future elicitation mode.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this mode should preserve the raw payload\nwhen storing, replaying, proxying, or forwarding elicitation requests.\nThey MUST NOT render it as a known elicitation mode.",
+          "description": "Custom or future elicitation mode.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this mode SHOULD preserve the raw payload\nwhen storing, replaying, proxying, or forwarding elicitation requests.\nThey MUST NOT render it as a known elicitation mode.",
           "type": "object",
           "properties": {
             "mode": {
@@ -2005,7 +2005,7 @@
           "x-deserialize-default-on-error": true
         },
         "properties": {
-          "description": "Property definitions (must be primitive types).",
+          "description": "Property definitions (MUST be primitive types).",
           "type": "object",
           "additionalProperties": {
             "$ref": "#/$defs/ElicitationPropertySchema"
@@ -2127,7 +2127,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future elicitation property schema.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this property schema type should preserve\nthe raw schema when storing, replaying, proxying, or forwarding\nelicitation requests. They MUST NOT render it as a known input control.",
+          "description": "Custom or future elicitation property schema.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this property schema type SHOULD preserve\nthe raw schema when storing, replaying, proxying, or forwarding\nelicitation requests. They MUST NOT render it as a known input control.",
           "type": "object",
           "properties": {
             "type": {
@@ -2219,7 +2219,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future string format.\n\nUnknown formats are preserved. Implementations that do not understand a\nformat should treat it as an annotation rather than rejecting the schema.",
+          "description": "Custom or future string format.\n\nUnknown formats are preserved. Implementations that do not understand a\nformat SHOULD treat it as an annotation rather than rejecting the schema.",
           "type": "string"
         }
       ]
@@ -2836,7 +2836,7 @@
       "type": "object",
       "properties": {
         "protocolVersion": {
-          "description": "The highest protocol version supported by the agent that is at or below\nthe version requested by the client. If no such version exists,\ninitialization fails with error code -32022.\n\nThe client must check that it supports this version and should disconnect\nif it does not.",
+          "description": "The highest protocol version supported by the agent that is at or below\nthe version requested by the client. If no such version exists,\ninitialization fails with error code -32022.\n\nThe client MUST check that it supports this version and SHOULD disconnect\nif it does not.",
           "allOf": [
             {
               "$ref": "#/$defs/ProtocolVersion"
@@ -2897,7 +2897,7 @@
           "type": "string"
         },
         "title": {
-          "description": "Intended for UI and end-user contexts and optimized to be human-readable\nand easily understood.\n\nIf not provided, the name should be used for display.\n\nOmitted and `null` are equivalent and mean the `name` is used for display.",
+          "description": "Intended for UI and end-user contexts and optimized to be human-readable\nand easily understood.\n\nIf not provided, the name SHOULD be used for display.\n\nOmitted and `null` are equivalent and mean the `name` is used for display.",
           "type": ["string", "null"],
           "x-deserialize-default-on-error": true
         },
@@ -2991,7 +2991,7 @@
           "x-deserialize-default-on-error": true
         },
         "additionalDirectories": {
-          "description": "Whether the agent supports `additionalDirectories` on supported session lifecycle requests.\n\nOptional. Omitted and `null` are equivalent and mean the agent does not advertise support.\nSupplying `{}` means the agent supports `additionalDirectories` on\nsupported session lifecycle requests.\n\nAgents may return `SessionInfo.additionalDirectories` to report the\ncomplete ordered additional-root list associated with a listed session.",
+          "description": "Whether the agent supports `additionalDirectories` on supported session lifecycle requests.\n\nOptional. Omitted and `null` are equivalent and mean the agent does not advertise support.\nSupplying `{}` means the agent supports `additionalDirectories` on\nsupported session lifecycle requests.\n\nAgents MAY return `SessionInfo.additionalDirectories` to report the\ncomplete ordered additional-root list associated with a listed session.",
           "anyOf": [
             {
               "$ref": "#/$defs/SessionAdditionalDirectoriesCapabilities"
@@ -3299,7 +3299,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future authentication method.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this method type should preserve the raw\npayload when storing, replaying, proxying, or forwarding initialization\ndata, and otherwise ignore the method or display it generically.",
+          "description": "Custom or future authentication method.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this method type SHOULD preserve the raw\npayload when storing, replaying, proxying, or forwarding initialization\ndata, and otherwise ignore the method or display it generically.",
           "type": "object",
           "properties": {
             "type": {
@@ -3403,7 +3403,7 @@
           "x-deserialize-default-on-null": true
         },
         "env": {
-          "description": "Additional environment variables to set on the configured agent invocation for terminal auth.\nNames MUST be unique. These values override same-named variables in the\nbase launch configuration.",
+          "description": "Additional environment variables to set on the configured agent invocation for terminal auth.\nNames SHOULD be unique, and otherwise the last entry wins. These values override\nsame-named variables in the base launch configuration.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/EnvVariable"
@@ -3523,7 +3523,7 @@
       "type": "object",
       "properties": {
         "configId": {
-          "description": "Unique identifier for the configuration option.",
+          "description": "Identifier for the configuration option. MUST be unique within `configOptions`.",
           "allOf": [
             {
               "$ref": "#/$defs/SessionConfigId"
@@ -3594,7 +3594,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future session configuration option payload.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this option type should preserve the raw\npayload when storing, replaying, proxying, or forwarding configuration\ndata, and otherwise ignore the option. The Agent keeps using its `currentValue`.",
+          "description": "Custom or future session configuration option payload.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this option type SHOULD preserve the raw\npayload when storing, replaying, proxying, or forwarding configuration\ndata, and otherwise ignore the option. The Agent keeps using its `currentValue`.",
           "type": "object",
           "properties": {
             "type": {
@@ -3727,7 +3727,7 @@
       "type": "object",
       "properties": {
         "groupId": {
-          "description": "Unique identifier for this group.",
+          "description": "Identifier for this group. MUST be unique within the option.",
           "allOf": [
             {
               "$ref": "#/$defs/SessionConfigGroupId"
@@ -3816,7 +3816,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future command kind.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this command type should preserve the raw\npayload when storing, replaying, proxying, or forwarding command\nmetadata, and otherwise ignore the command. They MUST NOT display it as a\nslash command.",
+          "description": "Custom or future command kind.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this command type SHOULD preserve the raw\npayload when storing, replaying, proxying, or forwarding command\nmetadata, and otherwise ignore the command. They MUST NOT display it as a\nslash command.",
           "type": "object",
           "properties": {
             "type": {
@@ -3872,7 +3872,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future command input specification.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this input type should preserve the raw\npayload when storing, replaying, proxying, or forwarding command\nmetadata, and otherwise ignore the input specification or display the\ncommand without structured input.",
+          "description": "Custom or future command input specification.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nClients that do not understand this input type SHOULD preserve the raw\npayload when storing, replaying, proxying, or forwarding command\nmetadata, and otherwise ignore the input specification or display the\ncommand without structured input.",
           "type": "object",
           "properties": {
             "type": {
@@ -3954,7 +3954,7 @@
       "type": "object",
       "properties": {
         "sessions": {
-          "description": "Array of session information objects.",
+          "description": "Array of session information objects.\n\nAgents SHOULD return the sessions with the most recent activity first.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/SessionInfo"
@@ -4005,7 +4005,7 @@
           ]
         },
         "additionalDirectories": {
-          "description": "Additional workspace roots reported for this session. Each path must be absolute.\n\nWhen present, this is the complete ordered additional-root list reported\nby the Agent. Omitted and empty values are equivalent: the response\nreports no additional roots.",
+          "description": "Additional workspace roots reported for this session. Each path MUST be absolute.\n\nWhen present, this is the complete ordered additional-root list reported\nby the Agent. Omitted and empty values are equivalent: the response\nreports no additional roots.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/AbsolutePath"
@@ -4152,7 +4152,7 @@
       "type": "object",
       "properties": {
         "messageId": {
-          "description": "Identifies the user message inserted into the ACP conversation.\n\nRequired and non-null. Omission and explicit `null` are both invalid.\n\nThe corresponding user-message session update carries this same identifier and may arrive\nbefore or after this response. Agents must echo the message during the live session, but are\nnot required to retain it. If retained and replayed, the message keeps this identifier.",
+          "description": "Identifies the user message inserted into the ACP conversation.\n\nRequired and non-null. Omission and explicit `null` are both invalid.\n\nThe corresponding user-message session update carries this same identifier and may arrive\nbefore or after this response. Agents MUST echo the message during the live session, but are\nnot required to retain it. If retained and replayed, the message keeps this identifier.",
           "allOf": [
             {
               "$ref": "#/$defs/MessageId"
@@ -4182,7 +4182,7 @@
       "type": "object",
       "properties": {
         "code": {
-          "description": "A number indicating the error type that occurred.\nThis must be an integer as defined in the JSON-RPC specification.",
+          "description": "A number indicating the error type that occurred.\nThis MUST be an integer as defined in the JSON-RPC specification.",
           "allOf": [
             {
               "$ref": "#/$defs/ErrorCode"
@@ -4190,7 +4190,7 @@
           ]
         },
         "message": {
-          "description": "A string providing a short description of the error.\nThe message should be limited to a concise single sentence.",
+          "description": "A string providing a short description of the error.\nThe message SHOULD be limited to a concise single sentence.",
           "type": "string"
         },
         "data": {
@@ -4283,7 +4283,7 @@
       ]
     },
     "ErrorData": {
-      "description": "Schema for [`Error::data`]: the shapes ACP defines, or any other value.",
+      "description": "Schema for the `data` field of an error: the shapes ACP defines, or any other value.",
       "anyOf": [
         {
           "title": "UnsupportedProtocolVersion",
@@ -4811,7 +4811,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future session update.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this update type should preserve the\nraw payload when storing, replaying, proxying, or forwarding session\nhistory, and otherwise ignore it or display it generically.",
+          "description": "Custom or future session update.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this update type SHOULD preserve the\nraw payload when storing, replaying, proxying, or forwarding session\nhistory, and otherwise ignore it or display it generically.",
           "type": "object",
           "properties": {
             "sessionUpdate": {
@@ -5345,7 +5345,7 @@
       "type": "object",
       "properties": {
         "background": {
-          "description": "Work running independently of foreground work, as a complete snapshot.\n\nOptional. Omitted and `null` are equivalent and mean the Agent is not reporting\nbackground work, not that nothing is running. `[]` means no background work is\nrunning. An Agent that reports background work MUST include it on every state\nupdate for the session. A malformed list is treated as not reported.\n\nSee protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)",
+          "description": "Work running independently of foreground work, as a complete snapshot.\n\nOptional. Omitted and `null` are equivalent and mean the Agent is not reporting\nbackground work, not that nothing is running. `[]` means no background work is\nrunning. An Agent that reports background work MUST include it on every state\nupdate for the session.\n\nSee protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)",
           "type": ["array", "null"],
           "items": {
             "$ref": "#/$defs/BackgroundWork"
@@ -5379,11 +5379,11 @@
       }
     },
     "IdleStateUpdate": {
-      "description": "No foreground work is active. Background activity may continue.\n\nAgents SHOULD include a `stopReason` when the idle transition ends foreground\nwork. An idle update that does not end foreground work need not include one.\nReceivers treat an omitted, `null`, or malformed `stopReason` as the agent not\nreporting one.\nRepeated or resume snapshots may carry the last stop reason for context.\nThey MUST NOT be counted as new completions, cancellations, or additional usage.",
+      "description": "No foreground work is active. Background activity may continue.\n\nAgents SHOULD include a `stopReason` when the idle transition ends foreground\nwork. An idle update that does not end foreground work need not include one.\nReceivers treat an omitted or `null` `stopReason` as the agent not reporting one.\nRepeated or resume snapshots may carry the last stop reason for context.\nThey MUST NOT be counted as new completions or cancellations.",
       "type": "object",
       "properties": {
         "background": {
-          "description": "Work running independently of foreground work, as a complete snapshot.\n\nOptional. Omitted and `null` are equivalent and mean the Agent is not reporting\nbackground work, not that nothing is running. `[]` means no background work is\nrunning. An Agent that reports background work MUST include it on every state\nupdate for the session. A malformed list is treated as not reported.\n\nSee protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)",
+          "description": "Work running independently of foreground work, as a complete snapshot.\n\nOptional. Omitted and `null` are equivalent and mean the Agent is not reporting\nbackground work, not that nothing is running. `[]` means no background work is\nrunning. An Agent that reports background work MUST include it on every state\nupdate for the session.\n\nSee protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)",
           "type": ["array", "null"],
           "items": {
             "$ref": "#/$defs/BackgroundWork"
@@ -5397,7 +5397,7 @@
           "additionalProperties": true
         },
         "stopReason": {
-          "description": "Why foreground work stopped. The value selects one of this type's variants, which may add fields of their own.\n\nOptional. Omitted and `null` are equivalent and mean the agent is not reporting a stop reason; a malformed value is treated the same way.\n\nSee protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#stop-reasons)",
+          "description": "Why foreground work stopped. The value selects one of this type's variants, which may add fields of their own.\n\nOptional. Omitted and `null` are equivalent and mean the agent is not reporting a stop reason.\n\nSee protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#stop-reasons)",
           "type": ["string", "null"],
           "x-deserialize-default-on-error": true
         }
@@ -5568,7 +5568,7 @@
       "type": "object",
       "properties": {
         "background": {
-          "description": "Work running independently of foreground work, as a complete snapshot.\n\nOptional. Omitted and `null` are equivalent and mean the Agent is not reporting\nbackground work, not that nothing is running. `[]` means no background work is\nrunning. An Agent that reports background work MUST include it on every state\nupdate for the session. A malformed list is treated as not reported.\n\nSee protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)",
+          "description": "Work running independently of foreground work, as a complete snapshot.\n\nOptional. Omitted and `null` are equivalent and mean the Agent is not reporting\nbackground work, not that nothing is running. `[]` means no background work is\nrunning. An Agent that reports background work MUST include it on every state\nupdate for the session.\n\nSee protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)",
           "type": ["array", "null"],
           "items": {
             "$ref": "#/$defs/BackgroundWork"
@@ -5588,7 +5588,7 @@
       "type": "object",
       "properties": {
         "background": {
-          "description": "Work running independently of foreground work, as a complete snapshot.\n\nOptional. Omitted and `null` are equivalent and mean the Agent is not reporting\nbackground work, not that nothing is running. `[]` means no background work is\nrunning. An Agent that reports background work MUST include it on every state\nupdate for the session. A malformed list is treated as not reported.\n\nSee protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)",
+          "description": "Work running independently of foreground work, as a complete snapshot.\n\nOptional. Omitted and `null` are equivalent and mean the Agent is not reporting\nbackground work, not that nothing is running. `[]` means no background work is\nrunning. An Agent that reports background work MUST include it on every state\nupdate for the session.\n\nSee protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)",
           "type": ["array", "null"],
           "items": {
             "$ref": "#/$defs/BackgroundWork"
@@ -5604,7 +5604,7 @@
       }
     },
     "StateUpdate": {
-      "description": "A snapshot of the session's aggregate foreground activity.\n\nForeground work is the agent's active response or workflow in the session,\nincluding model processing, tool execution, and waiting for user action needed\nto continue that work. It can start with a prompt or be agent-initiated, for\nexample to pursue an ongoing goal or follow up on a completed background task.\nEither way, the agent MUST report `running` when foreground work starts,\nor `requires_action` if it starts blocked on user action, and `idle` when it\nends. The agent SHOULD include a stop reason on that idle update.\nAgent-initiated work does not require a prompt request or a synthetic user\nmessage.\n\n`running` may precede user-message insertion, for example during a foreground\nhook. It is not acknowledgment of insertion, and rejecting a prompt does not\nitself end foreground work.\n\nBackground activity can continue and emit other `session/update` notifications\nwhile `idle`. Those notifications, including a detached task's progress or\ncompletion, do not by themselves change this state. A permission request only\nwarrants `requires_action` when foreground work is blocked on user action.\n\nThe agent SHOULD report `requires_action` when the foreground workflow as a\nwhole cannot progress without user action, including permissions or elicitations.\nOnce reported, it MUST report `running` when progress resumes, or `idle` when\nwork ends without resuming.\nIf other foreground work can progress, the state remains `running`. Resolving\none of several requests does not itself change the state. Agents SHOULD ignore\nresponses for work that has already ended rather than use them to resume it.\n\nA new session defaults to idle until a state update reports otherwise.\nResume MUST send a current-state snapshot after any replay and before its\nresponse. The snapshot reports foreground state after resuming.\nThe response alone does not imply idle.\nRepeated snapshots are idempotent, not additional work, completions, or usage.\nA repeated state may carry updated information without another state transition.\nThe agent MUST report `idle` when no foreground activity remains. Completing\nan individual activity while other foreground work continues does not require\nan idle boundary. Local commands use the same lifecycle even without model work.\n\nSee protocol docs: [Session States](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#session-states)",
+      "description": "A snapshot of the session's aggregate foreground activity.\n\nForeground work is the agent's active response or workflow in the session,\nincluding model processing, tool execution, and waiting for user action needed\nto continue that work. It can start with a prompt or be agent-initiated, for\nexample to pursue an ongoing goal or follow up on a completed background task.\nEither way, the agent MUST report `running` when foreground work starts,\nor `requires_action` if it starts blocked on user action, and `idle` when it\nends. The agent SHOULD include a stop reason on that idle update.\nAgent-initiated work does not require a prompt request or a synthetic user\nmessage.\n\n`running` may precede user-message insertion, for example during a foreground\nhook. It is not acknowledgment of insertion, and rejecting a prompt does not\nitself end foreground work.\n\nBackground activity can continue and emit other `session/update` notifications\nwhile `idle`. Those notifications, including a detached task's progress or\ncompletion, do not by themselves change this state. A permission request only\nwarrants `requires_action` when foreground work is blocked on user action.\n\nThe agent SHOULD report `requires_action` when the foreground workflow as a\nwhole cannot progress without user action, including permissions or elicitations.\nOnce reported, it MUST report `running` when progress resumes, or `idle` when\nwork ends without resuming.\nIf other foreground work can progress, the state remains `running`. Resolving\none of several requests does not itself change the state. Agents SHOULD ignore\nresponses for work that has already ended rather than use them to resume it.\n\nA new session defaults to idle until a state update reports otherwise.\nResume MUST send a current-state snapshot after any replay and before its\nresponse. The snapshot reports foreground state after resuming.\nThe response alone does not imply idle.\nRepeated snapshots are idempotent, not additional work or completions.\nA repeated state may carry updated information without another state transition.\nThe agent MUST report `idle` when no foreground activity remains. Completing\nan individual activity while other foreground work continues does not require\nan idle boundary. Local commands use the same lifecycle even without model work.\n\nSee protocol docs: [Session States](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#session-states)",
       "anyOf": [
         {
           "description": "Foreground work is in progress.",
@@ -5787,7 +5787,7 @@
           "x-deserialize-default-on-error": true
         },
         "signal": {
-          "description": "Signal that terminated the process, when known.\n\nAgents should use the conventional platform signal name. POSIX examples\ninclude `SIGTERM`, `SIGKILL`, and `SIGINT`. Other platforms may use a\nplatform-specific name. Omitted and `null` are equivalent.",
+          "description": "Signal that terminated the process, when known.\n\nAgents SHOULD use the conventional platform signal name. POSIX examples\ninclude `SIGTERM`, `SIGKILL`, and `SIGINT`. Other platforms may use a\nplatform-specific name. Omitted and `null` are equivalent.",
           "type": ["string", "null"],
           "x-deserialize-default-on-error": true
         },
@@ -5804,14 +5804,14 @@
       "type": "object",
       "properties": {
         "cols": {
-          "description": "Number of columns.",
+          "description": "Number of columns. At least 1.",
           "type": "integer",
           "format": "uint16",
           "minimum": 1,
           "maximum": 65535
         },
         "rows": {
-          "description": "Number of rows.",
+          "description": "Number of rows. At least 1.",
           "type": "integer",
           "format": "uint16",
           "minimum": 1,
@@ -5827,7 +5827,7 @@
       "required": ["cols", "rows"]
     },
     "TerminalCapabilities": {
-      "description": "Client-initiated controls a terminal currently supports.\n\nA malformed value falls back to no controls, so the Client never sends a request the\nAgent did not advertise.\n\nSee protocol docs: [Cancelling Terminals](https://agentclientprotocol.com/protocol/v2/tool-calls#cancelling-terminals)",
+      "description": "Client-initiated controls a terminal currently supports.\n\nSee protocol docs: [Cancelling Terminals](https://agentclientprotocol.com/protocol/v2/tool-calls#cancelling-terminals)",
       "type": "object",
       "properties": {
         "cancel": {
@@ -5995,7 +5995,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future plan update content.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content type should preserve the\nraw payload when storing, replaying, proxying, or forwarding plans, and\notherwise ignore it or display it generically. It still replaces any earlier\ncontent for the same `planId`.",
+          "description": "Custom or future plan update content.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this content type SHOULD preserve the\nraw payload when storing, replaying, proxying, or forwarding plans, and\notherwise ignore it or display it generically. It still replaces any earlier\ncontent for the same `planId`.",
           "type": "object",
           "properties": {
             "type": {
@@ -6039,7 +6039,7 @@
       "type": "object",
       "properties": {
         "content": {
-          "description": "Human-readable description of what this task aims to accomplish.",
+          "description": "Human-readable description of what this task aims to accomplish.\nMay contain Markdown.",
           "type": "string"
         },
         "priority": {
@@ -6135,7 +6135,7 @@
           ]
         },
         "entries": {
-          "description": "The list of tasks to be accomplished.\n\nWhen updating an item-based plan, the agent must send a complete list of all entries\nwith their current status. The client replaces that plan with each update.",
+          "description": "The list of tasks to be accomplished.\n\nWhen updating an item-based plan, the agent MUST send a complete list of all entries\nwith their current status. The client replaces that plan with each update.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/PlanEntry"
@@ -6387,7 +6387,7 @@
       ]
     },
     "CompactionUpdate": {
-      "description": "A context compaction upsert. The first notification fixes the compaction's\ntimeline position. Later updates with the same ID patch that entity in place.\n\n`summary`, `error`, and `_meta` have patch semantics: omission leaves the\nstored value unchanged, `null` clears it, and a concrete value replaces it.\n`summary: []` also clears the summary. A concrete `_meta` object patches the\nstored metadata by top-level key instead of replacing it.",
+      "description": "A context compaction upsert. The first notification fixes the compaction's\ntimeline position. Later updates with the same ID patch that entity in place.\n\nOnly `compactionId` is required. `status`, `summary`, `error`, and `_meta` have\npatch semantics: omission leaves the stored value unchanged, `null` clears it\nor resets it to its default, and a concrete value replaces it.\n`summary: []` also clears the summary. A concrete `_meta` object patches the\nstored metadata by top-level key instead of replacing it.",
       "type": "object",
       "properties": {
         "compactionId": {
@@ -6399,12 +6399,16 @@
           ]
         },
         "status": {
-          "description": "Current lifecycle status.",
-          "allOf": [
+          "description": "Current lifecycle status.\n\nOmission leaves the status unchanged, `null` resets it to `in_progress`, and a value\nreplaces it. A new compaction starts as `in_progress`.",
+          "anyOf": [
             {
               "$ref": "#/$defs/CompactionStatus"
+            },
+            {
+              "type": "null"
             }
-          ]
+          ],
+          "x-deserialize-default-on-error": true
         },
         "summary": {
           "description": "Complete replacement user-displayable summary content for the compaction.",
@@ -6427,7 +6431,7 @@
           "additionalProperties": true
         }
       },
-      "required": ["compactionId", "status"]
+      "required": ["compactionId"]
     },
     "CompactionSummaryChunk": {
       "description": "A content block appended to a compaction's summary. A first-seen ID creates\nan in-progress compaction. Chunks append in receive order.",
@@ -6459,7 +6463,7 @@
       "required": ["compactionId", "content"]
     },
     "ReplayComplete": {
-      "description": "Marks the end of the history replay requested by `session/resume`.\n\nThe Agent sends this once on a session for each `session/resume` request\nwith a `replayFrom` cursor, after the last replayed update for that session\nand before the response. It sends it for an empty history too. Every update\nfor the session between the request and this update is replayed history.\nEvery update after it is not.\n\nThe Agent does not send it when `replayFrom` is omitted or `null`, or when\nit cannot finish the replay. A resume that ends without it delivered a\ntruncated replay.\n\nSee protocol docs: [Replay Complete](https://agentclientprotocol.com/protocol/v2/session-setup#replay-complete)",
+      "description": "Marks the end of the history replay requested by `session/resume`.\n\nThe Agent sends this once on a session for each `session/resume` request\nwith a `replayFrom` cursor, after the last replayed update for that session\nand before the response. It sends it for an empty history too. Every update\nfor the session between the request and this update is replayed history.\nEvery update after it is not.\n\nThe Agent does not send it when `replayFrom` is omitted or `null`, or when\nit cannot finish the replay. A replay that ends without it and without a\nsuccessful response is truncated.\n\nSee protocol docs: [Replay Complete](https://agentclientprotocol.com/protocol/v2/session-setup#replay-complete)",
       "type": "object",
       "properties": {
         "_meta": {
@@ -6507,7 +6511,7 @@
       }
     },
     "SubagentUpdate": {
-      "description": "Notification that the enclosing parent session created and owns a child session.\n\nLater updates modify the existing association's metadata, not its ownership.\n\nSent on the immediate parent session. The first update for an unknown\n`sessionId` announces the child and MUST be sent\nbefore any live request or notification bearing the child's session ID,\nincluding messages naming it as sender or recipient. Child events are\ndelivered automatically. No separate child load, resume, or subscription is needed.\nUnderstanding this update, registering child sessions, and applying their\noperation restrictions are baseline v2 requirements. No Client capability\nis required.\n\nOnly `sessionId` is required. Other fields have\npatch semantics: omitted fields leave the stored value unchanged, `null`\nclears or unsets the value, and concrete values replace it. A concrete\n`_meta` object instead patches the stored metadata by top-level key. For\n`state`, `null` removes the current state report and leaves activity\nunconfirmed. It does not report idle or cancellation. A child whose capabilities are\nunset permits no Client-initiated session mutations.\n\n`cwd` and `additionalDirectories` report where the Agent placed the child.\nWhile unset, each inherits the immediate parent's effective value.\nThe title and description provide the parent's display metadata for the\nchild. Agents SHOULD mirror known child state changes in the parent's\n`state` using the same `StateUpdate` snapshot as the\nordinary `state_update` notification on the child session. This reports\nchild state, not a separate parent-owned lifecycle. Consumers should\ntreat duplicate reports idempotently.\nCompleting or cancelling work does not end the association: the parent may\nmessage the same child again. Individual messages and their outcomes do not\nchange this association.\n\nSee protocol docs: [Subagents](https://agentclientprotocol.com/protocol/v2/subagents)",
+      "description": "Notification that the enclosing parent session created and owns a child session.\n\nLater updates modify the existing association's metadata, not its ownership.\n\nSent on the immediate parent session. The first update for an unknown\n`sessionId` announces the child and MUST be sent\nbefore any live request or notification bearing the child's session ID,\nincluding messages naming it as sender or recipient. Child events are\ndelivered automatically. No separate child load, resume, or subscription is needed.\nUnderstanding this update, registering child sessions, and applying their\noperation restrictions are baseline requirements. No Client capability\nis required.\n\nOnly `sessionId` is required. Other fields have\npatch semantics: omitted fields leave the stored value unchanged, `null`\nclears or unsets the value, and concrete values replace it. A concrete\n`_meta` object instead patches the stored metadata by top-level key. For\n`state`, `null` removes the current state report and leaves activity\nunconfirmed. It does not report idle or cancellation. A child whose capabilities are\nunset permits no Client-initiated session mutations.\n\n`cwd` and `additionalDirectories` report where the Agent placed the child.\nWhile unset, each inherits the immediate parent's effective value.\nThe title and description provide the parent's display metadata for the\nchild. Agents SHOULD mirror known child state changes in the parent's\n`state` using the same `StateUpdate` snapshot as the\nordinary `state_update` notification on the child session. This reports\nchild state, not a separate parent-owned lifecycle. Consumers should\ntreat duplicate reports idempotently.\nCompleting or cancelling work does not end the association: the parent may\nmessage the same child again. Individual messages and their outcomes do not\nchange this association.\n\nSee protocol docs: [Subagents](https://agentclientprotocol.com/protocol/v2/subagents)",
       "type": "object",
       "properties": {
         "sessionId": {
@@ -6564,7 +6568,7 @@
           ]
         },
         "additionalDirectories": {
-          "description": "Additional workspace roots for the child. Each path must be absolute.\n\nOptional and nullable. Omitted means unchanged. `null` clears the\nreported value. While unset, the child inherits its immediate parent's\neffective additional directories, independently of `cwd`. A concrete\narray replaces the whole list. `[]` reports no additional directories.",
+          "description": "Additional workspace roots for the child. Each path MUST be absolute.\n\nOptional and nullable. Omitted means unchanged. `null` clears the\nreported value. While unset, the child inherits its immediate parent's\neffective additional directories, independently of `cwd`. A concrete\narray replaces the whole list. `[]` reports no additional directories.",
           "type": ["array", "null"],
           "items": {
             "$ref": "#/$defs/AbsolutePath"
@@ -6736,7 +6740,7 @@
               "anyOf": [
                 {
                   "title": "InitializeRequest",
-                  "description": "Establishes the connection with a client and negotiates protocol capabilities.\n\nThis method is called at the beginning of the connection, before any other request, to:\n- Negotiate the protocol version to use\n- Exchange capability information between client and agent\n- Determine available authentication methods\n\nThe Client may repeat it before its first other request. The latest successful\n`initialize` is authoritative.\n\nThe agent should respond with its supported protocol version and capabilities.\n\nSee protocol docs: [Initialization](https://agentclientprotocol.com/protocol/v2/initialization)",
+                  "description": "Establishes the connection with a client and negotiates protocol capabilities.\n\nThis method is called at the beginning of the connection, before any other request, to:\n- Negotiate the protocol version to use\n- Exchange capability information between client and agent\n- Determine available authentication methods\n\nThe Client MAY repeat it before its first other request. The latest successful\n`initialize` is authoritative.\n\nThe agent should respond with its supported protocol version and capabilities.\n\nSee protocol docs: [Initialization](https://agentclientprotocol.com/protocol/v2/initialization)",
                   "allOf": [
                     {
                       "$ref": "#/$defs/InitializeRequest"
@@ -6745,7 +6749,7 @@
                 },
                 {
                   "title": "LoginAuthRequest",
-                  "description": "Authenticates the client using the specified authentication method.\n\nAgents MUST support this method when their `initialize` response included\na non-empty `authMethods` list. Clients MUST call this method only\nwith a method whose type defines a protocol-driven login flow, and MUST NOT\ncall it when `authMethods` was omitted or empty.\n\nCalled when the agent requires authentication before allowing session creation.\nThe client provides the authentication method ID that was advertised during initialization.\n\nAfter successful authentication, the client can proceed to create sessions with\n`session/new` without receiving an `auth_required` (`-32000`) error.\n\nSee protocol docs: [Initialization](https://agentclientprotocol.com/protocol/v2/initialization)",
+                  "description": "Authenticates the client using the specified authentication method.\n\nAgents MUST support this method when their `initialize` response included\na non-empty `authMethods` list. Clients MUST call this method only\nwith a method whose type defines a protocol-driven login flow, and MUST NOT\ncall it when `authMethods` was omitted or empty.\n\nCalled when the agent requires authentication before allowing session creation.\nThe client provides the authentication method ID that was advertised during initialization.\n\nAfter successful authentication, the client can proceed to create sessions with\n`session/new` without receiving a `-32000` (Authentication required) error.\n\nSee protocol docs: [Initialization](https://agentclientprotocol.com/protocol/v2/initialization)",
                   "allOf": [
                     {
                       "$ref": "#/$defs/LoginAuthRequest"
@@ -6763,7 +6767,7 @@
                 },
                 {
                   "title": "NewSessionRequest",
-                  "description": "Creates a new conversation session with the agent.\n\nSessions represent independent conversation contexts with their own history and state.\n\nThe agent should:\n- Create a new session context\n- Connect to any specified MCP servers\n- Return a unique session ID for future requests\n\nMay return an `auth_required` (`-32000`) error if the agent requires authentication.\n\nSee protocol docs: [Session Setup](https://agentclientprotocol.com/protocol/v2/session-setup)",
+                  "description": "Creates a new conversation session with the agent.\n\nSessions represent independent conversation contexts with their own history and state.\n\nThe agent should:\n- Create a new session context\n- Connect to any specified MCP servers\n- Return a unique session ID for future requests\n\nMay return a `-32000` (Authentication required) error if the agent requires authentication.\n\nSee protocol docs: [Session Setup](https://agentclientprotocol.com/protocol/v2/session-setup)",
                   "allOf": [
                     {
                       "$ref": "#/$defs/NewSessionRequest"
@@ -6944,7 +6948,7 @@
       "type": "object",
       "properties": {
         "terminal": {
-          "description": "Whether the client supports `terminal` authentication methods.\n\nOptional. Omitted and `null` are equivalent and mean the client does not advertise support.\nThe client should supply `{}` only when it can reproduce the configured\nagent invocation in an interactive terminal. Supplying `{}` means the\nagent may include `terminal` entries in its authentication methods.",
+          "description": "Whether the client supports `terminal` authentication methods.\n\nOptional. Omitted and `null` are equivalent and mean the client does not advertise support.\nThe client SHOULD supply `{}` only when it can reproduce the configured\nagent invocation in an interactive terminal. Supplying `{}` means the\nagent MAY include `terminal` entries in its authentication methods.",
           "anyOf": [
             {
               "$ref": "#/$defs/TerminalAuthCapabilities"
@@ -7085,7 +7089,7 @@
           ]
         },
         "additionalDirectories": {
-          "description": "Additional workspace roots for this session. Each path must be absolute.\n\nThese expand the session's workspace scope without changing `cwd`, which\nremains the base for relative paths. When omitted or empty, no\nadditional roots are activated for the new session.",
+          "description": "Additional workspace roots for this session. Each path MUST be absolute.\n\nThese expand the session's workspace scope without changing `cwd`, which\nremains the base for relative paths. When omitted or empty, no\nadditional roots are activated for the new session.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/AbsolutePath"
@@ -7159,7 +7163,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future MCP server transport configuration.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this transport should preserve the raw\npayload when storing, replaying, proxying, or forwarding session setup\ndata. Agents MUST reject a request with a transport they do not support\nwith `-32602`.",
+          "description": "Custom or future MCP server transport configuration.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nReceivers that do not understand this transport SHOULD preserve the raw\npayload when storing, replaying, proxying, or forwarding session setup\ndata. Agents MUST reject a request with a transport they do not support\nwith `-32602`.",
           "type": "object",
           "properties": {
             "type": {
@@ -7222,7 +7226,7 @@
       "type": "object",
       "properties": {
         "name": {
-          "description": "Human-readable name identifying this MCP server.",
+          "description": "Human-readable name identifying this MCP server. MUST be unique within `mcpServers`.\n\nAgents reject a request with a duplicate `name` with `-32602`.",
           "type": "string"
         },
         "url": {
@@ -7252,11 +7256,11 @@
       "type": "object",
       "properties": {
         "name": {
-          "description": "Human-readable name identifying this MCP server.",
+          "description": "Human-readable name identifying this MCP server. MUST be unique within `mcpServers`.\n\nAgents reject a request with a duplicate `name` with `-32602`.",
           "type": "string"
         },
         "command": {
-          "description": "Absolute path to the MCP server executable.",
+          "description": "Path to the MCP server executable. Must be an absolute path.\n\nAgents reject a request with a relative `command` with `-32602`.",
           "allOf": [
             {
               "$ref": "#/$defs/AbsolutePath"
@@ -7305,7 +7309,8 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/ContentBlock"
-          }
+          },
+          "minItems": 1
         },
         "_meta": {
           "description": "The _meta property is reserved by ACP to allow clients and agents to attach additional\nmetadata to their interactions. Omitted and `null` are equivalent and mean no metadata.\nImplementations MUST NOT assign meaning to keys they do not recognize.\n\nSee protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/extensibility)",
@@ -7341,7 +7346,7 @@
       "type": "object",
       "properties": {
         "cwd": {
-          "description": "Filter sessions by working directory. Must be an absolute path.\n\nOnly sessions whose `cwd` is this same directory match. Subdirectories and\n`additionalDirectories` don't. Agents MAY normalize paths when comparing.\n\nOmitted and `null` are equivalent and mean sessions are not filtered by working directory.",
+          "description": "Filter sessions by working directory. Must be an absolute path.\n\nOnly sessions whose `cwd` is this same directory match. Subdirectories and\n`additionalDirectories` don't. Agents MAY normalize paths when comparing.\n\nOmitted and `null` are equivalent and mean sessions are not filtered by working directory.\nClients keep the same value when following `nextCursor`.",
           "anyOf": [
             {
               "$ref": "#/$defs/AbsolutePath"
@@ -7416,7 +7421,7 @@
           ]
         },
         "additionalDirectories": {
-          "description": "Additional workspace roots to activate for this session. Each path must be absolute.\n\nWhen omitted or empty, no additional roots are activated. When non-empty,\nthis is the complete resulting additional-root list for the resumed\nsession. It may differ from any previously used or reported list as long as\nthe request `cwd` matches the session's `cwd`.",
+          "description": "Additional workspace roots to activate for this session. Each path MUST be absolute.\n\nWhen omitted or empty, no additional roots are activated. When non-empty,\nthis is the complete resulting additional-root list for the resumed\nsession. It MAY differ from any previously used or reported list as long as\nthe request `cwd` matches the session's `cwd`.",
           "type": "array",
           "items": {
             "$ref": "#/$defs/AbsolutePath"
@@ -7443,7 +7448,7 @@
           ]
         },
         "systemPrompt": {
-          "description": "System-level instructions for the resumed session.\n\nOptional. Omitted and `null` are equivalent. The Agent may then keep a\nsystem prompt it stored with the session or use its default instructions.\nClients MUST only send this when the Agent advertises\n`session.systemPrompt`, and SHOULD send the same value they used when the\nsession was created.",
+          "description": "System-level instructions for the resumed session.\n\nOptional. Omitted and `null` are equivalent. The Agent MAY then keep a\nsystem prompt it stored with the session or use its default instructions.\nClients MUST only send this when the Agent advertises\n`session.systemPrompt`, and SHOULD send the same value they used when the\nsession was created.",
           "anyOf": [
             {
               "$ref": "#/$defs/SystemPrompt"
@@ -7913,7 +7918,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future permission outcome.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nAgents that do not understand this outcome MUST NOT treat it as approval.\nThey should preserve the raw payload when storing, replaying, proxying, or\nforwarding permission responses, and otherwise fail or decline the\npermission request according to policy.",
+          "description": "Custom or future permission outcome.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nAgents that do not understand this outcome MUST NOT treat it as approval.\nThey SHOULD preserve the raw payload when storing, replaying, proxying, or\nforwarding permission responses, and otherwise fail or decline the\npermission request according to policy.",
           "type": "object",
           "properties": {
             "outcome": {
@@ -8035,7 +8040,7 @@
         },
         {
           "title": "other",
-          "description": "Custom or future elicitation action.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nAgents that do not understand this action should preserve the raw\npayload when storing, replaying, proxying, or forwarding elicitation\nresponses, and otherwise MUST handle it as `cancel`.",
+          "description": "Custom or future elicitation action.\n\nValues beginning with `_` are reserved for implementation-specific\nextensions. Unknown values that do not begin with `_` are reserved for\nfuture ACP variants.\n\nAgents that do not understand this action SHOULD preserve the raw\npayload when storing, replaying, proxying, or forwarding elicitation\nresponses, and otherwise MUST handle it as `cancel`.",
           "type": "object",
           "properties": {
             "action": {

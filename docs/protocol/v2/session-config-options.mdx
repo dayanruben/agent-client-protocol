@@ -93,7 +93,8 @@ During [Session Setup](/protocol/v2/session-setup) the Agent **MAY** return a li
 ### SessionConfigOption
 
 <ResponseField name="configId" type="string" required>
-  Unique identifier for this configuration option. Used when setting values.
+  Identifier for this configuration option. **MUST** be unique within
+  `configOptions`. Used when setting values.
 </ResponseField>
 
 <ResponseField name="name" type="string" required>
@@ -128,8 +129,7 @@ During [Session Setup](/protocol/v2/session-setup) the Agent **MAY** return a li
   a `select` option, Agents **MUST** offer at least one value, **MUST** keep
   each `value` unique within the option, including across groups, and
   `currentValue` **MUST** be one of them. Each group **MUST** contain at least
-  one value. Clients **SHOULD** hide a group that ends up empty, for example
-  after skipping values they couldn\'t parse.
+  one value.
 </ResponseField>
 
 ### SessionConfigSelectOption
@@ -151,7 +151,7 @@ During [Session Setup](/protocol/v2/session-setup) the Agent **MAY** return a li
 Select options may be grouped under labeled headers. Each
 `SessionConfigSelectGroup` requires `groupId`, `name`, and an `options` array containing
 the same `SessionConfigSelectOption` objects used by flat selects. A group's `_meta` is
-optional. Value descriptions and `_meta` remain optional as described above.
+optional. Value descriptions and `_meta` remain optional as described above. Each `groupId` **MUST** be unique within the option.
 
 ```json
 {
@@ -196,12 +196,12 @@ Each config option **MAY** include a `category` field. Categories are semantic m
 
 Category names beginning with `_` are free for custom use (e.g., `_com.example/category`). Category names that do not begin with `_` are reserved for the ACP spec.
 
-| Category        | Description                                                              |
-| --------------- | ------------------------------------------------------------------------ |
-| `mode`          | Session mode selector                                                    |
-| `model`         | Model selector                                                           |
-| `model_config`  | Model-related parameter, such as context size or speed/quality trade-off |
-| `thought_level` | Thought/reasoning level selector                                         |
+| Category        | Description                                   |
+| --------------- | --------------------------------------------- |
+| `mode`          | Session mode selector                         |
+| `model`         | Model selector                                |
+| `model_config`  | Model-related parameter, such as context size |
+| `thought_level` | Thought/reasoning level selector              |
 
 Clients **SHOULD** render `model_config` options near the `model` selector, such as in the same popover or panel. No capability negotiation is required for category values.
 
@@ -295,7 +295,7 @@ The Agent **MUST** respond with the complete list of all configuration options a
 ```json
 {
   "jsonrpc": "2.0",
-  "id": 2,
+  "id": 3,
   "result": {
     "configOptions": [
       {
@@ -359,7 +359,7 @@ The Agent **MUST** respond with the complete list of all configuration options a
         "name": "Brave Mode",
         "description": "Skip confirmation prompts and act autonomously",
         "type": "boolean",
-        "currentValue": false
+        "currentValue": true
       }
     ]
   }

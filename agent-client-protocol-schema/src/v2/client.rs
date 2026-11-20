@@ -3,9 +3,10 @@
 //! This module defines the Client trait and all associated types for implementing
 //! a client that interacts with AI coding agents via the Agent Client Protocol (ACP).
 
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use derive_more::{Display, From};
+use indexmap::IndexMap;
 #[cfg(feature = "schemars")]
 use schemars::Schema;
 use serde::{Deserialize, Serialize};
@@ -195,7 +196,7 @@ pub enum SessionUpdate {
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
     ///
-    /// Receivers that do not understand this update type should preserve the
+    /// Receivers that do not understand this update type SHOULD preserve the
     /// raw payload when storing, replaying, proxying, or forwarding session
     /// history, and otherwise ignore it or display it generically.
     #[serde(untagged)]
@@ -779,8 +780,9 @@ pub enum CompactionStatus {
 /// A context compaction upsert. The first notification fixes the compaction's
 /// timeline position. Later updates with the same ID patch that entity in place.
 ///
-/// `summary`, `error`, and `_meta` have patch semantics: omission leaves the
-/// stored value unchanged, `null` clears it, and a concrete value replaces it.
+/// Only `compactionId` is required. `status`, `summary`, `error`, and `_meta` have
+/// patch semantics: omission leaves the stored value unchanged, `null` clears it
+/// or resets it to its default, and a concrete value replaces it.
 /// `summary: []` also clears the summary. A concrete `_meta` object patches the
 /// stored metadata by top-level key instead of replacing it.
 #[serde_as]
@@ -793,7 +795,13 @@ pub struct CompactionUpdate {
     /// The Agent-owned ID of this compaction, unique within the session.
     pub compaction_id: CompactionId,
     /// Current lifecycle status.
-    pub status: CompactionStatus,
+    ///
+    /// Omission leaves the status unchanged, `null` resets it to `in_progress`, and a value
+    /// replaces it. A new compaction starts as `in_progress`.
+    #[serde_as(deserialize_as = "DefaultOnError")]
+    #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
+    #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
+    pub status: MaybeUndefined<CompactionStatus>,
     /// Complete replacement user-displayable summary content for the compaction.
     #[serde_as(deserialize_as = "DefaultOnError<MaybeUndefined<VecSkipError<_>>>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true)))]
@@ -825,14 +833,21 @@ pub struct CompactionUpdate {
 impl CompactionUpdate {
     /// Builds a compaction update with optional patch fields omitted.
     #[must_use]
-    pub fn new(compaction_id: impl Into<CompactionId>, status: CompactionStatus) -> Self {
+    pub fn new(compaction_id: impl Into<CompactionId>) -> Self {
         Self {
             compaction_id: compaction_id.into(),
-            status,
+            status: MaybeUndefined::Undefined,
             summary: MaybeUndefined::Undefined,
             error: MaybeUndefined::Undefined,
             meta: MaybeUndefined::Undefined,
         }
+    }
+
+    /// Sets, resets, or omits the lifecycle status patch.
+    #[must_use]
+    pub fn status(mut self, status: impl IntoMaybeUndefined<CompactionStatus>) -> Self {
+        self.status = status.into_maybe_undefined();
+        self
     }
 
     /// Sets, clears, or omits the complete retained summary patch.
@@ -1037,9 +1052,6 @@ impl CursorUpdate {
 /// This capability is not part of the spec yet, and may be removed or changed at any point.
 ///
 /// The methods that currently accept a session cursor.
-///
-/// A malformed value falls back to no capabilities, so the Client never passes a
-/// cursor to a method the Agent did not advertise.
 ///
 /// See the [Session Cursors RFD](https://agentclientprotocol.com/rfds/session-cursors).
 #[cfg(feature = "unstable_session_cursors")]
@@ -1403,15 +1415,15 @@ pub struct OtherCursorAnchor {
     /// The remaining fields of the unknown anchor payload, preserved verbatim,
     /// including `_meta`.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 #[cfg(feature = "unstable_session_cursors")]
 impl OtherCursorAnchor {
     /// Builds [`OtherCursorAnchor`] from an unknown discriminator and preserves the remaining extension fields.
     #[must_use]
-    pub fn new(type_: impl Into<String>, mut fields: BTreeMap<String, serde_json::Value>) -> Self {
-        fields.remove("type");
+    pub fn new(type_: impl Into<String>, mut fields: IndexMap<String, serde_json::Value>) -> Self {
+        fields.shift_remove("type");
         Self {
             type_: type_.into(),
             fields,
@@ -1425,9 +1437,9 @@ impl<'de> Deserialize<'de> for OtherCursorAnchor {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let type_ = fields
-            .remove("type")
+            .shift_remove("type")
             .ok_or_else(|| serde::de::Error::missing_field("type"))?;
         let serde_json::Value::String(type_) = type_ else {
             return Err(serde::de::Error::custom("`type` must be a string"));
@@ -1471,8 +1483,8 @@ fn other_cursor_anchor_schema(schema: &mut Schema) {
 /// Every update after it is not.
 ///
 /// The Agent does not send it when `replayFrom` is omitted or `null`, or when
-/// it cannot finish the replay. A resume that ends without it delivered a
-/// truncated replay.
+/// it cannot finish the replay. A replay that ends without it and without a
+/// successful response is truncated.
 ///
 /// See protocol docs: [Replay Complete](https://agentclientprotocol.com/protocol/v2/session-setup#replay-complete)
 #[serde_as]
@@ -1518,7 +1530,7 @@ impl ReplayComplete {
 /// including messages naming it as sender or recipient. Child events are
 /// delivered automatically. No separate child load, resume, or subscription is needed.
 /// Understanding this update, registering child sessions, and applying their
-/// operation restrictions are baseline v2 requirements. No Client capability
+/// operation restrictions are baseline requirements. No Client capability
 /// is required.
 ///
 /// Only `sessionId` is required. Other fields have
@@ -1591,7 +1603,7 @@ pub struct SubagentUpdate {
     /// effective working directory.
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
     pub cwd: MaybeUndefined<AbsolutePath>,
-    /// Additional workspace roots for the child. Each path must be absolute.
+    /// Additional workspace roots for the child. Each path MUST be absolute.
     ///
     /// Optional and nullable. Omitted means unchanged. `null` clears the
     /// reported value. While unset, the child inherits its immediate parent's
@@ -1813,7 +1825,7 @@ pub struct OtherSessionUpdate {
     pub session_update: String,
     /// Additional fields from the unknown update payload.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 impl OtherSessionUpdate {
@@ -1821,9 +1833,9 @@ impl OtherSessionUpdate {
     #[must_use]
     pub fn new(
         session_update: impl Into<String>,
-        mut fields: BTreeMap<String, serde_json::Value>,
+        mut fields: IndexMap<String, serde_json::Value>,
     ) -> Self {
-        fields.remove("sessionUpdate");
+        fields.shift_remove("sessionUpdate");
         Self {
             session_update: session_update.into(),
             fields,
@@ -1836,9 +1848,9 @@ impl<'de> Deserialize<'de> for OtherSessionUpdate {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let session_update = fields
-            .remove("sessionUpdate")
+            .shift_remove("sessionUpdate")
             .ok_or_else(|| serde::de::Error::missing_field("sessionUpdate"))?;
         let serde_json::Value::String(session_update) = session_update else {
             return Err(serde::de::Error::custom("`sessionUpdate` must be a string"));
@@ -2161,7 +2173,7 @@ impl UsageUpdate {
 /// Resume MUST send a current-state snapshot after any replay and before its
 /// response. The snapshot reports foreground state after resuming.
 /// The response alone does not imply idle.
-/// Repeated snapshots are idempotent, not additional work, completions, or usage.
+/// Repeated snapshots are idempotent, not additional work or completions.
 /// A repeated state may carry updated information without another state transition.
 /// The agent MUST report `idle` when no foreground activity remains. Completing
 /// an individual activity while other foreground work continues does not require
@@ -2230,7 +2242,7 @@ pub struct RunningStateUpdate {
     /// Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
     /// background work, not that nothing is running. `[]` means no background work is
     /// running. An Agent that reports background work MUST include it on every state
-    /// update for the session. A malformed list is treated as not reported.
+    /// update for the session.
     ///
     /// See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -2279,10 +2291,9 @@ impl RunningStateUpdate {
 ///
 /// Agents SHOULD include a `stopReason` when the idle transition ends foreground
 /// work. An idle update that does not end foreground work need not include one.
-/// Receivers treat an omitted, `null`, or malformed `stopReason` as the agent not
-/// reporting one.
+/// Receivers treat an omitted or `null` `stopReason` as the agent not reporting one.
 /// Repeated or resume snapshots may carry the last stop reason for context.
-/// They MUST NOT be counted as new completions, cancellations, or additional usage.
+/// They MUST NOT be counted as new completions or cancellations.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -2301,7 +2312,8 @@ pub struct IdleStateUpdate {
     /// Token usage for completed foreground work.
     ///
     /// Optional. Omitted and `null` are equivalent and mean the agent is not reporting token
-    /// usage for this state update.
+    /// usage for this state update. A repeated or resume snapshot that carries it MUST NOT
+    /// be counted as additional usage.
     #[cfg(feature = "unstable_end_turn_token_usage")]
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
@@ -2312,7 +2324,7 @@ pub struct IdleStateUpdate {
     /// Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
     /// background work, not that nothing is running. `[]` means no background work is
     /// running. An Agent that reports background work MUST include it on every state
-    /// update for the session. A malformed list is treated as not reported.
+    /// update for the session.
     ///
     /// See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -2393,7 +2405,7 @@ fn idle_state_update_schema(schema: &mut Schema) {
         properties.insert(
             "stopReason".into(),
             serde_json::json!({
-                "description": "Why foreground work stopped. The value selects one of this type's variants, which may add fields of their own.\n\nOptional. Omitted and `null` are equivalent and mean the agent is not reporting a stop reason; a malformed value is treated the same way.\n\nSee protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#stop-reasons)",
+                "description": "Why foreground work stopped. The value selects one of this type's variants, which may add fields of their own.\n\nOptional. Omitted and `null` are equivalent and mean the agent is not reporting a stop reason.\n\nSee protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#stop-reasons)",
                 "type": ["string", "null"],
                 "x-deserialize-default-on-error": true
             }),
@@ -2439,7 +2451,7 @@ pub struct RequiresActionStateUpdate {
     /// Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
     /// background work, not that nothing is running. `[]` means no background work is
     /// running. An Agent that reports background work MUST include it on every state
-    /// update for the session. A malformed list is treated as not reported.
+    /// update for the session.
     ///
     /// See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -2508,7 +2520,7 @@ pub struct UnknownStateUpdate {
     /// Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
     /// background work, not that nothing is running. `[]` means no background work is
     /// running. An Agent that reports background work MUST include it on every state
-    /// update for the session. A malformed list is treated as not reported.
+    /// update for the session.
     ///
     /// See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
     #[serde_as(deserialize_as = "DefaultOnError")]
@@ -2568,14 +2580,14 @@ pub struct OtherStateUpdate {
     pub state: String,
     /// Additional fields from the unknown state payload.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 impl OtherStateUpdate {
     /// Builds [`OtherStateUpdate`] from an unknown discriminator and preserves the remaining extension fields.
     #[must_use]
-    pub fn new(state: impl Into<String>, mut fields: BTreeMap<String, serde_json::Value>) -> Self {
-        fields.remove("state");
+    pub fn new(state: impl Into<String>, mut fields: IndexMap<String, serde_json::Value>) -> Self {
+        fields.shift_remove("state");
         Self {
             state: state.into(),
             fields,
@@ -2588,9 +2600,9 @@ impl<'de> Deserialize<'de> for OtherStateUpdate {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let state = fields
-            .remove("state")
+            .shift_remove("state")
             .ok_or_else(|| serde::de::Error::missing_field("state"))?;
         let serde_json::Value::String(state) = state else {
             return Err(serde::de::Error::custom("`state` must be a string"));
@@ -2808,14 +2820,14 @@ pub struct OtherBackgroundWork {
     pub kind: String,
     /// Additional fields from the unknown item.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 impl OtherBackgroundWork {
     /// Builds [`OtherBackgroundWork`] from an unknown discriminator and preserves the remaining extension fields.
     #[must_use]
-    pub fn new(kind: impl Into<String>, mut fields: BTreeMap<String, serde_json::Value>) -> Self {
-        fields.remove("type");
+    pub fn new(kind: impl Into<String>, mut fields: IndexMap<String, serde_json::Value>) -> Self {
+        fields.shift_remove("type");
         Self {
             kind: kind.into(),
             fields,
@@ -2828,9 +2840,9 @@ impl<'de> Deserialize<'de> for OtherBackgroundWork {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let kind = fields
-            .remove("type")
+            .shift_remove("type")
             .ok_or_else(|| serde::de::Error::missing_field("type"))?;
         let serde_json::Value::String(kind) = kind else {
             return Err(serde::de::Error::custom("`type` must be a string"));
@@ -3225,8 +3237,7 @@ pub struct PromptSuggestionsUpdate {
     /// The suggestions the Client can offer, ordered most likely first.
     ///
     /// Required and non-null. An empty list withdraws the suggestions the
-    /// Client is offering. A Client skips an entry it cannot parse and keeps
-    /// the rest.
+    /// Client is offering.
     #[serde_as(deserialize_as = "VecSkipError<_>")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-skip-invalid-items" = true)))]
     pub suggestions: Vec<PromptSuggestion>,
@@ -3397,7 +3408,7 @@ pub enum AvailableCommand {
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
     ///
-    /// Clients that do not understand this command type should preserve the raw
+    /// Clients that do not understand this command type SHOULD preserve the raw
     /// payload when storing, replaying, proxying, or forwarding command
     /// metadata, and otherwise ignore the command. They MUST NOT display it as a
     /// slash command.
@@ -3468,7 +3479,7 @@ pub struct OtherAvailableCommand {
     /// The remaining fields of the unknown command payload, preserved verbatim, including
     /// `_meta`.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 impl OtherAvailableCommand {
@@ -3478,11 +3489,11 @@ impl OtherAvailableCommand {
         type_: impl Into<String>,
         name: impl Into<String>,
         description: impl Into<String>,
-        mut fields: BTreeMap<String, serde_json::Value>,
+        mut fields: IndexMap<String, serde_json::Value>,
     ) -> Self {
-        fields.remove("type");
-        fields.remove("name");
-        fields.remove("description");
+        fields.shift_remove("type");
+        fields.shift_remove("name");
+        fields.shift_remove("description");
         Self {
             type_: type_.into(),
             name: name.into(),
@@ -3504,7 +3515,7 @@ impl<'de> Deserialize<'de> for OtherAvailableCommand {
             name: String,
             description: String,
             #[serde(flatten)]
-            fields: BTreeMap<String, serde_json::Value>,
+            fields: IndexMap<String, serde_json::Value>,
         }
 
         let raw = RawOtherAvailableCommand::deserialize(deserializer)?;
@@ -3709,7 +3720,7 @@ pub enum AvailableCommandInput {
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
     ///
-    /// Clients that do not understand this input type should preserve the raw
+    /// Clients that do not understand this input type SHOULD preserve the raw
     /// payload when storing, replaying, proxying, or forwarding command
     /// metadata, and otherwise ignore the input specification or display the
     /// command without structured input.
@@ -3734,14 +3745,14 @@ pub struct OtherAvailableCommandInput {
     pub type_: String,
     /// Additional fields from the unknown command input payload.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 impl OtherAvailableCommandInput {
     /// Builds [`OtherAvailableCommandInput`] from an unknown discriminator and preserves the remaining extension fields.
     #[must_use]
-    pub fn new(type_: impl Into<String>, mut fields: BTreeMap<String, serde_json::Value>) -> Self {
-        fields.remove("type");
+    pub fn new(type_: impl Into<String>, mut fields: IndexMap<String, serde_json::Value>) -> Self {
+        fields.shift_remove("type");
         Self {
             type_: type_.into(),
             fields,
@@ -3754,9 +3765,9 @@ impl<'de> Deserialize<'de> for OtherAvailableCommandInput {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let type_ = fields
-            .remove("type")
+            .shift_remove("type")
             .ok_or_else(|| serde::de::Error::missing_field("type"))?;
         let serde_json::Value::String(type_) = type_ else {
             return Err(serde::de::Error::custom("`type` must be a string"));
@@ -3870,6 +3881,7 @@ pub struct RequestPermissionRequest {
     /// Available permission options for the user to choose from.
     /// Must contain at least one option.
     #[cfg_attr(feature = "schemars", schemars(length(min = 1)))]
+    #[serde(deserialize_with = "deserialize_permission_options")]
     pub options: Vec<PermissionOption>,
     /// The _meta property is reserved by ACP to allow clients and agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
@@ -3881,6 +3893,24 @@ pub struct RequestPermissionRequest {
     #[serde(default)]
     #[serde(rename = "_meta")]
     pub meta: Option<Meta>,
+}
+
+// A Client cannot answer a permission request that offers nothing to select, so an empty
+// list fails the request instead of reaching the user.
+fn deserialize_permission_options<'de, D>(
+    deserializer: D,
+) -> Result<Vec<PermissionOption>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let options = Vec::<PermissionOption>::deserialize(deserializer)?;
+    if options.is_empty() {
+        return Err(serde::de::Error::invalid_length(
+            0,
+            &"at least one permission option",
+        ));
+    }
+    Ok(options)
 }
 
 impl RequestPermissionRequest {
@@ -3943,7 +3973,7 @@ pub enum RequestPermissionSubject {
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
     ///
-    /// Clients that do not understand this subject type should preserve the raw
+    /// Clients that do not understand this subject type SHOULD preserve the raw
     /// payload when storing, replaying, proxying, or forwarding permission
     /// requests, and otherwise display a generic permission prompt or decline it
     /// according to policy.
@@ -4103,14 +4133,14 @@ pub struct OtherRequestPermissionSubject {
     pub type_: String,
     /// Additional fields from the unknown permission subject payload.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 impl OtherRequestPermissionSubject {
     /// Builds [`OtherRequestPermissionSubject`] from an unknown discriminator and preserves the remaining extension fields.
     #[must_use]
-    pub fn new(type_: impl Into<String>, mut fields: BTreeMap<String, serde_json::Value>) -> Self {
-        fields.remove("type");
+    pub fn new(type_: impl Into<String>, mut fields: IndexMap<String, serde_json::Value>) -> Self {
+        fields.shift_remove("type");
         Self {
             type_: type_.into(),
             fields,
@@ -4123,9 +4153,9 @@ impl<'de> Deserialize<'de> for OtherRequestPermissionSubject {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let type_ = fields
-            .remove("type")
+            .shift_remove("type")
             .ok_or_else(|| serde::de::Error::missing_field("type"))?;
         let serde_json::Value::String(type_) = type_ else {
             return Err(serde::de::Error::custom("`type` must be a string"));
@@ -4324,7 +4354,7 @@ pub enum RequestPermissionOutcome {
     /// future ACP variants.
     ///
     /// Agents that do not understand this outcome MUST NOT treat it as approval.
-    /// They should preserve the raw payload when storing, replaying, proxying, or
+    /// They SHOULD preserve the raw payload when storing, replaying, proxying, or
     /// forwarding permission responses, and otherwise fail or decline the
     /// permission request according to policy.
     #[serde(untagged)]
@@ -4351,7 +4381,7 @@ pub struct OtherRequestPermissionOutcome {
     pub outcome: String,
     /// Additional fields from the unknown permission outcome payload.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 impl OtherRequestPermissionOutcome {
@@ -4359,9 +4389,9 @@ impl OtherRequestPermissionOutcome {
     #[must_use]
     pub fn new(
         outcome: impl Into<String>,
-        mut fields: BTreeMap<String, serde_json::Value>,
+        mut fields: IndexMap<String, serde_json::Value>,
     ) -> Self {
-        fields.remove("outcome");
+        fields.shift_remove("outcome");
         Self {
             outcome: outcome.into(),
             fields,
@@ -4374,9 +4404,9 @@ impl<'de> Deserialize<'de> for OtherRequestPermissionOutcome {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let outcome = fields
-            .remove("outcome")
+            .shift_remove("outcome")
             .ok_or_else(|| serde::de::Error::missing_field("outcome"))?;
         let serde_json::Value::String(outcome) = outcome else {
             return Err(serde::de::Error::custom("`outcome` must be a string"));
@@ -4722,7 +4752,7 @@ pub struct CommandsCapabilities {
     /// Support for `skill` command entries.
     ///
     /// Optional. Omitted and `null` are equivalent and mean the client does not advertise support.
-    /// Supplying `{}` means the agent may send `skill` entries in `availableCommands`. The
+    /// Supplying `{}` means the agent MAY send `skill` entries in `availableCommands`. The
     /// client invokes them with `skill` content blocks.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
@@ -5067,9 +5097,9 @@ pub struct ClientAuthCapabilities {
     /// Whether the client supports `terminal` authentication methods.
     ///
     /// Optional. Omitted and `null` are equivalent and mean the client does not advertise support.
-    /// The client should supply `{}` only when it can reproduce the configured
+    /// The client SHOULD supply `{}` only when it can reproduce the configured
     /// agent invocation in an interactive terminal. Supplying `{}` means the
-    /// agent may include `terminal` entries in its authentication methods.
+    /// agent MAY include `terminal` entries in its authentication methods.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
@@ -5096,9 +5126,9 @@ impl ClientAuthCapabilities {
     /// Whether the client supports `terminal` authentication methods.
     ///
     /// Omitted and `null` are equivalent and mean the client does not advertise support.
-    /// The client should supply `{}` only when it can reproduce the configured
+    /// The client SHOULD supply `{}` only when it can reproduce the configured
     /// agent invocation in an interactive terminal. Supplying `{}` means the
-    /// agent may include `AuthMethod::Terminal` entries in its authentication
+    /// agent MAY include `AuthMethod::Terminal` entries in its authentication
     /// methods.
     #[must_use]
     pub fn terminal(mut self, terminal: impl IntoOption<TerminalAuthCapabilities>) -> Self {
@@ -5229,6 +5259,9 @@ pub enum AgentRequest {
     /// After `session/cancel`, the agent stops waiting for requests of the cancelled
     /// foreground work and MUST cancel them with `$/cancel_request`. The client
     /// answers a cancelled request with the `cancelled` outcome.
+    ///
+    /// An error response is not approval, and neither is a connection that ends
+    /// before the client answers. The agent MUST NOT treat either as approval.
     ///
     /// See protocol docs: [Requesting Permission](https://agentclientprotocol.com/protocol/v2/tool-calls#requesting-permission)
     RequestPermissionRequest(Box<RequestPermissionRequest>),
@@ -6433,9 +6466,11 @@ mod tests {
 
         assert_eq!(
             serde_json::to_value(SessionUpdate::CompactionUpdate(
-                CompactionUpdate::new("cmp_001", CompactionStatus::Completed).summary(vec![
-                    ContentBlock::Text(crate::v2::TextContent::new("retained")),
-                ]),
+                CompactionUpdate::new("cmp_001")
+                    .status(CompactionStatus::Completed)
+                    .summary(vec![ContentBlock::Text(crate::v2::TextContent::new(
+                        "retained",
+                    ))]),
             ))
             .unwrap(),
             json!({
@@ -6455,9 +6490,30 @@ mod tests {
         .unwrap() else {
             panic!("expected compaction update");
         };
-        assert_eq!(update.status, CompactionStatus::Other("paused".into()));
+        assert_eq!(
+            update.status,
+            MaybeUndefined::Value(CompactionStatus::Other("paused".into()))
+        );
         assert!(update.summary.is_null());
         assert!(update.error.is_undefined());
+
+        // `status` is a patch field: an update can change the summary alone.
+        let SessionUpdate::CompactionUpdate(patch) = serde_json::from_value(json!({
+            "sessionUpdate": "compaction_update",
+            "compactionId": "cmp_001",
+            "summary": []
+        }))
+        .unwrap() else {
+            panic!("expected compaction update");
+        };
+        assert!(patch.status.is_undefined());
+        assert_eq!(
+            serde_json::to_value(CompactionUpdate::new("cmp_001")).unwrap(),
+            json!({ "compactionId": "cmp_001" })
+        );
+        let reset: CompactionUpdate =
+            serde_json::from_value(json!({ "compactionId": "cmp_001", "status": null })).unwrap();
+        assert!(reset.status.is_null());
     }
 
     #[test]
@@ -7903,10 +7959,11 @@ mod tests {
             })
         );
 
+        let options = json!([{ "optionId": "allow", "name": "Allow", "kind": "allow_once" }]);
         let missing_subject: RequestPermissionRequest = serde_json::from_value(json!({
             "sessionId": "sess_abc123def456",
             "title": "Approve elevated permissions?",
-            "options": []
+            "options": options
         }))
         .unwrap();
         assert!(missing_subject.subject.is_none());
@@ -7915,7 +7972,7 @@ mod tests {
             "sessionId": "sess_abc123def456",
             "title": "Approve elevated permissions?",
             "subject": null,
-            "options": []
+            "options": options
         }))
         .unwrap();
         assert!(null_subject.subject.is_none());
@@ -7923,7 +7980,7 @@ mod tests {
         assert!(
             serde_json::from_value::<RequestPermissionRequest>(json!({
                 "sessionId": "sess_abc123def456",
-                "options": []
+                "options": options
             }))
             .is_err()
         );
@@ -8094,6 +8151,15 @@ mod tests {
                 "sessionId": "sess-1",
                 "title": "Run tool?",
                 "options": [{"optionId": "allow"}]
+            }))
+            .is_err()
+        );
+        // A request that offers nothing to select cannot be answered.
+        assert!(
+            serde_json::from_value::<RequestPermissionRequest>(json!({
+                "sessionId": "sess-1",
+                "title": "Run tool?",
+                "options": []
             }))
             .is_err()
         );

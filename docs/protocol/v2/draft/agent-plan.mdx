@@ -5,7 +5,7 @@ description: "How Agents communicate their execution plans"
 
 A plan is the Agent's list of steps for a multi-step task. Each entry has a description, a priority, and a status.
 
-Agents may send plans to Clients through [`session/update`](/protocol/v2/draft/prompt-lifecycle#3-agent-reports-output) notifications and update them as work progresses.
+Agents **MAY** send plans to Clients through [`session/update`](/protocol/v2/draft/prompt-lifecycle#3-agent-reports-output) notifications and update them as work progresses.
 
 `plan_update` carries a `plan` object with a `type` discriminator, and every plan format includes a required `planId` so Clients can track multiple plans independently.
 
@@ -70,7 +70,7 @@ The draft unstable schema includes markdown plans and explicit plan removal. The
 
 Clients using the draft unstable schema **MUST** tolerate these variants. Tolerating a variant means the Client can deserialize and validate it, then render it, preserve it for replay or proxying, or ignore it.
 
-No Client capability is required in v2. Clients using only the baseline schema
+No Client capability is required. Clients using only the baseline schema
 accept unfamiliar plan representations through the unknown plan-content fallback
 and unfamiliar removal updates through the unknown session-update fallback.
 Agents cannot assume that these plans will be rendered. See [Experimental
@@ -143,7 +143,9 @@ Every plan content variant, including custom or future variants, **MUST** carry 
 Each plan entry represents a specific task or goal within the overall execution strategy:
 
 <ParamField path="content" type="string" required>
-  A human-readable description of what this task aims to accomplish
+  A human-readable description of what this task aims to accomplish. It may be
+  plain text or Markdown, like a [text content
+  block](/protocol/v2/draft/content#text-content).
 </ParamField>
 
 <ParamField path="priority" type="PlanEntryPriority" required>

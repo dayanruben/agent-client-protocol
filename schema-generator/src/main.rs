@@ -454,23 +454,52 @@ mod schema_annotation_tests {
         ));
     }
 
+    type RequiredFieldsCase = (&'static str, Value, Vec<(&'static str, &'static str)>);
+
+    // v1 requires `status` on every `compaction_update`. In v2 it is a patch field.
+    #[cfg(not(feature = "unstable_protocol_v2"))]
+    fn compaction_update_case() -> RequiredFieldsCase {
+        (
+            "CompactionUpdate",
+            serde_json::json!(["compactionId", "status"]),
+            vec![
+                ("compactionId", "CompactionId"),
+                ("status", "CompactionStatus"),
+            ],
+        )
+    }
+
+    #[cfg(feature = "unstable_protocol_v2")]
+    fn compaction_update_case() -> RequiredFieldsCase {
+        (
+            "CompactionUpdate",
+            serde_json::json!(["compactionId"]),
+            vec![("compactionId", "CompactionId")],
+        )
+    }
+
+    #[cfg(feature = "unstable_protocol_v2")]
+    #[test]
+    fn generated_compaction_status_is_a_patch_field() {
+        let schema = root_schema_value();
+        let status = property_schema(&schema, "CompactionUpdate", "status");
+        assert_eq!(
+            status["anyOf"],
+            serde_json::json!([{"$ref": "#/$defs/CompactionStatus"}, {"type": "null"}])
+        );
+        assert_bool_extension(status, DEFAULT_ON_ERROR_EXTENSION);
+    }
+
     #[test]
     fn generated_compaction_schema_is_available_without_unstable_features() {
         let schema = root_schema_value();
         assert_eq!(def_schema(&schema, "CompactionId")["type"], "string");
         for (definition, required, referenced_fields) in [
-            (
-                "CompactionUpdate",
-                serde_json::json!(["compactionId", "status"]),
-                [
-                    ("compactionId", "CompactionId"),
-                    ("status", "CompactionStatus"),
-                ],
-            ),
+            compaction_update_case(),
             (
                 "CompactionSummaryChunk",
                 serde_json::json!(["compactionId", "content"]),
-                [
+                vec![
                     ("compactionId", "CompactionId"),
                     ("content", "ContentBlock"),
                 ],
@@ -1516,6 +1545,7 @@ mod markdown_generator {
     use std::collections::{BTreeMap, BTreeSet, HashMap};
     use std::fmt::Write;
     use std::fs;
+    use std::path::{Path, PathBuf};
     use std::process::Command;
 
     pub struct MarkdownGenerator {
@@ -1551,14 +1581,15 @@ mod markdown_generator {
             writeln!(&mut self.output, "---").unwrap();
             writeln!(&mut self.output).unwrap();
             let schema_file = self.schema_file;
+            let download_file = schema_file.rsplit('/').next().unwrap_or(schema_file);
             if schema_file.starts_with("v2/") {
+                // `releases/latest` resolves to the v1 schema release, so link the v2 releases.
                 writeln!(
                     &mut self.output,
-                    "<Note>This schema file is generated in this repository at [`schema/{schema_file}`](https://github.com/agentclientprotocol/agent-client-protocol/blob/main/schema/{schema_file}). GitHub releases for this schema are not published yet.</Note>"
+                    "<Note>This schema file is generated in this repository at [`schema/{schema_file}`](https://github.com/agentclientprotocol/agent-client-protocol/blob/main/schema/{schema_file}). Each [`schema-v2` release](https://github.com/agentclientprotocol/agent-client-protocol/releases?q=schema-v2) has it as the `{download_file}` download.</Note>"
                 )
                 .unwrap();
             } else {
-                let download_file = schema_file.rsplit('/').next().unwrap_or(schema_file);
                 writeln!(
                     &mut self.output,
                     "<Note>The schema file can be downloaded directly from the [latest GitHub release](https://github.com/agentclientprotocol/agent-client-protocol/releases/latest/download/{download_file}).</Note>"
@@ -1692,6 +1723,7 @@ Ordinary clients and agents never send or receive these messages. A conductor se
             {
                 writeln!(&mut self.output, "## Protocol Level").unwrap();
                 writeln!(&mut self.output).unwrap();
+                #[cfg(not(feature = "unstable_protocol_v2"))]
                 writeln!(
             &mut self.output,
             "Defines the interface that ACP-compliant agents and clients must both implement.
@@ -1703,6 +1735,17 @@ programming language then there is little it can do to react to a
 `$/cancel_request` notification. If an agent or client receives notifications
 starting with '$/' it is free to ignore the notification."
         )
+                .unwrap();
+                #[cfg(feature = "unstable_protocol_v2")]
+                writeln!(
+                    &mut self.output,
+                    "Defines the notifications that both Agents and Clients can send.
+
+Their methods start with `$/`. Acting on one is optional, because it might not be
+implementable in every Client or Agent. For example, a single-threaded synchronous
+implementation can do little to react to a `$/cancel_request` notification. An Agent
+or Client **MAY** ignore a `$/` notification it cannot act on."
+                )
                 .unwrap();
 
                 for (method, types) in protocol_types {
@@ -2757,11 +2800,28 @@ starting with '$/' it is free to ignore the notification."
         }
     }
 
+    fn schema_rustdoc_path(messages: &[u8]) -> Option<PathBuf> {
+        messages.split(|&b| b == b'\n').find_map(|line| {
+            let message: Value = serde_json::from_slice(line).ok()?;
+            if message["reason"] != "compiler-artifact"
+                || message["target"]["name"] != "agent_client_protocol_schema"
+            {
+                return None;
+            }
+            message["filenames"]
+                .as_array()?
+                .iter()
+                .filter_map(Value::as_str)
+                .map(Path::new)
+                .find(|path| path.extension().is_some_and(|ext| ext == "json"))
+                .map(Path::to_path_buf)
+        })
+    }
+
     #[expect(clippy::too_many_lines)]
     fn extract_side_docs() -> SideDocs {
-        let root = super::repo_root();
         let output = Command::new("cargo")
-            .current_dir(&root)
+            .current_dir(super::repo_root())
             .args([
                 "+nightly",
                 "rustdoc",
@@ -2769,14 +2829,14 @@ starting with '$/' it is free to ignore the notification."
                 "agent-client-protocol-schema",
                 "--lib",
                 "--all-features",
-                "--",
+                // Ask Cargo, not just rustdoc, for JSON so it reports the artifact path.
                 "-Z",
                 "unstable-options",
-                "--output-format",
-                "json",
+                "--output-format=json",
+                "--message-format=json-render-diagnostics",
             ])
             .output()
-            .unwrap();
+            .expect("failed to run cargo +nightly rustdoc");
 
         assert!(
             output.status.success(),
@@ -2784,10 +2844,21 @@ starting with '$/' it is free to ignore the notification."
             String::from_utf8_lossy(&output.stderr)
         );
 
-        // Parse the JSON output
-        let json_path = root.join("target/doc/agent_client_protocol_schema.json");
-        let json_content = fs::read_to_string(json_path).unwrap();
-        let doc: Value = serde_json::from_str(&json_content).unwrap();
+        let json_path = schema_rustdoc_path(&output.stdout).expect(
+            "cargo rustdoc did not report a JSON artifact for agent-client-protocol-schema",
+        );
+        let json_content = fs::read_to_string(&json_path).unwrap_or_else(|error| {
+            panic!(
+                "failed to read rustdoc JSON at {}: {error}",
+                json_path.display()
+            )
+        });
+        let doc: Value = serde_json::from_str(&json_content).unwrap_or_else(|error| {
+            panic!(
+                "rustdoc JSON at {} is not valid JSON: {error}",
+                json_path.display()
+            )
+        });
 
         let mut side_docs = SideDocs::default();
 
@@ -2912,8 +2983,31 @@ starting with '$/' it is free to ignore the notification."
 
     #[cfg(test)]
     mod tests {
-        use super::MarkdownGenerator;
+        use super::{MarkdownGenerator, schema_rustdoc_path};
         use serde_json::json;
+        use std::path::Path;
+
+        #[test]
+        fn reads_schema_rustdoc_path_from_cargo_artifacts() {
+            let messages = br#"{"reason":"compiler-artifact","target":{"name":"other"},"filenames":["/cache/doc/other.json"]}
+{"reason":"compiler-artifact","target":{"name":"agent_client_protocol_schema"},"filenames":["/cache/debug/deps/libagent_client_protocol_schema.rmeta"]}
+{"reason":"compiler-artifact","target":{"name":"agent_client_protocol_schema"},"filenames":["/shared cache/aarch64-apple-darwin/doc/agent_client_protocol_schema.json"],"fresh":true}
+{"reason":"build-finished","success":true}"#;
+            assert_eq!(
+                schema_rustdoc_path(messages).as_deref(),
+                Some(Path::new(
+                    "/shared cache/aarch64-apple-darwin/doc/agent_client_protocol_schema.json"
+                ))
+            );
+        }
+
+        #[test]
+        fn missing_rustdoc_artifact_has_no_fallback_path() {
+            assert_eq!(
+                schema_rustdoc_path(br#"{"reason":"build-finished","success":true}"#),
+                None
+            );
+        }
 
         #[test]
         fn unconstrained_json_schema_renders_any_value() {

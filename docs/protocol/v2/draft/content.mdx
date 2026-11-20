@@ -25,11 +25,13 @@ Content block `type` values can be custom or future variants when the receiver c
 
 When displaying Agent output, Clients **SHOULD** show text content. For image, audio, resource, and resource link content they can't render, Clients **SHOULD** show a placeholder with whatever identifies it, such as its name, title, URI, or MIME type, and **SHOULD NOT** drop it silently. Agents that need content to reach the user in a particular form **SHOULD** also include it as text.
 
-`annotations` are hints with [MCP semantics](https://modelcontextprotocol.io/specification/2026-07-28/schema#annotations). In `audience`, `user` means the person using the Client and `assistant` means the Agent's model. `priority` ranges from 0 (least important) to 1 (most important). Clients **MAY** collapse or hide content whose `audience` doesn't include `user`, which is an exception to the display rule above.
+`annotations` are hints with [MCP semantics](https://modelcontextprotocol.io/specification/2026-07-28/schema#annotations). In `audience`, `user` means the person using the Client and `assistant` means the Agent's model. `priority` ranges from 0 (least important) to 1 (most important). `lastModified` is the time the underlying resource was last modified, as an ISO 8601 string such as `2025-01-12T15:00:58Z`. Clients **MAY** collapse or hide content whose `audience` doesn't include `user`, which is an exception to the display rule above.
 
 ### Text content
 
-Text may be plain text or Markdown. Clients **SHOULD** render it as [CommonMark](https://spec.commonmark.org/), and **MAY** support [GitHub Flavored Markdown](https://github.github.com/gfm/) extensions such as tables. This applies wherever a text block appears, including user messages, thoughts, and tool-call content. See [Rendering Agent Content](/protocol/v2/draft/security#rendering-agent-content) for raw HTML.
+Text may be plain text or Markdown. Clients **SHOULD** render it as [CommonMark](https://spec.commonmark.org/), and **MAY** support [GitHub Flavored Markdown](https://github.github.com/gfm/) extensions such as tables. Adjacent text blocks form one continuous text, and Clients **SHOULD** join them without a separator before rendering. This applies wherever a text block appears, including user messages, thoughts, and tool-call content. See [Rendering Agent Content](/protocol/v2/draft/security#rendering-agent-content) for raw HTML.
+
+Other strings shown to users, such as a tool call `title`, a session `title`, and the `name` and `description` of a command or config option, are plain text unless the field's description says otherwise. Clients **SHOULD NOT** render them as Markdown.
 
 ```json
 {
@@ -57,7 +59,7 @@ Images can be included for visual context or analysis.
 {
   "type": "image",
   "mimeType": "image/png",
-  "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB..."
+  "data": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
 }
 ```
 
@@ -90,7 +92,7 @@ Audio data for transcription or analysis.
 {
   "type": "audio",
   "mimeType": "audio/wav",
-  "data": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAAB..."
+  "data": "UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YQAAAAA="
 }
 ```
 
@@ -218,7 +220,8 @@ All Agents **MUST** support resource links when included in prompts.
 
 <ParamField path="icons" type="Icon[]">
   Optional icons Clients can display for this resource. Each icon requires a
-  `src` URI and may include `mimeType`, `sizes`, and `theme`.
+  `src` URI and may include `mimeType`, `sizes`, and `theme`. `theme` names the
+  background the icon is designed for: `light` or `dark`.
 </ParamField>
 
 <ParamField path="size" type="integer">

@@ -56,7 +56,7 @@ does not advertise these methods and Clients **MUST NOT** call either one.
 authentication-related extensions, not the availability of the baseline
 `auth/login` and `auth/logout` methods.
 
-```json highlight={8-15}
+```json highlight={7-14}
 {
   "jsonrpc": "2.0",
   "id": 0,
@@ -190,9 +190,9 @@ On success, the Agent returns an empty result:
 
 If `methodId` is not an advertised method whose type uses `auth/login`, the Agent responds with `-32602` (Invalid params). If login fails or the user abandons it, the Agent responds with `-32000` (Authentication required). A login cancelled with [`$/cancel_request`](/protocol/v2/cancellation) gets `-32800`.
 
-When the Agent requires authentication, any request except `initialize`, `auth/login`, and `auth/logout` may fail with `auth_required` (`-32000`). After successful
-authentication, the Client can create new sessions without receiving an
-`auth_required` error for authentication-gated requests.
+When the Agent requires authentication, any request except `initialize`, `auth/login`, and `auth/logout` may fail with `-32000` (Authentication required). After successful
+authentication, the Client can create new sessions without receiving a
+`-32000` error for authentication-gated requests.
 
 ## Terminal authentication
 
@@ -201,18 +201,18 @@ For a `terminal` method, the Client:
 1. Launches a separate interactive process using the same configured Agent
    program and base launch configuration as the ACP connection.
 2. Appends the method's `args` and applies its `env`, overriding any same-named
-   variables in the base launch configuration. Every `env` entry **MUST** have a
-   unique `name`.
+   variables in the base launch configuration. Each `env` entry **SHOULD** have a
+   unique `name`. Otherwise the last entry with a given name wins.
 3. Presents the terminal to the user and waits for the process to exit. Exit
    status zero signals success. A non-zero status, termination without an exit
    status, or cancellation signals failure.
-4. On success, retries an operation rejected for requiring authentication. The Client **SHOULD** first close the existing ACP connection, start and initialize a new one, and resume with `session/resume` any sessions it wants to keep, since the running Agent may not pick up the new credentials. It **MAY** instead retry on the existing connection first, and reconnect only if the retry still fails with `auth_required`. For an already-inserted prompt, see
+4. On success, retries an operation rejected for requiring authentication. The Client **SHOULD** first close the existing ACP connection, start and initialize a new one, and resume with `session/resume` any sessions it wants to keep, since the running Agent may not pick up the new credentials. It **MAY** instead retry on the existing connection first, and reconnect only if the retry still fails with `-32000`. For an already-inserted prompt, see
    [Authentication failures during session work](#authentication-failures-during-session-work).
 
 The descriptor cannot provide a command. The Client derives the command from its
 own Agent configuration. Agents **SHOULD** provide arguments that enter a
 login-only flow and exit when it completes. ACP does not define an output
-pattern or other in-band success signal. Clients may recognize
+pattern or other in-band success signal. Clients **MAY** recognize
 implementation-specific signals only as an extension. The terminal process is
 not the ACP connection, so the Client **MUST NOT** send an `auth/login` request
 for a terminal method.
@@ -225,17 +225,17 @@ for a terminal method.
 
 ## Authentication failures during session work
 
-`auth_required` (`-32000`) applies in v2 both to rejected requests and to
+`-32000` (Authentication required) applies both to rejected requests and to
 authentication failures that end foreground work. For `session/prompt`, the
 reporting channel depends on whether the user message was inserted:
 
-- Before insertion, the Agent returns an `auth_required` JSON-RPC error response.
+- Before insertion, the Agent returns a `-32000` (Authentication required) error response.
 - After insertion, the Agent **MUST** respond successfully with the inserted
   `messageId`, even if authentication fails before the response is sent. If the
   failure terminates foreground work, the Agent **MUST** report `idle` and
   **SHOULD** include `stopReason: "error"` with `error.code: -32000`.
 
-Clients may prompt the user to complete an advertised authentication flow.
+Clients **MAY** prompt the user to complete an advertised authentication flow.
 Successful authentication does not itself restart work that already ended.
 Resending the prompt inserts a new message and does not undo the original
 insertion or any tool side effects. Clients **SHOULD NOT** automatically resubmit
@@ -245,7 +245,7 @@ an inserted prompt as though it had been rejected. See
 ## Logging out
 
 The `auth/logout` method allows Clients to end the current authenticated state.
-Clients may call it only when the Agent advertised one or more authentication methods during initialization. There is no separate logout
+Clients **MAY** call it only when the Agent advertised one or more authentication methods during initialization. There is no separate logout
 capability marker.
 
 ```json
@@ -275,8 +275,8 @@ Logging out is idempotent. If there is no authenticated state to end, for exampl
 ## Active sessions
 
 The protocol does not guarantee what happens to already-running sessions after
-`auth/logout`. Agents may terminate them, keep them running, or return
-`auth_required` errors for future session activity.
+`auth/logout`. Agents **MAY** terminate them, keep them running, or return
+`-32000` errors for future session activity.
 
 Clients **SHOULD** be prepared for active session operations to fail with
 authentication-related errors after logout and **SHOULD** prompt the user to

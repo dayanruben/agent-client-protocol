@@ -4,9 +4,10 @@
 //! the model's behalf and reports its progress to the client.
 //!
 /// See protocol docs: [Tool Calls](https://agentclientprotocol.com/protocol/v2/tool-calls)
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use derive_more::{Display, From};
+use indexmap::IndexMap;
 #[cfg(feature = "schemars")]
 use schemars::Schema;
 use serde::{Deserialize, Serialize};
@@ -49,7 +50,7 @@ pub struct ToolCallUpdate {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default, skip_serializing_if = "MaybeUndefined::is_undefined")]
     pub name: MaybeUndefined<String>,
-    /// Human-readable title describing what the tool is doing.
+    /// Human-readable plain-text title describing what the tool is doing.
     ///
     /// Omission leaves the title unchanged, `null` unsets it, and a string replaces it.
     /// A new tool call starts without a title.
@@ -258,9 +259,6 @@ impl ToolCallUpdate {
 }
 
 /// Client-initiated controls a tool call currently supports.
-///
-/// A malformed value falls back to no controls, so the Client never sends a request the
-/// Agent did not advertise.
 ///
 /// See protocol docs: [Cancelling Tool Calls](https://agentclientprotocol.com/protocol/v2/tool-calls#cancelling-tool-calls)
 #[serde_as]
@@ -533,7 +531,7 @@ pub enum ToolCallContent {
     /// extensions. Unknown values that do not begin with `_` are reserved for
     /// future ACP variants.
     ///
-    /// Receivers that do not understand this content type should preserve the
+    /// Receivers that do not understand this content type SHOULD preserve the
     /// raw payload when storing, replaying, proxying, or forwarding tool call
     /// output, and otherwise ignore it or display it generically.
     #[serde(untagged)]
@@ -557,14 +555,14 @@ pub struct OtherToolCallContent {
     pub type_: String,
     /// Additional fields from the unknown tool call content payload.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 impl OtherToolCallContent {
     /// Builds [`OtherToolCallContent`] from an unknown discriminator and preserves the remaining extension fields.
     #[must_use]
-    pub fn new(type_: impl Into<String>, mut fields: BTreeMap<String, serde_json::Value>) -> Self {
-        fields.remove("type");
+    pub fn new(type_: impl Into<String>, mut fields: IndexMap<String, serde_json::Value>) -> Self {
+        fields.shift_remove("type");
         Self {
             type_: type_.into(),
             fields,
@@ -577,9 +575,9 @@ impl<'de> Deserialize<'de> for OtherToolCallContent {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let type_ = fields
-            .remove("type")
+            .shift_remove("type")
             .ok_or_else(|| serde::de::Error::missing_field("type"))?;
         let serde_json::Value::String(type_) = type_ else {
             return Err(serde::de::Error::custom("`type` must be a string"));
@@ -1097,7 +1095,7 @@ pub struct OtherDiffChange {
     pub operation: String,
     /// Additional fields from the unknown file operation payload.
     #[serde(flatten)]
-    pub fields: BTreeMap<String, serde_json::Value>,
+    pub fields: IndexMap<String, serde_json::Value>,
 }
 
 impl OtherDiffChange {
@@ -1105,12 +1103,12 @@ impl OtherDiffChange {
     #[must_use]
     pub fn new(
         operation: impl Into<String>,
-        mut fields: BTreeMap<String, serde_json::Value>,
+        mut fields: IndexMap<String, serde_json::Value>,
     ) -> Self {
-        fields.remove("operation");
-        fields.remove("fileType");
-        fields.remove("mimeType");
-        fields.remove("_meta");
+        fields.shift_remove("operation");
+        fields.shift_remove("fileType");
+        fields.shift_remove("mimeType");
+        fields.shift_remove("_meta");
         Self {
             operation: operation.into(),
             fields,
@@ -1123,9 +1121,9 @@ impl<'de> Deserialize<'de> for OtherDiffChange {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut fields = BTreeMap::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut fields = IndexMap::<String, serde_json::Value>::deserialize(deserializer)?;
         let operation = fields
-            .remove("operation")
+            .shift_remove("operation")
             .ok_or_else(|| serde::de::Error::missing_field("operation"))?;
         let serde_json::Value::String(operation) = operation else {
             return Err(serde::de::Error::custom("`operation` must be a string"));
@@ -1136,9 +1134,9 @@ impl<'de> Deserialize<'de> for OtherDiffChange {
                 "known diff change operation `{operation}` did not match its schema"
             )));
         }
-        fields.remove("fileType");
-        fields.remove("mimeType");
-        fields.remove("_meta");
+        fields.shift_remove("fileType");
+        fields.shift_remove("mimeType");
+        fields.shift_remove("_meta");
 
         Ok(Self { operation, fields })
     }

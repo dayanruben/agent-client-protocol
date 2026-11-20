@@ -6,7 +6,9 @@ description: "Schema definitions for the Agent Client Protocol"
 <Note>
   This schema file is generated in this repository at
   [`schema/v2/schema.json`](https://github.com/agentclientprotocol/agent-client-protocol/blob/main/schema/v2/schema.json).
-  GitHub releases for this schema are not published yet.
+  Each [`schema-v2`
+  release](https://github.com/agentclientprotocol/agent-client-protocol/releases?q=schema-v2)
+  has it as the `schema.json` download.
 </Note>
 
 ## Agent
@@ -30,7 +32,7 @@ Called when the agent requires authentication before allowing session creation.
 The client provides the authentication method ID that was advertised during initialization.
 
 After successful authentication, the client can proceed to create sessions with
-`session/new` without receiving an `auth_required` (`-32000`) error.
+`session/new` without receiving a `-32000` (Authentication required) error.
 
 See protocol docs: [Initialization](https://agentclientprotocol.com/protocol/v2/initialization)
 
@@ -141,7 +143,7 @@ This method is called at the beginning of the connection, before any other reque
 - Exchange capability information between client and agent
 - Determine available authentication methods
 
-The Client may repeat it before its first other request. The latest successful
+The Client MAY repeat it before its first other request. The latest successful
 `initialize` is authoritative.
 
 The agent should respond with its supported protocol version and capabilities.
@@ -223,7 +225,7 @@ the agent MUST support both `auth/login` and `auth/logout`.
 the version requested by the client. If no such version exists,
 initialization fails with error code -32022.
 
-The client must check that it supports this version and should disconnect
+The client MUST check that it supports this version and SHOULD disconnect
 if it does not.
 
 </ResponseField>
@@ -430,6 +432,7 @@ Only sessions whose `cwd` is this same directory match. Subdirectories and
 `additionalDirectories` don't. Agents MAY normalize paths when comparing.
 
 Omitted and `null` are equivalent and mean sessions are not filtered by working directory.
+Clients keep the same value when following `nextCursor`.
 
 </ResponseField>
 
@@ -456,6 +459,9 @@ results. An empty string is a valid cursor, not the end of results.
 </ResponseField>
 <ResponseField name="sessions" type={<a href="#sessioninfo">SessionInfo[]</a>} required>
   Array of session information objects.
+
+Agents SHOULD return the sessions with the most recent activity first.
+
 </ResponseField>
 
 <a id="session-new"></a>
@@ -471,7 +477,7 @@ The agent should:
 - Connect to any specified MCP servers
 - Return a unique session ID for future requests
 
-May return an `auth_required` (`-32000`) error if the agent requires authentication.
+May return a `-32000` (Authentication required) error if the agent requires authentication.
 
 See protocol docs: [Session Setup](https://agentclientprotocol.com/protocol/v2/session-setup)
 
@@ -494,7 +500,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 </ResponseField>
 <ResponseField name="additionalDirectories" type={<a href="#absolutepath">AbsolutePath[]</a>} >
-  Additional workspace roots for this session. Each path must be absolute.
+  Additional workspace roots for this session. Each path MUST be absolute.
 
 These expand the session's workspace scope without changing `cwd`, which
 remains the base for relative paths. When omitted or empty, no
@@ -682,7 +688,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Required and non-null. Omission and explicit `null` are both invalid.
 
 The corresponding user-message session update carries this same identifier and may arrive
-before or after this response. Agents must echo the message during the live session, but are
+before or after this response. Agents MUST echo the message during the live session, but are
 not required to retain it. If retained and replayed, the message keeps this identifier.
 
 </ResponseField>
@@ -716,11 +722,11 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 </ResponseField>
 <ResponseField name="additionalDirectories" type={<a href="#absolutepath">AbsolutePath[]</a>} >
-  Additional workspace roots to activate for this session. Each path must be absolute.
+  Additional workspace roots to activate for this session. Each path MUST be absolute.
 
 When omitted or empty, no additional roots are activated. When non-empty,
 this is the complete resulting additional-root list for the resumed
-session. It may differ from any previously used or reported list as long as
+session. It MAY differ from any previously used or reported list as long as
 the request `cwd` matches the session's `cwd`.
 
 </ResponseField>
@@ -758,7 +764,7 @@ or resuming without replay.
 <ResponseField name="systemPrompt" type={<><span><a href="#systemprompt">SystemPrompt</a></span><span> | null</span></>} >
   System-level instructions for the resumed session.
 
-Optional. Omitted and `null` are equivalent. The Agent may then keep a
+Optional. Omitted and `null` are equivalent. The Agent MAY then keep a
 system prompt it stored with the session or use its default instructions.
 Clients MUST only send this when the Agent advertises
 `session.systemPrompt`, and SHOULD send the same value they used when the
@@ -1250,7 +1256,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Clients that do not understand this mode should preserve the raw payload
+Clients that do not understand this mode SHOULD preserve the raw payload
 when storing, replaying, proxying, or forwarding elicitation requests.
 They MUST NOT render it as a known elicitation mode.
 
@@ -1375,7 +1381,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Agents that do not understand this action should preserve the raw
+Agents that do not understand this action SHOULD preserve the raw
 payload when storing, replaying, proxying, or forwarding elicitation
 responses, and otherwise MUST handle it as `cancel`.
 
@@ -1405,6 +1411,9 @@ to the user and return their decision.
 After `session/cancel`, the agent stops waiting for requests of the cancelled
 foreground work and MUST cancel them with `$/cancel_request`. The client
 answers a cancelled request with the `cancelled` outcome.
+
+An error response is not approval, and neither is a connection that ends
+before the client answers. The agent MUST NOT treat either as approval.
 
 See protocol docs: [Requesting Permission](https://agentclientprotocol.com/protocol/v2/tool-calls#requesting-permission)
 
@@ -1522,14 +1531,12 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 ## Protocol Level
 
-Defines the interface that ACP-compliant agents and clients must both implement.
+Defines the notifications that both Agents and Clients can send.
 
-Notifications whose methods start with '$/' are messages which are protocol
-implementation dependent and might not be implementable in all clients or
-agents. For example if the implementation uses a single threaded synchronous
-programming language then there is little it can do to react to a
-`$/cancel_request` notification. If an agent or client receives notifications
-starting with '$/' it is free to ignore the notification.
+Their methods start with `$/`. Acting on one is optional, because it might not be
+implementable in every Client or Agent. For example, a single-threaded synchronous
+implementation can do little to react to a `$/cancel_request` notification. An Agent
+or Client **MAY** ignore a `$/` notification it cannot act on.
 
 <a id="$-cancel_request"></a>
 ### <span class="font-mono">$/cancel_request</span>
@@ -1830,8 +1837,8 @@ Omitted and `null` are equivalent and mean no description is provided.
 </ResponseField>
 <ResponseField name="env" type={<a href="#envvariable">EnvVariable[]</a>} >
   Additional environment variables to set on the configured agent invocation for terminal auth.
-Names MUST be unique. These values override same-named variables in the
-base launch configuration.
+Names SHOULD be unique, and otherwise the last entry wins. These values override
+same-named variables in the base launch configuration.
 </ResponseField>
 <ResponseField name="methodId" type={<a href="#authmethodid">AuthMethodId</a>} required>
   Unique identifier for this authentication method.
@@ -1887,7 +1894,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Clients that do not understand this method type should preserve the raw
+Clients that do not understand this method type SHOULD preserve the raw
 payload when storing, replaying, proxying, or forwarding initialization
 data, and otherwise ignore the method or display it generically.
 
@@ -1981,8 +1988,8 @@ Omitted and `null` are equivalent and mean no description is provided.
 </ResponseField>
 <ResponseField name="env" type={<a href="#envvariable">EnvVariable[]</a>} >
   Additional environment variables to set on the configured agent invocation for terminal auth.
-Names MUST be unique. These values override same-named variables in the
-base launch configuration.
+Names SHOULD be unique, and otherwise the last entry wins. These values override
+same-named variables in the base launch configuration.
 </ResponseField>
 <ResponseField name="methodId" type={<a href="#authmethodid">AuthMethodId</a>} required>
   Unique identifier for this authentication method.
@@ -2041,7 +2048,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Clients that do not understand this command type should preserve the raw
+Clients that do not understand this command type SHOULD preserve the raw
 payload when storing, replaying, proxying, or forwarding command
 metadata, and otherwise ignore the command. They MUST NOT display it as a
 slash command.
@@ -2102,7 +2109,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Clients that do not understand this input type should preserve the raw
+Clients that do not understand this input type SHOULD preserve the raw
 payload when storing, replaying, proxying, or forwarding command
 metadata, and otherwise ignore the input specification or display the
 command without structured input.
@@ -2422,9 +2429,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
   Whether the client supports `terminal` authentication methods.
 
 Optional. Omitted and `null` are equivalent and mean the client does not advertise support.
-The client should supply `\{\}` only when it can reproduce the configured
+The client SHOULD supply `\{\}` only when it can reproduce the configured
 agent invocation in an interactive terminal. Supplying `\{\}` means the
-agent may include `terminal` entries in its authentication methods.
+agent MAY include `terminal` entries in its authentication methods.
 
 </ResponseField>
 
@@ -2596,8 +2603,9 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 A context compaction upsert. The first notification fixes the compaction's
 timeline position. Later updates with the same ID patch that entity in place.
 
-`summary`, `error`, and `_meta` have patch semantics: omission leaves the
-stored value unchanged, `null` clears it, and a concrete value replaces it.
+Only `compactionId` is required. `status`, `summary`, `error`, and `_meta` have
+patch semantics: omission leaves the stored value unchanged, `null` clears it
+or resets it to its default, and a concrete value replaces it.
 `summary: []` also clears the summary. A concrete `_meta` object patches the
 stored metadata by top-level key instead of replacing it.
 
@@ -2622,8 +2630,12 @@ See protocol docs: [Metadata Patches](https://agentclientprotocol.com/protocol/v
 <ResponseField name="error" type={"string | null"} >
   Human-readable error details for the compaction.
 </ResponseField>
-<ResponseField name="status" type={<a href="#compactionstatus">CompactionStatus</a>} required>
+<ResponseField name="status" type={<><span><a href="#compactionstatus">CompactionStatus</a></span><span> | null</span></>} >
   Current lifecycle status.
+
+Omission leaves the status unchanged, `null` resets it to `in_progress`, and a value
+replaces it. A new compaction starts as `in_progress`.
+
 </ResponseField>
 <ResponseField name="summary" type={<><span><a href="#contentblock">ContentBlock[]</a></span><span> | null</span></>} >
   Complete replacement user-displayable summary content for the compaction.
@@ -2911,7 +2923,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Receivers that do not understand this content block type should preserve
+Receivers that do not understand this content block type SHOULD preserve
 the raw payload when storing, replaying, proxying, or forwarding content,
 and otherwise ignore it or display it generically. Agents MUST reject a
 `session/prompt` request with a content block type they do not support
@@ -3750,7 +3762,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Clients that do not understand this property schema type should preserve
+Clients that do not understand this property schema type SHOULD preserve
 the raw schema when storing, replaying, proxying, or forwarding
 elicitation requests. They MUST NOT render it as a known input control.
 
@@ -3811,7 +3823,7 @@ Optional. Omitted and `null` are equivalent and mean no schema description is pr
 
 </ResponseField>
 <ResponseField name="properties" type={"object"} required>
-  Property definitions (must be primitive types).
+  Property definitions (MUST be primitive types).
 </ResponseField>
 <ResponseField name="required" type={<><span><><span>"string"</span><span>[]</span></></span><span> | null</span></>} >
   List of required property names.
@@ -4103,7 +4115,7 @@ See protocol docs: [JSON-RPC Error Object](https://www.jsonrpc.org/specification
 
 <ResponseField name="code" type={<a href="#errorcode">ErrorCode</a>} required>
   A number indicating the error type that occurred.
-This must be an integer as defined in the JSON-RPC specification.
+This MUST be an integer as defined in the JSON-RPC specification.
 </ResponseField>
 <ResponseField name="data" type={<><span><a href="#errordata">ErrorData</a></span><span> | null</span></>} >
   Optional primitive or structured value that contains additional information about the error.
@@ -4116,7 +4128,7 @@ define a shape: `UnsupportedProtocolVersionErrorData` for `-32022`, and
 </ResponseField>
 <ResponseField name="message" type={"string"} required>
   A string providing a short description of the error.
-The message should be limited to a concise single sentence.
+The message SHOULD be limited to a concise single sentence.
 </ResponseField>
 
 ## <span class="font-mono">ErrorCode</span>
@@ -4177,7 +4189,7 @@ range LSP reserves (-32899 to -32800).
 
 ## <span class="font-mono">ErrorData</span>
 
-Schema for `Error::data`: the shapes ACP defines, or any other value.
+Schema for the `data` field of an error: the shapes ACP defines, or any other value.
 
 **Type:** Union
 
@@ -4313,10 +4325,10 @@ Omitted and `null` are equivalent and mean the source MIME type is used.
 </ResponseField>
 <ResponseField name="sizes" type={<><span><><span>"string"</span><span>[]</span></></span><span> | null</span></>} >
   Optional array of strings that specify sizes at which the icon can be used.
-Each string should be in `WxH` format (e.g., `"48x48"`, `"96x96"`) or
+Each string SHOULD be in `WxH` format (e.g., `"48x48"`, `"96x96"`) or
 `"any"` for scalable formats like SVG.
 
-If not provided, the client should assume that the icon can be used at any size.
+If not provided, the client SHOULD assume that the icon can be used at any size.
 
 Omitted and `null` are equivalent and mean no sizes are specified.
 
@@ -4381,10 +4393,9 @@ No foreground work is active. Background activity may continue.
 
 Agents SHOULD include a `stopReason` when the idle transition ends foreground
 work. An idle update that does not end foreground work need not include one.
-Receivers treat an omitted, `null`, or malformed `stopReason` as the agent not
-reporting one.
+Receivers treat an omitted or `null` `stopReason` as the agent not reporting one.
 Repeated or resume snapshots may carry the last stop reason for context.
-They MUST NOT be counted as new completions, cancellations, or additional usage.
+They MUST NOT be counted as new completions or cancellations.
 
 **Type:** Union
 
@@ -4404,7 +4415,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -4412,7 +4423,7 @@ See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2
 <ResponseField name="stopReason" type={"string | null"} >
   Why foreground work stopped. The value selects one of this type's variants, which may add fields of their own.
 
-Optional. Omitted and `null` are equivalent and mean the agent is not reporting a stop reason; a malformed value is treated the same way.
+Optional. Omitted and `null` are equivalent and mean the agent is not reporting a stop reason.
 
 See protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#stop-reasons)
 
@@ -4611,7 +4622,7 @@ name fallback if title isn't present.
   Intended for UI and end-user contexts and optimized to be human-readable
 and easily understood.
 
-If not provided, the name should be used for display.
+If not provided, the name SHOULD be used for display.
 
 Omitted and `null` are equivalent and mean the `name` is used for display.
 
@@ -4749,7 +4760,10 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 defines are owned by the transport, and Agents use the transport's values for them.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
-  Human-readable name identifying this MCP server.
+  Human-readable name identifying this MCP server. MUST be unique within `mcpServers`.
+
+Agents reject a request with a duplicate `name` with `-32602`.
+
 </ResponseField>
 <ResponseField name="type" type={"string"} required>
   The discriminator value. Must be `"http"`.
@@ -4783,14 +4797,20 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
   Command-line arguments to pass to the MCP server.
 </ResponseField>
 <ResponseField name="command" type={<a href="#absolutepath">AbsolutePath</a>} required>
-  Absolute path to the MCP server executable.
+  Path to the MCP server executable. Must be an absolute path.
+
+Agents reject a request with a relative `command` with `-32602`.
+
 </ResponseField>
 <ResponseField name="env" type={<a href="#envvariable">EnvVariable[]</a>} >
   Environment variables to set when launching the MCP server. Names SHOULD be unique.
 Agents MAY reject duplicates with `-32602`, and otherwise the last entry wins.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
-  Human-readable name identifying this MCP server.
+  Human-readable name identifying this MCP server. MUST be unique within `mcpServers`.
+
+Agents reject a request with a duplicate `name` with `-32602`.
+
 </ResponseField>
 <ResponseField name="type" type={"string"} required>
   The discriminator value. Must be `"stdio"`.
@@ -4806,7 +4826,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Receivers that do not understand this transport should preserve the raw
+Receivers that do not understand this transport SHOULD preserve the raw
 payload when storing, replaying, proxying, or forwarding session setup
 data. Agents MUST reject a request with a transport they do not support
 with `-32602`.
@@ -4846,7 +4866,10 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 defines are owned by the transport, and Agents use the transport's values for them.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
-  Human-readable name identifying this MCP server.
+  Human-readable name identifying this MCP server. MUST be unique within `mcpServers`.
+
+Agents reject a request with a duplicate `name` with `-32602`.
+
 </ResponseField>
 <ResponseField name="url" type={"string"} required>
   URL to the MCP server.
@@ -4875,14 +4898,20 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
   Command-line arguments to pass to the MCP server.
 </ResponseField>
 <ResponseField name="command" type={<a href="#absolutepath">AbsolutePath</a>} required>
-  Absolute path to the MCP server executable.
+  Path to the MCP server executable. Must be an absolute path.
+
+Agents reject a request with a relative `command` with `-32602`.
+
 </ResponseField>
 <ResponseField name="env" type={<a href="#envvariable">EnvVariable[]</a>} >
   Environment variables to set when launching the MCP server. Names SHOULD be unique.
 Agents MAY reject duplicates with `-32602`, and otherwise the last entry wins.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
-  Human-readable name identifying this MCP server.
+  Human-readable name identifying this MCP server. MUST be unique within `mcpServers`.
+
+Agents reject a request with a duplicate `name` with `-32602`.
+
 </ResponseField>
 
 ## <span class="font-mono">McpStdioCapabilities</span>
@@ -5240,6 +5269,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 </ResponseField>
 <ResponseField name="content" type={"string"} required>
   Human-readable description of what this task aims to accomplish.
+May contain Markdown.
 </ResponseField>
 <ResponseField name="priority" type={<a href="#planentrypriority">PlanEntryPriority</a>} required>
   The relative importance of this task.
@@ -5339,7 +5369,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 <ResponseField name="entries" type={<a href="#planentry">PlanEntry[]</a>} required>
   The list of tasks to be accomplished.
 
-When updating an item-based plan, the agent must send a complete list of all entries
+When updating an item-based plan, the agent MUST send a complete list of all entries
 with their current status. The client replaces that plan with each update.
 
 </ResponseField>
@@ -5389,7 +5419,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 <ResponseField name="entries" type={<a href="#planentry">PlanEntry[]</a>} required>
   The list of tasks to be accomplished.
 
-When updating an item-based plan, the agent must send a complete list of all entries
+When updating an item-based plan, the agent MUST send a complete list of all entries
 with their current status. The client replaces that plan with each update.
 
 </ResponseField>
@@ -5410,7 +5440,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Receivers that do not understand this content type should preserve the
+Receivers that do not understand this content type SHOULD preserve the
 raw payload when storing, replaying, proxying, or forwarding plans, and
 otherwise ignore it or display it generically. It still replaces any earlier
 content for the same `planId`.
@@ -5566,8 +5596,8 @@ for the session between the request and this update is replayed history.
 Every update after it is not.
 
 The Agent does not send it when `replayFrom` is omitted or `null`, or when
-it cannot finish the replay. A resume that ends without it delivered a
-truncated replay.
+it cannot finish the replay. A replay that ends without it and without a
+successful response is truncated.
 
 See protocol docs: [Replay Complete](https://agentclientprotocol.com/protocol/v2/session-setup#replay-complete)
 
@@ -5742,7 +5772,7 @@ extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
 Agents that do not understand this outcome MUST NOT treat it as approval.
-They should preserve the raw payload when storing, replaying, proxying, or
+They SHOULD preserve the raw payload when storing, replaying, proxying, or
 forwarding permission responses, and otherwise fail or decline the
 permission request according to policy.
 
@@ -5833,7 +5863,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Clients that do not understand this subject type should preserve the raw
+Clients that do not understand this subject type SHOULD preserve the raw
 payload when storing, replaying, proxying, or forwarding permission
 requests, and otherwise display a generic permission prompt or decline it
 according to policy.
@@ -5881,7 +5911,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -5996,7 +6026,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -6096,7 +6126,7 @@ Optional. Omitted and `null` are equivalent and mean the agent does not advertis
 Supplying `\{\}` means the agent supports `additionalDirectories` on
 supported session lifecycle requests.
 
-Agents may return `SessionInfo.additionalDirectories` to report the
+Agents MAY return `SessionInfo.additionalDirectories` to report the
 complete ordered additional-root list associated with a listed session.
 
 </ResponseField>
@@ -6177,7 +6207,7 @@ Omitted and `null` are equivalent and mean no category is provided.
 
 </ResponseField>
 <ResponseField name="configId" type={<a href="#sessionconfigid">SessionConfigId</a>} required>
-  Unique identifier for the configuration option.
+  Identifier for the configuration option. MUST be unique within `configOptions`.
 </ResponseField>
 <ResponseField name="description" type={"string | null"} >
   Optional description for the Client to display to the user.
@@ -6240,7 +6270,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Clients that do not understand this option type should preserve the raw
+Clients that do not understand this option type SHOULD preserve the raw
 payload when storing, replaying, proxying, or forwarding configuration
 data, and otherwise ignore the option. The Agent keeps using its `currentValue`.
 
@@ -6338,7 +6368,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 </ResponseField>
 <ResponseField name="groupId" type={<a href="#sessionconfiggroupid">SessionConfigGroupId</a>} required>
-  Unique identifier for this group.
+  Identifier for this group. MUST be unique within the option.
 </ResponseField>
 <ResponseField name="name" type={"string"} required>
   Human-readable label for this group.
@@ -6443,7 +6473,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 </ResponseField>
 <ResponseField name="additionalDirectories" type={<a href="#absolutepath">AbsolutePath[]</a>} >
-  Additional workspace roots reported for this session. Each path must be absolute.
+  Additional workspace roots reported for this session. Each path MUST be absolute.
 
 When present, this is the complete ordered additional-root list reported
 by the Agent. Omitted and empty values are equivalent: the response
@@ -6952,7 +6982,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -6983,7 +7013,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -6994,7 +7024,7 @@ See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2
 <ResponseField name="stopReason" type={"string | null"} >
   Why foreground work stopped. The value selects one of this type's variants, which may add fields of their own.
 
-Optional. Omitted and `null` are equivalent and mean the agent is not reporting a stop reason; a malformed value is treated the same way.
+Optional. Omitted and `null` are equivalent and mean the agent is not reporting a stop reason.
 
 See protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#stop-reasons)
 
@@ -7150,7 +7180,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -7182,7 +7212,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -7315,7 +7345,7 @@ back to `pending` once it has another status.
 
 </ResponseField>
 <ResponseField name="title" type={"string | null"} >
-  Human-readable title describing what the tool is doing.
+  Human-readable plain-text title describing what the tool is doing.
 
 Omission leaves the title unchanged, `null` unsets it, and a string replaces it.
 A new tool call starts without a title.
@@ -7613,8 +7643,12 @@ See protocol docs: [Metadata Patches](https://agentclientprotocol.com/protocol/v
 <ResponseField name="sessionUpdate" type={"string"} required>
   The discriminator value. Must be `"compaction_update"`.
 </ResponseField>
-<ResponseField name="status" type={<a href="#compactionstatus">CompactionStatus</a>} required>
+<ResponseField name="status" type={<><span><a href="#compactionstatus">CompactionStatus</a></span><span> | null</span></>} >
   Current lifecycle status.
+
+Omission leaves the status unchanged, `null` resets it to `in_progress`, and a value
+replaces it. A new compaction starts as `in_progress`.
+
 </ResponseField>
 <ResponseField name="summary" type={<><span><a href="#contentblock">ContentBlock[]</a></span><span> | null</span></>} >
   Complete replacement user-displayable summary content for the compaction.
@@ -7691,7 +7725,7 @@ See protocol docs: [Metadata Patches](https://agentclientprotocol.com/protocol/v
 
 </ResponseField>
 <ResponseField name="additionalDirectories" type={<><span><a href="#absolutepath">AbsolutePath[]</a></span><span> | null</span></>} >
-  Additional workspace roots for the child. Each path must be absolute.
+  Additional workspace roots for the child. Each path MUST be absolute.
 
 Optional and nullable. Omitted means unchanged. `null` clears the
 reported value. While unset, the child inherits its immediate parent's
@@ -7839,7 +7873,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Receivers that do not understand this update type should preserve the
+Receivers that do not understand this update type SHOULD preserve the
 raw payload when storing, replaying, proxying, or forwarding session
 history, and otherwise ignore it or display it generically.
 
@@ -7892,7 +7926,7 @@ A new session defaults to idle until a state update reports otherwise.
 Resume MUST send a current-state snapshot after any replay and before its
 response. The snapshot reports foreground state after resuming.
 The response alone does not imply idle.
-Repeated snapshots are idempotent, not additional work, completions, or usage.
+Repeated snapshots are idempotent, not additional work or completions.
 A repeated state may carry updated information without another state transition.
 The agent MUST report `idle` when no foreground activity remains. Completing
 an individual activity while other foreground work continues does not require
@@ -7921,7 +7955,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -7952,7 +7986,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -7963,7 +7997,7 @@ See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2
 <ResponseField name="stopReason" type={"string | null"} >
   Why foreground work stopped. The value selects one of this type's variants, which may add fields of their own.
 
-Optional. Omitted and `null` are equivalent and mean the agent is not reporting a stop reason; a malformed value is treated the same way.
+Optional. Omitted and `null` are equivalent and mean the agent is not reporting a stop reason.
 
 See protocol docs: [Stop Reasons](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#stop-reasons)
 
@@ -8119,7 +8153,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -8151,7 +8185,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 
@@ -8216,7 +8250,7 @@ String format types for string properties in elicitation schemas.
 Custom or future string format.
 
 Unknown formats are preserved. Implementations that do not understand a
-format should treat it as an annotation rather than rejecting the schema.
+format SHOULD treat it as an annotation rather than rejecting the schema.
 
 </ResponseField>
 
@@ -8351,7 +8385,7 @@ before any live request or notification bearing the child's session ID,
 including messages naming it as sender or recipient. Child events are
 delivered automatically. No separate child load, resume, or subscription is needed.
 Understanding this update, registering child sessions, and applying their
-operation restrictions are baseline v2 requirements. No Client capability
+operation restrictions are baseline requirements. No Client capability
 is required.
 
 Only `sessionId` is required. Other fields have
@@ -8392,7 +8426,7 @@ See protocol docs: [Metadata Patches](https://agentclientprotocol.com/protocol/v
 
 </ResponseField>
 <ResponseField name="additionalDirectories" type={<><span><a href="#absolutepath">AbsolutePath[]</a></span><span> | null</span></>} >
-  Additional workspace roots for the child. Each path must be absolute.
+  Additional workspace roots for the child. Each path MUST be absolute.
 
 Optional and nullable. Omitted means unchanged. `null` clears the
 reported value. While unset, the child inherits its immediate parent's
@@ -8590,9 +8624,6 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 Client-initiated controls a terminal currently supports.
 
-A malformed value falls back to no controls, so the Client never sends a request the
-Agent did not advertise.
-
 See protocol docs: [Cancelling Terminals](https://agentclientprotocol.com/protocol/v2/tool-calls#cancelling-terminals)
 
 **Type:** Object
@@ -8641,7 +8672,7 @@ allowed, for example signed Windows exit codes. Omitted and `null` are equivalen
 <ResponseField name="signal" type={"string | null"} >
   Signal that terminated the process, when known.
 
-Agents should use the conventional platform signal name. POSIX examples
+Agents SHOULD use the conventional platform signal name. POSIX examples
 include `SIGTERM`, `SIGKILL`, and `SIGINT`. Other platforms may use a
 platform-specific name. Omitted and `null` are equivalent.
 
@@ -8720,7 +8751,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 </ResponseField>
 <ResponseField name="cols" type={"uint16"} required>
-  Number of columns.
+  Number of columns. At least 1.
 
     | Constraint | Value |
     | ---------- | ----- |
@@ -8729,7 +8760,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 </ResponseField>
 <ResponseField name="rows" type={"uint16"} required>
-  Number of rows.
+  Number of rows. At least 1.
 
     | Constraint | Value |
     | ---------- | ----- |
@@ -8914,9 +8945,6 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 
 Client-initiated controls a tool call currently supports.
 
-A malformed value falls back to no controls, so the Client never sends a request the
-Agent did not advertise.
-
 See protocol docs: [Cancelling Tool Calls](https://agentclientprotocol.com/protocol/v2/tool-calls#cancelling-tool-calls)
 
 **Type:** Object
@@ -9059,7 +9087,7 @@ Values beginning with `_` are reserved for implementation-specific
 extensions. Unknown values that do not begin with `_` are reserved for
 future ACP variants.
 
-Receivers that do not understand this content type should preserve the
+Receivers that do not understand this content type SHOULD preserve the
 raw payload when storing, replaying, proxying, or forwarding tool call
 output, and otherwise ignore it or display it generically.
 
@@ -9294,7 +9322,7 @@ back to `pending` once it has another status.
 
 </ResponseField>
 <ResponseField name="title" type={"string | null"} >
-  Human-readable title describing what the tool is doing.
+  Human-readable plain-text title describing what the tool is doing.
 
 Omission leaves the title unchanged, `null` unsets it, and a string replaces it.
 A new tool call starts without a title.
@@ -9399,7 +9427,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v2/e
 Optional. Omitted and `null` are equivalent and mean the Agent is not reporting
 background work, not that nothing is running. `[]` means no background work is
 running. An Agent that reports background work MUST include it on every state
-update for the session. A malformed list is treated as not reported.
+update for the session.
 
 See protocol docs: [Background Work](https://agentclientprotocol.com/protocol/v2/prompt-lifecycle#background-work)
 

@@ -189,8 +189,6 @@ and history, and the Agent need not report anything further for it. See
 Announcement ordering also applies to short-lived work. Clients attribute
 subsequent traffic to the announced child and apply its restricted-session
 semantics; routing internals and presentation are implementation choices.
-SDKs may tolerate non-conforming Agents by buffering early traffic, but that
-tolerance does not replace the Agent's announcement obligation.
 
 Provider callbacks need not arrive in announcement order. If an interaction
 arrives before the corresponding spawn metadata, the adapter can announce a
@@ -661,8 +659,7 @@ its session ID. The Agent adds a reference only when it can resolve that
 handle to a known session. It **MUST NOT** guess the session.
 
 In v1, `session` content is covered by the `subagents` Client capability like
-the rest of this RFD. In v2, receivers that do not recognize it preserve it as
-unknown tool call content.
+the rest of this RFD. In v2, it is part of the baseline and needs no capability.
 
 #### Delegated tasks
 
@@ -1105,8 +1102,8 @@ tool call content, including references to the forked root. Each copied child st
 identity. Participants outside the copied tree do not become part of the copy;
 unavailable participants follow the historical replay rules above. Copying
 history does not itself create live child runtimes. Parent deletion keeps its
-ordinary history-management semantics; it is not a substitute for closing
-active sessions.
+ordinary history-management semantics. Deleting an active session closes it
+first.
 
 ### Cancellation and resource ownership
 
@@ -1693,6 +1690,10 @@ important difference from a user-facing session.
 
 ## Revision history
 
+- 2026-11-19: Deleting an active session closes it first, as the session delete page says. The RFD no longer says that deletion is not a substitute for closing.
+- 2026-11-19: In v2, `session` tool call content is part of the baseline. It is no longer described as unknown content that receivers preserve.
+- 2026-11-19: The v1 draft page says that a parent can work outside a prompt turn when a child reports back, and that `session/cancel` for the parent cancels that work. It also says that a child's `config_option_update` that arrives before the `session/load` response is historical.
+- 2026-11-19: Removed the statement about SDKs buffering traffic for an unannounced child. How an SDK handles a non-conforming Agent is not part of the protocol.
 - 2026-11-17: A session's cost includes its descendants' costs, in both versions. Clients show a session's cost as the cost of its subtree and do not add child costs to it.
 - 2026-11-17: Agents **SHOULD** reject a Client-initiated request that is not permitted for a child with `-32602`, in both versions.
 - 2026-11-17: The v1 rules are on the v1 draft [Subagents](/protocol/v1/draft/subagents) page. The v1 draft pages link to it instead of to this RFD.

@@ -13,7 +13,7 @@ Implementations can add custom behavior without breaking peers that don't know a
 - Support describes whether a peer implements the feature's behavior, as advertised by its capability or another explicitly documented negotiation mechanism.
 - Forward compatibility describes whether a receiver can safely accept a field or variant without implementing its behavior.
 
-Negotiating `protocolVersion: 2` selects the v2 protocol, not all experimental
+Negotiating `protocolVersion: 2` selects the baseline protocol, not all experimental
 features in `schema/v2/schema.unstable.json`. There is no connection-wide
 "unstable schema" flag. Implementations **MUST NOT** infer peer support from
 their own schema selection, generated types, or local feature flags.
@@ -23,25 +23,24 @@ their own schema selection, generated types, or local feature flags.
 Each feature defines its negotiation requirements, whether stable or experimental:
 
 - **Optional operations requiring peer participation** need an advertised capability or another explicitly documented negotiation mechanism. Callers **MUST** follow that feature's requirements. An omitted or `null` support marker means unsupported.
-- **Informational additions with a safe fallback** may be sent without a capability when the feature explicitly permits it. A receiver may ignore or generically display them. Senders **MUST NOT** depend on feature-specific presentation, acknowledgement, or action.
+- **Informational additions with a safe fallback** **MAY** be sent without a capability when the feature explicitly permits it. A receiver **MAY** ignore or generically display them. Senders **MUST NOT** depend on feature-specific presentation, acknowledgement, or action.
 - **Local feature flags** control implementation and rollout. They neither advertise peer support nor replace a required capability.
 
 For example:
 
-| Feature                                                                                                                                 | Negotiation and receiver behavior                                                                                                                                                                                                                            |
-| --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [Session deletion](/protocol/v2/draft/session-delete)                                                                                   | The Agent advertises `session.delete`. Clients must not call `session/delete` without it.                                                                                                                                                                    |
-| [Elicitation](/protocol/v2/draft/elicitation#checking-support)                                                                          | The Client advertises each supported mode under `elicitation`. Agents must not request other modes.                                                                                                                                                          |
-| [Provider configuration](/protocol/v2/draft/initialization#agent-capabilities) (experimental)                                           | The Agent advertises `capabilities.providers`. Clients must not call provider configuration methods without it.                                                                                                                                              |
-| [Notices](/protocol/v2/draft/prompt-lifecycle#session-notices) and [compaction](/protocol/v2/draft/prompt-lifecycle#session-compaction) | No Client capability is required in v2. Clients without feature-specific handling may preserve, ignore, or generically display the updates.                                                                                                                  |
-| [Markdown plans](/protocol/v2/draft/agent-plan#unstable-plan-operations) (experimental)                                                 | No Client capability is required in v2. Clients without this plan representation use the unknown plan-content fallback. Sending one does not establish that it will be rendered.                                                                             |
-| [End-turn token usage](/protocol/v2/draft/prompt-lifecycle#end-turn-token-usage-unstable) (experimental)                                | Optional `usage` on an idle `state_update`, not on the prompt response. No capability is required. Clients may ignore it.                                                                                                                                    |
-| [Prompt suggestions](/protocol/v2/draft/prompt-lifecycle#prompt-suggestions-unstable) (experimental)                                    | The Client advertises `session.promptSuggestions`. Agents must not send `prompt_suggestions_update` without it.                                                                                                                                              |
-| [Skills](/protocol/v2/draft/slash-commands#skills-unstable) (experimental)                                                              | The Client advertises `session.commands.skill`. Agents must not send `skill` command entries without it. The Agent advertises `session.prompt.skill`. Clients must not send `skill` content blocks that it does not allow.                                   |
-| [Session cursors](/protocol/v2/draft/prompt-lifecycle#session-cursors-unstable) (experimental)                                          | No Client or Agent capability is required in v2. An Agent that supports cursors sends `cursor_update`. Clients without cursor handling may preserve or ignore it. A method that accepts a `cursorId` still needs its own capability, such as `session.fork`. |
+| Feature                                                                                                                                 | Negotiation and receiver behavior                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Session deletion](/protocol/v2/draft/session-delete)                                                                                   | The Agent advertises `session.delete`. Clients **MUST NOT** call `session/delete` without it.                                                                                                                                                              |
+| [Elicitation](/protocol/v2/draft/elicitation#checking-support)                                                                          | The Client advertises each supported mode under `elicitation`. Agents **MUST NOT** request other modes.                                                                                                                                                    |
+| [Provider configuration](/protocol/v2/draft/initialization#agent-capabilities) (experimental)                                           | The Agent advertises `capabilities.providers`. Clients **MUST NOT** call provider configuration methods without it.                                                                                                                                        |
+| [Notices](/protocol/v2/draft/prompt-lifecycle#session-notices) and [compaction](/protocol/v2/draft/prompt-lifecycle#session-compaction) | No Client capability is required. Clients without feature-specific handling **MAY** preserve, ignore, or generically display the updates.                                                                                                                  |
+| [Markdown plans](/protocol/v2/draft/agent-plan#unstable-plan-operations) (experimental)                                                 | No Client capability is required. Clients without this plan representation use the unknown plan-content fallback. Sending one does not establish that it will be rendered.                                                                                 |
+| [End-turn token usage](/protocol/v2/draft/prompt-lifecycle#end-turn-token-usage-unstable) (experimental)                                | Optional `usage` on an idle `state_update`, not on the prompt response. No capability is required. Clients **MAY** ignore it.                                                                                                                              |
+| [Prompt suggestions](/protocol/v2/draft/prompt-lifecycle#prompt-suggestions-unstable) (experimental)                                    | The Client advertises `session.promptSuggestions`. Agents **MUST NOT** send `prompt_suggestions_update` without it.                                                                                                                                        |
+| [Skills](/protocol/v2/draft/slash-commands#skills-unstable) (experimental)                                                              | The Client advertises `session.commands.skill`. Agents **MUST NOT** send `skill` command entries without it. The Agent advertises `session.prompt.skill`. Clients **MUST NOT** send `skill` content blocks that it does not allow.                         |
+| [Session cursors](/protocol/v2/draft/prompt-lifecycle#session-cursors-unstable) (experimental)                                          | No Client or Agent capability is required. An Agent that supports cursors sends `cursor_update`. Clients without cursor handling **MAY** preserve or ignore it. A method that accepts a `cursorId` still needs its own capability, such as `session.fork`. |
 
-These rules are specific to v2. Features with capability gates in v1 retain
-those gates on v1 connections.
+These rules apply to this protocol version only. On a connection that negotiated an earlier version, features keep the capability gates that version defines.
 
 Experimental schema revisions may disagree about a feature's shape or semantics.
 A capability advertises the behavior defined for that feature, not compatibility
@@ -74,7 +73,7 @@ is not necessarily supported or permitted on the connection.
 
 Protocol object types that define a `_meta` field can use it to attach custom information. This includes requests, responses, notifications, and nested object types such as content blocks, tool calls, plan entries, and capability objects. Primitive types and object types that do not define `_meta` cannot carry it.
 
-`_meta` is an object with string keys (`{ [key: string]: unknown }`). Receivers treat any other value as omitted. Except for [metadata patches](#metadata-patches), omitted and `null` are equivalent and mean no metadata. Metadata on a chunk is scoped to that chunk and does not patch stored metadata.
+`_meta` is an object with string keys (`{ [key: string]: unknown }`). Except for [metadata patches](#metadata-patches), omitted and `null` are equivalent and mean no metadata. Metadata on a chunk is scoped to that chunk and does not patch stored metadata.
 
 ```json
 {
@@ -97,7 +96,7 @@ Protocol object types that define a `_meta` field can use it to attach custom in
 }
 ```
 
-Clients may propagate fields to the agent for correlation purposes, using a namespaced key such as `com.example/requestId`. The following root-level keys in `_meta` are reserved, as in MCP, for interop with MCP implementations and OpenTelemetry tooling. When present, their values **MUST** use the corresponding W3C format:
+Clients **MAY** propagate fields to the agent for correlation purposes, using a namespaced key such as `com.example/requestId`. The following root-level keys in `_meta` are reserved, as in MCP, for interop with MCP implementations and OpenTelemetry tooling. When present, their values **MUST** use the corresponding W3C format:
 
 - `traceparent` and `tracestate`: [W3C Trace Context](https://www.w3.org/TR/trace-context/)
 - `baggage`: [W3C Baggage](https://www.w3.org/TR/baggage/)
@@ -159,7 +158,7 @@ Other `_meta` fields are not patches, including the `_meta` of `plan_update`. Me
 
 Receivers **MUST** ignore unrecognized properties of protocol-defined objects, including properties nested within capability objects. An otherwise valid message **MUST NOT** be rejected solely because it contains unrecognized properties. Ignoring a property means not assigning protocol behavior to it. It does not imply support for the feature it describes.
 
-This rule does not relax validation of known properties or change their documented handling of malformed values. Unknown enum values, discriminator values, and method names follow their own rules. They are not unknown object fields. A malformed value for a known discriminator **MUST NOT** be treated as an unknown variant.
+This rule does not relax validation of known properties. Unknown enum values, discriminator values, and method names follow their own rules. They are not unknown object fields. A malformed value for a known discriminator **MUST NOT** be treated as an unknown variant.
 
 Ignoring an unknown property means not interpreting it. Implementations are not required to remove it from the message.
 
