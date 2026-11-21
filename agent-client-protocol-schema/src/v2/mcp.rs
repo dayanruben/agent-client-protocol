@@ -66,7 +66,7 @@ impl McpError {
 /// Both branches require their carrier key. An error MUST be a non-null object.
 /// Unknown outer fields are ignored. Inner result and error fields are preserved.
 /// Carrier `_meta` is optional. Omitted and `null` are equivalent.
-/// Senders must include exactly one outcome. Receivers prefer `result` if both are present.
+/// Senders MUST include exactly one outcome.
 #[serde_as]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -79,7 +79,7 @@ pub enum MessageMcpResponse {
         /// Required, even if JSON null.
         #[serde(deserialize_with = "Deserialize::deserialize")]
         result: Value,
-        /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+        /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
         /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
         /// Implementations MUST NOT assign meaning to keys they do not recognize.
         /// This is ACP metadata, not the inner MCP message's `_meta`.
@@ -94,7 +94,7 @@ pub enum MessageMcpResponse {
     Error {
         /// Required, non-null MCP error object.
         error: McpError,
-        /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+        /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
         /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
         /// Implementations MUST NOT assign meaning to keys they do not recognize.
         /// This is ACP metadata, not the inner MCP message's `_meta`.
@@ -161,6 +161,7 @@ impl McpRequestId {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[cfg_attr(feature = "schemars", schemars(extend("x-side" = "client", "x-method" = MCP_MESSAGE_METHOD_NAME)))]
+#[cfg_attr(feature = "schemars", schemars(extend("x-scope" = {"mcpServer": ["serverId"]})))]
 #[non_exhaustive]
 pub struct MessageMcpRequest {
     /// The declared ACP MCP server receiving this request.
@@ -172,7 +173,7 @@ pub struct MessageMcpRequest {
     /// Optional inner MCP params. Null is equivalent to omission.
     #[serde(default)]
     pub params: Option<serde_json::Map<String, serde_json::Value>>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     /// This is ACP metadata, not the inner MCP message's `_meta`.
@@ -241,7 +242,7 @@ pub struct MessageMcpNotification {
     /// Optional inner MCP params. Null is equivalent to omission.
     #[serde(default)]
     pub params: Option<serde_json::Map<String, serde_json::Value>>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     /// This is ACP metadata, not the inner MCP message's `_meta`.

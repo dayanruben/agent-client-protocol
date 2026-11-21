@@ -75,7 +75,8 @@ Every request has these fields. Each mode adds its own.
 </ParamField>
 
 Scope is represented with flattened fields. Exactly one of `sessionId` or
-`requestId` **MUST** be present:
+`requestId` **MUST** be present. Omit the unused field rather than sending `null`.
+With `requestId`, the Agent **MUST NOT** send `toolCallId`.
 
 <ParamField path="sessionId" type="SessionId">
   The session, for a session-scoped request.
@@ -160,18 +161,19 @@ optional `required`, `title`, and `description`. Each property is one of:
 | Boolean       | `type: "boolean"`                                                                                                           | `default`                                                                           |
 | Multi select  | `type: "array"` with `items` of `{ "type": "string", "enum": [...] }` or `{ "anyOf": [...] }` (`const` and `title` options) | `minItems`, `maxItems`, `default`                                                   |
 
-Every property may also have `title` and `description`. Each `oneOf` or `anyOf` option has a `const` value and a `title`, and may also have a `description`. Clients treat an unknown
+Every property may also have `title` and `description`. Each `oneOf` or `anyOf` option has a `const` value and a `title`, and may also have a `description`. Each `enum`, `oneOf`, and `anyOf` list needs at least one option. Clients treat an unknown
 `format` as plain text. Accepted `content` maps each answered property name to its value: a string for text and single-select properties, a number for `number` and `integer`, a boolean for `boolean`, and an array of strings for multi-select. Unanswered properties are omitted, not set to `null`. Custom or future property types may use other JSON values.
+
+In multi-select `items`, the titled `anyOf` form omits `type`. When `type` is `"string"`, `enum` is required even if `anyOf` is also present.
 
 Clients **SHOULD** validate submitted values before responding, and Agents
 **SHOULD** validate them again.
 
-If a Client cannot render a form, it **SHOULD** respond with `-32602` (Invalid
+If a Client cannot render a form, it **MUST** respond with `-32602` (Invalid
 params), not `decline` or `cancel`, which report a user's choice. This includes
 a required property of an unknown type, a `required` entry with no matching
 property, and a property that sets both `enum` and `oneOf`. Clients **MAY** leave
-out optional properties of unknown types and render the rest. Clients **SHOULD**
-ignore a `default` that does not match its property schema.
+out optional properties of unknown types and render the rest.
 
 Clients that support schema defaults **SHOULD** pre-populate form fields with
 their declared default values.
@@ -244,7 +246,7 @@ Agents **MUST** handle an unknown action as `cancel`.
 
 The `content` field is optional on `accept`. Receivers treat omission and `null`
 equivalently. It is only meaningful for `accept`. Receivers ignore it for
-`decline` and `cancel`. For an accepted form elicitation, `content` **SHOULD** conform to the requested schema. Receivers accept any JSON value in `content` and validate it against the schema, so an unexpected value invalidates only that property, not the whole response. For an accepted URL elicitation, clients
+`decline` and `cancel`. For an accepted form elicitation, `content` **SHOULD** conform to the requested schema. A `content` value can be any JSON value, such as the value of a custom or future property type. For an accepted URL elicitation, Clients
 normally omit `content` because the interaction happens out of band.
 
 Agents **MUST NOT** assume an elicitation succeeds. They **MUST** handle
@@ -307,7 +309,7 @@ complete independently. Cancellation can finish without waiting for it.
 
 ## URL security
 
-Agents and Clients implementing URL mode **MUST** follow these requirements:
+Agents and Clients implementing URL mode follow these requirements:
 
 These requirements adapt MCP's
 [Safe URL Handling](https://modelcontextprotocol.io/specification/2026-07-28/client/elicitation#safe-url-handling)
@@ -326,7 +328,7 @@ rules to ACP.
 - Clients **SHOULD NOT** render a URL as clickable in any elicitation field
   except the `url` field of a URL-mode request, subject to the restrictions
   above.
-- When the Agent has an authenticated user, it **MUST** verify that the user who started the elicitation is the same user who completes the external interaction. Without one, such as during `auth/login`, the Agent **MUST** tie completion to the elicitation it issued and the connection it issued it on, for example with an unguessable single-use `state` value in the URL, and **MUST NOT** apply the result to a different connection.
+- When the Agent has an authenticated user, it **MUST** verify that the user who started the elicitation is the same user who completes the external interaction. Without one, such as during `auth/login`, the Agent **MUST** tie completion to the elicitation it issued and the connection it issued it on, for example with an unguessable single-use `state` value in the URL, and **MUST NOT** accept the completion for an elicitation or `auth/login` request on a different connection. This rule is about matching the completion. It does not limit where the Agent [stores the resulting credentials](/protocol/v2/draft/authentication#agent-handled-authentication).
 
 See the [schema reference](/protocol/v2/draft/schema#elicitation%2Fcreate) for
 the complete request and response types.

@@ -45,7 +45,7 @@ sequenceDiagram
 
 ## Session lifecycle
 
-A session exists from `session/new` until the Agent discards it. Agents choose how long to keep sessions: for example, they may not store a session that was never prompted, may expire old sessions, or may remove one through [`session/delete`](/protocol/v2/draft/session-delete). `session/list` and `session/resume` only see sessions the Agent still has, and resuming one it no longer has fails with `-32002`.
+A session exists from `session/new` until the Agent discards it. Agents choose how long to keep sessions: for example, they can skip storing a session that was never prompted, expire old sessions, or remove one through [`session/delete`](/protocol/v2/draft/session-delete). `session/list` and `session/resume` only see sessions the Agent still has, and resuming one it no longer has fails with `-32002`.
 
 On a connection, a session is **active** from a successful `session/new`, `session/resume`, or, when supported, `session/fork` (for the new session) until `session/close` or the end of the connection. A forked session starts with no background work: unfinished tool calls and running terminals copied into its history are not live, and its state snapshots report `background: []` until it starts its own. Agents **SHOULD NOT** discard a session while it is active, except through `session/delete`, which closes it first.
 
@@ -54,7 +54,7 @@ On a connection, a session is **active** from a successful `session/new`, `sessi
 - Closing a session ends it on the connection but doesn't discard it. Whether a closed session stays listed and resumable depends on how long the Agent keeps it.
 - Resuming a session that is already active on the connection synchronizes it again, like any resume. Ongoing work continues, and the request's MCP servers and workspace roots replace the previous ones.
 - Whether a session can be active on more than one connection at once is up to the Agent. An Agent that doesn't allow it **MAY** reject a `session/resume` for a session active on another connection, or end the session's activity on that other connection as if it were closed, for example when a Client reconnects before the Agent notices the old connection is gone.
-- When the connection ends, its sessions stop being active. The Agent **MAY** continue or cancel their foreground work, and it **MAY** insert or discard the prompts it was [holding](/protocol/v2/draft/prompt-lifecycle#prompts-during-active-work). A later `session/resume` reports the outcome in its [current-state snapshot](#current-state-synchronization). A Client that sent a `session/prompt` with an `idempotencyKey` and got no response can send it again with the same key once it has resumed the session. The retry is safe whether the Agent inserted the prompt or discarded it. See [Retrying a prompt](/protocol/v2/draft/prompt-lifecycle#retrying-a-prompt).
+- When the connection ends, its sessions stop being active. The Agent **MAY** continue or cancel their foreground work, and it **MAY** insert or discard the prompts it was [holding](/protocol/v2/draft/prompt-lifecycle#prompts-during-active-work). A later `session/resume` reports [current activity](#current-state-synchronization), not whether an unanswered prompt was inserted or its `idempotencyKey` was retained. Retrying with a forgotten key is a new submission. See [Retrying a prompt](/protocol/v2/draft/prompt-lifecycle#retrying-a-prompt).
 
 ## Creating a session
 
@@ -100,7 +100,7 @@ The Agent **MUST** respond with a unique [Session ID](#session-id) that identifi
 New sessions default to `idle` until a `state_update` reports otherwise. Updates
 may arrive before or after the `session/new` response. Clients **MUST NOT**
 overwrite an already-reported state when the response arrives. An optional
-initial idle notification is a snapshot, not a completed turn.
+initial idle notification is a snapshot, not completed work.
 
 Agents **SHOULD** put initial state in the `session/new` response rather than sending notifications before it. For `configOptions` and `availableCommands`, the response is required, as described below. Agents **SHOULD NOT** send session-scoped requests, such as permission requests or elicitations, before the response, because the Client cannot yet show them for that session. While a `session/new` is pending, Clients **MAY** buffer notifications for a `sessionId` they don't recognize and apply them in order once the response arrives, or drop them. Agents cannot rely on such notifications being seen. An Agent whose new session is not `idle`, for example because it started work when the session was created, **MUST** send the session's `state_update` after the response.
 
@@ -135,7 +135,7 @@ The `session/new`, `session/resume`, and, when supported, `session/fork` respons
 }
 ```
 
-`configOptions` and `availableCommands` are optional. Each is the complete current list for the session: omission or `[]` means none, and empty lists are omitted when serializing. Agents **MUST NOT** send `null` for these fields.
+`configOptions` and `availableCommands` are optional. Each is the complete current list for the session: omission or `[]` means none. Agents **MUST NOT** send `null` for these fields.
 
 When a `session/new`, `session/resume`, or, when supported, `session/fork` response arrives, Clients replace the lists they hold for the session with the response's lists, including lists from updates received before the response. Later `config_option_update` and `available_commands_update` notifications each replace the complete list, including `[]` to clear it.
 
@@ -193,9 +193,6 @@ A resume without replay synchronizes the session's state, not its conversation. 
 To request full history replay, Clients set `replayFrom` to
 `{ "type": "start" }`:
 
-Replay cursors are inclusive: replay includes the position identified by the
-cursor. For `{ "type": "start" }`, that means replaying all retained conversation history.
-
 ```json
 {
   "jsonrpc": "2.0",
@@ -210,6 +207,9 @@ cursor. For `{ "type": "start" }`, that means replaying all retained conversatio
   }
 }
 ```
+
+Replay cursors are inclusive: replay includes the position identified by the
+cursor. For `{ "type": "start" }`, that means replaying all retained conversation history.
 
 When `replayFrom.type` is `"start"`, the Agent **MUST** replay all retained
 conversation history to the Client in the form of `session/update` notifications before
@@ -264,7 +264,7 @@ For example, a user message from the conversation history:
 }
 ```
 
-Followed by the agent's response:
+Followed by the Agent's response:
 
 ```json
 {
@@ -293,11 +293,11 @@ message inserted by `session/prompt` **MUST** use the ID returned in that
 prompt response, including after reconnecting or restarting the Agent. Replaying a command reports its message. It does not
 execute the command again.
 
-Agents **SHOULD** preserve the IDs of all other replayed [entities](/protocol/v2/draft/prompt-lifecycle#entity-ids), such as agent and thought message IDs, `toolCallId`, `terminalId`, `planId`, and `compactionId`, across replay when possible, but these IDs are not
+Agents **SHOULD** preserve the IDs of all other replayed [entities](/protocol/v2/draft/prompt-lifecycle#entity-ids), such as Agent and thought message IDs, `toolCallId`, `terminalId`, `planId`, and `compactionId`, across replay when possible, but these IDs are not
 guaranteed to remain stable across reconnects or Agent restarts. Clients **MUST
-NOT** rely on them to deduplicate replay against previously received history. A
-full replay is authoritative: Clients **SHOULD** rebuild all of the session's entities, such as messages, tool calls, terminals, plans, and compactions, from it rather than merging it into
-existing state by ID.
+NOT** rely on them to deduplicate replay against previously received history.
+A Client attaching to a session can rebuild its transcript from a full replay.
+It contains the history the Agent retained, not necessarily everything the Client saw live.
 
 `user_message`, `agent_message`, `agent_thought`, and `session_message` updates
 are upserts keyed by `messageId`. Their `content` arrays replace the whole
@@ -337,7 +337,7 @@ Replay also reports unstable [session cursors](/protocol/v2/draft/prompt-lifecyc
 
 - When an Agent replays history, it **SHOULD** send a `cursor_update` for each cursor in that history that it still accepts. A replayed update carries the cursor's `capabilities` and `anchor`, like a first update, and follows the replayed entity it is anchored to.
 - Agents **SHOULD** use the same `cursorId` for the same position in every replay.
-- A full replay rebuilds the session's cursors, like its other entities. The Client **SHOULD** discard the cursors it held for the session and build them again from the replayed `cursor_update` notifications. A replayed cursor can carry a different anchor than it had before, for example when a `messageId` changed across the replay.
+- On a full replay, the Client **SHOULD** discard the cursors it held for the session and build them again from the replayed `cursor_update` notifications. A replayed cursor can carry a different anchor than it had before, for example when a `messageId` changed across the replay.
 - A resume without replay announces no cursors for earlier history. The cursors the Client already holds stay usable.
 
 When all requested replay entries have been reported to the Client, the Agent
@@ -376,11 +376,13 @@ For each `session/resume` request with a `replayFrom` cursor, the Agent marks th
 The update has no required fields.
 
 - The Agent **MUST** send `replay_complete` exactly once on the session named in the request, after the last replayed update and before the response.
-- The Agent **MUST** send it for an empty history too. Then it is the first `session/update` for the session after the request.
+- The Agent **MUST** send it for an empty replay too. It is then the first `session/update` the Agent sends for that session after it receives the request.
 - The Agent **MUST NOT** send it when `replayFrom` is omitted or `null`, or for `session/new`.
 - The Agent **MUST NOT** send it when it cannot finish the replay.
 
-Every `session/update` that the Agent sends for the session between the request and `replay_complete` **MUST** be replayed history, as [Replay Contents](#replay-contents) defines it. The Agent holds every other update for the session and sends it after `replay_complete`. Examples are the chunks of a message that is still streaming, `notice`, `available_commands_update`, `config_option_update`, and the updates of [current-state synchronization](#current-state-synchronization).
+From the time the Agent receives the replay request until it sends `replay_complete`, each `session/update` it sends for that session **MUST** be [replayed history](#replay-contents). The Agent holds every other update for the session and sends it after `replay_complete`. Examples are the chunks of a message that is still streaming, `notice`, `available_commands_update`, `config_option_update`, and the updates of [current-state synchronization](#current-state-synchronization).
+
+Sending `session/resume` does not mark the start of replay for the Client. If that session is already active on the connection, a live `user_message` the Agent sent before it received the request can arrive after the Client sent it. The Client can therefore receive that message just before `replay_complete` even if the replay was empty.
 
 Foreground work that is still running during a resume is split at a cut point. The updates up to the cut are history and come before `replay_complete`. The rest comes after it. Chunks are keyed by `messageId`, so the later chunks append to the replayed message.
 
@@ -392,13 +394,13 @@ Agent requests such as `session/request_permission` and `elicitation/create` are
 
 Together with the response, `replay_complete` tells the Client whether the replay was complete:
 
-| What the Client received                                         | Meaning                                                                                          |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `replay_complete`, then a success response                       | Complete history. The resume succeeded.                                                          |
-| `replay_complete`, then an error response or the connection ends | Complete history. The resume failed.                                                             |
-| No `replay_complete`, then an error response                     | Truncated replay. The Client **MUST NOT** use the updates as the full history.                   |
-| No `replay_complete`, then the connection ends                   | Truncated replay, as above.                                                                      |
-| No `replay_complete`, then a success response                    | Protocol violation. The success response still certifies the history. The Client **MAY** log it. |
+| What the Client received                                         | Meaning                                                                                                           |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `replay_complete`, then a success response                       | Requested replay complete. The resume succeeded.                                                                  |
+| `replay_complete`, then an error response or the connection ends | Requested replay complete. The resume failed.                                                                     |
+| No `replay_complete`, then an error response                     | Truncated replay. The Client **MUST NOT** treat the updates as a complete replay.                                 |
+| No `replay_complete`, then the connection ends                   | Truncated replay, as above.                                                                                       |
+| No `replay_complete`, then a success response                    | Protocol violation. The success response still confirms the requested replay finished. The Client **MAY** log it. |
 
 A `session/resume` that is cancelled with [`$/cancel_request`](/protocol/v2/draft/cancellation) still gets a response. A `-32800` response is an error response in this table.
 
@@ -411,12 +413,12 @@ Clients **SHOULD NOT** send a second `session/resume` with a `replayFrom` cursor
 A resume with replay can also replay the history of [child sessions](/protocol/v2/draft/subagents#replayed-child-history), at any depth. Each session has its own `replay_complete` on its own `sessionId`, and the rules above apply to each session separately:
 
 - The Agent **MUST** send `replay_complete` exactly once on each child session that it announces with `subagent_update` between the request and the response. It sends it after the announcement and after the last replayed update for that child. An announced child with no replayed history gets one too, like the session named in the request. A child that the Agent does not announce gets none.
-- Every update for a session before that session's `replay_complete` is replayed history. Updates and Agent requests that are not history follow it. They do not wait for the replay of any other session.
+- After receiving the resume request, the Agent holds live updates and requests for each announced child until that child's `replay_complete`. They do not wait for the replay of any other session.
 - A `subagent_update` is an update for the parent session, so the parent's `replay_complete` separates replayed associations from current ones. The `capabilities` and `state` in a replayed `subagent_update` are historical. See [Resuming](/protocol/v2/draft/subagents#resuming).
 - The `replay_complete` updates of different sessions have no required order. A parent's `replay_complete` says nothing about its children.
 - The table above applies to each session, with that session's `replay_complete` and the response to the request.
 
-No `replay_complete` means that the replay of every session is complete. The successful response does, because the Agent sends all history selected for the replay before it.
+Each marker covers only its own session. The successful `session/resume` response confirms that the Agent finished the replay for the requested session and all the children it included.
 
 ### Current-state synchronization
 
@@ -476,7 +478,7 @@ resources associated with the session. Before responding to `session/close`, the
 
 When closing cancels active foreground work, the Agent **MUST** send the final updates for that work and the idle `state_update` with `stopReason: "cancelled"` before responding successfully to `session/close`. Closing an idle session does not itself require another idle update.
 
-Closing also cancels pending `session/prompt` requests whose messages have not been inserted, including [held prompts](/protocol/v2/draft/prompt-lifecycle#prompts-during-active-work). If closing prevents a prompt's user message from being inserted, the Agent **MUST** answer that request with `-32800` (Request Cancelled). If the message has already been inserted, the Agent **MUST** respond successfully with its `messageId`, as described in [Prompt Accepted](/protocol/v2/draft/prompt-lifecycle#2-prompt-accepted). Prompt responses need not precede the close response. After the close response, the Agent sends no other messages for the session on that connection.
+Closing also cancels pending `session/prompt` requests whose messages have not been inserted, including [held prompts](/protocol/v2/draft/prompt-lifecycle#prompts-during-active-work). If closing prevents a prompt's user message from being inserted, the Agent **MUST** answer that request with `-32800` (Request cancelled). If the message has already been inserted, the Agent **MUST** respond successfully with its `messageId`, as described in [Prompt Accepted](/protocol/v2/draft/prompt-lifecycle#2-prompt-accepted). Prompt responses need not precede the close response. After the close response, the Agent sends no notifications or requests for the session on that connection. It still answers `session/prompt` requests that were pending.
 
 On success, the Agent responds with an empty result object:
 
@@ -492,6 +494,8 @@ Closing is idempotent. If the session does not exist or is not active, for
 example because it was already closed, the Agent **SHOULD** respond with the
 same empty result. Clients **SHOULD** treat a `-32002` response to
 `session/close` as a successful close. See [Unknown Sessions](/protocol/v2/draft/error#unknown-sessions).
+
+A [child session](/protocol/v2/draft/subagents#restricted-methods) is the exception. Agents **SHOULD** reject a `session/close` that names one with `-32602`.
 
 ## Additional workspace roots
 
@@ -657,7 +661,7 @@ When the Agent supports `session.mcp.stdio`, Clients can specify MCP servers con
   reject a request with a relative `command` with `-32602`.
 </ParamField>
 
-<ParamField path="args" type="array">
+<ParamField path="args" type="string[]">
   Command-line arguments to pass to the server. Omitted and empty values are
   equivalent.
 </ParamField>
@@ -771,7 +775,7 @@ If `session.mcp.stdio` is omitted or `null`, the Agent does not support stdio tr
 If `session.mcp.http` is omitted or `null`, the Agent does not support HTTP transport.
 Supplying `{}` means the Agent supports the corresponding transport.
 
-Agents **SHOULD** connect to all MCP servers specified by the Client. If a server fails to launch or connect, the Agent either fails the request or continues without that server. If it continues, it **SHOULD** tell the user, for example with a [notice](/protocol/v2/draft/prompt-lifecycle#session-notices).
+Agents **SHOULD** connect to all MCP servers specified by the Client. If a server fails to launch or connect, the Agent **SHOULD** continue without that server and tell the user, for example with a [notice](/protocol/v2/draft/prompt-lifecycle#session-notices).
 
 Clients **MAY** use this ability to provide tools directly to the underlying language model by including their own MCP server.
 

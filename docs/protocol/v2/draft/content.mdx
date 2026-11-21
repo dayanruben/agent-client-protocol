@@ -21,7 +21,7 @@ The unstable [`skill` content block](#skill-reference-unstable) is an ACP additi
 
 A content type from a later MCP revision that ACP doesn't define isn't forwarded as is. Agents convert it to a supported type, such as an embedded resource, or omit it.
 
-Content block `type` values can be custom or future variants when the receiver can preserve or display them generically. Custom content block types **MUST** begin with `_`. Unknown non-underscore content block types are reserved for future ACP variants. In prompts, Clients send only baseline content types (`text` and `resource_link`) and content types the Agent advertised, including custom types advertised through a [custom capability](/protocol/v2/draft/extensibility#advertising-custom-capabilities), and Agents reject others with `-32602`.
+Content block `type` values can be custom or future variants when the receiver can preserve or display them generically. Custom content block types **MUST** begin with `_`. Unknown non-underscore content block types are reserved for future ACP variants. In prompts, Clients send only baseline content types (`text` and `resource_link`) and content types the Agent advertised, including custom types advertised through a [custom capability](/protocol/v2/draft/extensibility#advertising-custom-capabilities), and Agents **MUST** reject others with `-32602`.
 
 When displaying Agent output, Clients **SHOULD** show text content. For image, audio, resource, and resource link content they can't render, Clients **SHOULD** show a placeholder with whatever identifies it, such as its name, title, URI, or MIME type, and **SHOULD NOT** drop it silently. Agents that need content to reach the user in a particular form **SHOULD** also include it as text.
 
@@ -130,7 +130,7 @@ Complete resource contents embedded directly in the message.
 
 This is the preferred way to include context in prompts, such as when using @-mentions to reference files or other resources.
 
-By embedding the content directly in the request, Clients can include context from sources that the Agent may not have direct access to.
+By embedding the content directly in the request, Clients can include context from sources that the Agent might not have direct access to.
 
 <Icon icon="asterisk" size="14" /> Requires the `embeddedContext` [prompt
 capability](/protocol/v2/draft/initialization#session-prompt-capabilities) when
@@ -139,7 +139,7 @@ included in prompts.
 <ParamField path="resource" type="EmbeddedResourceResource" required>
   The embedded resource contents, which can be either:
 
-  <Expandable title="Text Resource">
+  <Expandable title="Text resource">
     <ParamField path="uri" type="string" required>
       The URI identifying the resource
     </ParamField>
@@ -154,7 +154,7 @@ included in prompts.
 
   </Expandable>
 
-  <Expandable title="Blob Resource">
+  <Expandable title="Blob resource">
     <ParamField path="uri" type="string" required>
       The URI identifying the resource
     </ParamField>

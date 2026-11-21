@@ -1,7 +1,7 @@
 //! Elicitation types for structured user input.
 //!
-//! This module defines the types used for agent-initiated elicitation,
-//! where the agent requests structured input from the user via forms or URLs.
+//! This module defines the types used for Agent-initiated elicitation,
+//! where the Agent requests structured input from the user via forms or URLs.
 
 use std::sync::Arc;
 
@@ -85,7 +85,7 @@ pub struct EnumOption {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub description: Option<String>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -116,7 +116,7 @@ impl EnumOption {
         self
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -193,7 +193,7 @@ pub struct StringPropertySchema {
     #[serde(default)]
     #[serde(rename = "oneOf")]
     pub one_of: Option<Vec<EnumOption>>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -304,7 +304,7 @@ impl StringPropertySchema {
         self
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -357,7 +357,7 @@ pub struct NumberPropertySchema {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub default: Option<f64>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -411,7 +411,7 @@ impl NumberPropertySchema {
         self
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -464,7 +464,7 @@ pub struct IntegerPropertySchema {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub default: Option<i64>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -518,7 +518,7 @@ impl IntegerPropertySchema {
         self
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -561,7 +561,7 @@ pub struct BooleanPropertySchema {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub default: Option<bool>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -601,7 +601,7 @@ impl BooleanPropertySchema {
         self
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -626,7 +626,7 @@ pub struct StringMultiSelectItems {
     #[cfg_attr(feature = "schemars", schemars(length(min = 1)))]
     #[serde(rename = "enum")]
     pub values: Vec<String>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -645,7 +645,7 @@ impl StringMultiSelectItems {
         Self { values, meta: None }
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -659,10 +659,11 @@ impl StringMultiSelectItems {
     }
 }
 
-/// Items definition for titled multi-select enum properties.
+/// Titled multi-select items use `anyOf` and omit `type`.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schemars", schemars(extend("propertyNames" = {"not": {"const": "type"}})))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct TitledMultiSelectItems {
@@ -670,7 +671,7 @@ pub struct TitledMultiSelectItems {
     #[cfg_attr(feature = "schemars", schemars(length(min = 1)))]
     #[serde(rename = "anyOf")]
     pub options: Vec<EnumOption>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -692,7 +693,7 @@ impl TitledMultiSelectItems {
         }
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -709,7 +710,7 @@ impl TitledMultiSelectItems {
 /// Custom or future typed item schema for multi-select properties.
 ///
 /// This preserves unknown item `type` values and the rest of the `items`
-/// payload for clients that store, replay, proxy, or forward elicitation
+/// payload for Clients that store, replay, proxy, or forward elicitation
 /// requests.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -782,7 +783,7 @@ fn other_multi_select_items_schema(schema: &mut Schema) {
 
 /// Items for a multi-select (array) property schema.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum MultiSelectItems {
@@ -796,6 +797,21 @@ pub enum MultiSelectItems {
     /// As in MCP, titled items omit `type` and are identified by `anyOf`.
     #[serde(untagged)]
     Titled(TitledMultiSelectItems),
+}
+
+impl<'de> Deserialize<'de> for MultiSelectItems {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        match value.get("type") {
+            Some(tag) if tag == "string" => serde_json::from_value(value).map(Self::String),
+            Some(_) => serde_json::from_value(value).map(Self::Other),
+            None => serde_json::from_value(value).map(Self::Titled),
+        }
+        .map_err(serde::de::Error::custom)
+    }
 }
 
 /// Schema for multi-select (array) properties in an elicitation form.
@@ -839,7 +855,7 @@ pub struct MultiSelectPropertySchema {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true, "x-deserialize-skip-invalid-items" = true)))]
     #[serde(default)]
     pub default: Option<Vec<String>>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -918,7 +934,7 @@ impl MultiSelectPropertySchema {
         self
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -968,7 +984,7 @@ pub enum ElicitationPropertySchema {
 /// Custom or future elicitation property schema payload.
 ///
 /// This preserves the unknown `type` discriminator and the rest of the property
-/// schema object for clients that store, replay, proxy, or forward elicitation
+/// schema object for Clients that store, replay, proxy, or forward elicitation
 /// requests.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -1109,7 +1125,7 @@ pub struct ElicitationSchema {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub description: Option<String>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -1155,7 +1171,7 @@ impl ElicitationSchema {
         self
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -1250,7 +1266,7 @@ impl ElicitationSchema {
     }
 }
 
-/// Elicitation capabilities supported by the client.
+/// Elicitation capabilities supported by the Client.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1258,7 +1274,7 @@ impl ElicitationSchema {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ElicitationCapabilities {
-    /// Whether the client supports form-based elicitation.
+    /// Whether the Client supports form-based elicitation.
     ///
     /// Optional. Omitted and `null` are equivalent and mean form support is not advertised.
     /// Supplying `{}` explicitly advertises form support.
@@ -1266,15 +1282,15 @@ pub struct ElicitationCapabilities {
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub form: Option<ElicitationFormCapabilities>,
-    /// Whether the client supports URL-based elicitation.
+    /// Whether the Client supports URL-based elicitation.
     ///
-    /// Optional. Omitted and `null` are equivalent and mean the client does not advertise support.
-    /// Supplying `{}` means the client supports URL-based elicitation.
+    /// Optional. Omitted and `null` are equivalent and mean the Client does not advertise support.
+    /// Supplying `{}` means the Client supports URL-based elicitation.
     #[serde_as(deserialize_as = "DefaultOnError")]
     #[cfg_attr(feature = "schemars", schemars(extend("x-deserialize-default-on-error" = true)))]
     #[serde(default)]
     pub url: Option<ElicitationUrlCapabilities>,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -1309,7 +1325,7 @@ impl ElicitationCapabilities {
         self.url.is_some()
     }
 
-    /// Whether the client supports form-based elicitation.
+    /// Whether the Client supports form-based elicitation.
     ///
     /// Omitted and `null` are equivalent and mean form support is not advertised.
     /// Supplying `{}` explicitly advertises form-based elicitation.
@@ -1319,17 +1335,17 @@ impl ElicitationCapabilities {
         self
     }
 
-    /// Whether the client supports URL-based elicitation.
+    /// Whether the Client supports URL-based elicitation.
     ///
-    /// Omitted and `null` are equivalent and mean the client does not advertise support.
-    /// Supplying `{}` means the client supports URL-based elicitation.
+    /// Omitted and `null` are equivalent and mean the Client does not advertise support.
+    /// Supplying `{}` means the Client supports URL-based elicitation.
     #[must_use]
     pub fn url(mut self, url: impl IntoOption<ElicitationUrlCapabilities>) -> Self {
         self.url = url.into_option();
         self
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -1345,7 +1361,7 @@ impl ElicitationCapabilities {
 
 /// Form-based elicitation capabilities.
 ///
-/// Supplying `{}` means the client supports form-based elicitation.
+/// Supplying `{}` means the Client supports form-based elicitation.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1353,7 +1369,7 @@ impl ElicitationCapabilities {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ElicitationFormCapabilities {
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -1372,7 +1388,7 @@ impl ElicitationFormCapabilities {
         Self::default()
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -1388,7 +1404,7 @@ impl ElicitationFormCapabilities {
 
 /// URL-based elicitation capabilities.
 ///
-/// Supplying `{}` means the client supports URL-based elicitation.
+/// Supplying `{}` means the Client supports URL-based elicitation.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1396,7 +1412,7 @@ impl ElicitationFormCapabilities {
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct ElicitationUrlCapabilities {
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -1415,7 +1431,7 @@ impl ElicitationUrlCapabilities {
         Self::default()
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -1464,6 +1480,11 @@ impl<'de> Deserialize<'de> for ElicitationScope {
                 serde_json::from_value(scope.into()).map(Self::Session)
             }
             (None, Some(request_id)) => {
+                if fields.contains_key("toolCallId") {
+                    return Err(serde::de::Error::custom(
+                        "`toolCallId` requires `sessionId`",
+                    ));
+                }
                 serde_json::from_value(serde_json::json!({ "requestId": request_id }))
                     .map(Self::Request)
             }
@@ -1487,11 +1508,12 @@ fn elicitation_scope_schema(schema: &mut Schema) {
 /// Session-scoped elicitation, optionally tied to a specific tool call.
 ///
 /// When `toolCallId` is set, the elicitation is tied to a specific tool call.
-/// This is useful when an agent receives an elicitation from an MCP server
+/// This is useful when an Agent receives an elicitation from an MCP server
 /// during a tool call and needs to redirect it to the user.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schemars", schemars(extend("propertyNames" = {"not": {"const": "requestId"}})))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1529,6 +1551,7 @@ impl ElicitationSessionScope {
 /// Request-scoped elicitation, tied to a specific JSON-RPC request outside of a session
 /// (e.g., during auth/configuration phases before any session is started).
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "schemars", schemars(extend("propertyNames" = {"not": {"enum": ["sessionId", "toolCallId"]}})))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -1559,20 +1582,21 @@ impl From<ElicitationRequestScope> for ElicitationScope {
     }
 }
 
-/// Request from the agent to elicit structured user input.
+/// Request from the Agent to elicit structured user input.
 ///
-/// The agent sends this to the client to request information from the user,
+/// The Agent sends this to the Client to request information from the user,
 /// either via a form or by directing them to a URL.
 /// Elicitations are tied to a session (optionally a tool call) or a request.
 ///
 /// A session-scoped request follows the aggregate foreground-state contract:
-/// agents SHOULD report `requires_action` when the whole foreground workflow is
+/// Agents SHOULD report `requires_action` when the whole foreground workflow is
 /// blocked on user action. Once reported, they MUST report `running` when progress
 /// resumes, or `idle` if work ends without resuming. Independent background requests
 /// and request-scoped elicitations do not themselves change session state.
 /// Accepting a URL does not mean the external interaction completed.
 ///
-/// Agents SHOULD cancel pending elicitations no longer needed by cancelled work.
+/// When an Agent stops waiting for an elicitation because its work was cancelled,
+/// it MUST cancel the request with `$/cancel_request`.
 /// The request's scope alone does not establish that dependency.
 ///
 /// See protocol docs: [Elicitation](https://agentclientprotocol.com/protocol/v2/elicitation)
@@ -1581,6 +1605,7 @@ impl From<ElicitationRequestScope> for ElicitationScope {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "schemars", schemars(extend("x-side" = "client", "x-method" = ELICITATION_CREATE_METHOD_NAME)))]
+#[cfg_attr(feature = "schemars", schemars(extend("x-scope" = {"request": ["requestId"], "session": ["sessionId"], "toolCall": ["toolCallId"]})))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CreateElicitationRequest {
@@ -1589,7 +1614,7 @@ pub struct CreateElicitationRequest {
     pub mode: ElicitationMode,
     /// A human-readable message describing what input is needed.
     pub message: String,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -1618,7 +1643,7 @@ impl CreateElicitationRequest {
         self.mode.scope()
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -1638,9 +1663,9 @@ impl CreateElicitationRequest {
 #[serde(tag = "mode", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ElicitationMode {
-    /// Form-based elicitation where the client renders a form from the provided schema.
+    /// Form-based elicitation where the Client renders a form from the provided schema.
     Form(ElicitationFormMode),
-    /// URL-based elicitation where the client directs the user to a URL.
+    /// URL-based elicitation where the Client directs the user to a URL.
     Url(ElicitationUrlMode),
     /// Custom or future elicitation mode.
     ///
@@ -1658,7 +1683,7 @@ pub enum ElicitationMode {
 /// Custom or future elicitation mode payload.
 ///
 /// This preserves the unknown `mode` discriminator and the rest of the mode
-/// object for clients that store, replay, proxy, or forward elicitation
+/// object for Clients that store, replay, proxy, or forward elicitation
 /// requests.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -1779,7 +1804,7 @@ impl ElicitationMode {
     }
 }
 
-/// Form-based elicitation mode where the client renders a form from the provided schema.
+/// Form-based elicitation mode where the Client renders a form from the provided schema.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -1803,7 +1828,7 @@ impl ElicitationFormMode {
     }
 }
 
-/// URL-based elicitation mode where the client directs the user to a URL.
+/// URL-based elicitation mode where the Client directs the user to a URL.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1835,7 +1860,7 @@ impl ElicitationUrlMode {
     }
 }
 
-/// Response from the client to an elicitation request.
+/// Response from the Client to an elicitation request.
 #[serde_as]
 #[skip_serializing_none]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
@@ -1847,7 +1872,7 @@ pub struct CreateElicitationResponse {
     /// The user's action in response to the elicitation.
     #[serde(flatten)]
     pub action: ElicitationAction,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -1869,7 +1894,7 @@ impl CreateElicitationResponse {
         }
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -1911,7 +1936,7 @@ pub enum ElicitationAction {
 /// Custom or future elicitation action payload.
 ///
 /// This preserves the unknown `action` discriminator and the rest of the
-/// response object for agents that store, replay, proxy, or forward elicitation
+/// response object for Agents that store, replay, proxy, or forward elicitation
 /// responses.
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -2103,7 +2128,7 @@ impl Default for ElicitationAcceptAction {
     }
 }
 
-/// Notification sent by the agent when a URL-based elicitation is complete.
+/// Notification sent by the Agent when a URL-based elicitation is complete.
 ///
 /// This notification is not a foreground state update.
 #[serde_as]
@@ -2111,12 +2136,13 @@ impl Default for ElicitationAcceptAction {
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "schemars", schemars(extend("x-side" = "client", "x-method" = ELICITATION_COMPLETE_NOTIFICATION)))]
+#[cfg_attr(feature = "schemars", schemars(extend("x-scope" = {"elicitation": ["elicitationId"]})))]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
 pub struct CompleteElicitationNotification {
     /// The ID of the elicitation that completed.
     pub elicitation_id: ElicitationId,
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Omitted and `null` are equivalent and mean no metadata.
     /// Implementations MUST NOT assign meaning to keys they do not recognize.
     ///
@@ -2138,7 +2164,7 @@ impl CompleteElicitationNotification {
         }
     }
 
-    /// The _meta property is reserved by ACP to allow clients and agents to attach additional
+    /// The _meta property is reserved by ACP to allow Clients and Agents to attach additional
     /// metadata to their interactions. Implementations MUST NOT assign meaning to keys they
     /// do not recognize.
     ///
@@ -2407,6 +2433,10 @@ mod tests {
         };
 
         assert!(request(json!({ "sessionId": "sess_1", "requestId": 42 })).is_err());
+        assert!(request(json!({ "sessionId": "sess_1", "requestId": null })).is_err());
+        assert!(request(json!({ "sessionId": null, "requestId": 42 })).is_err());
+        assert!(request(json!({ "requestId": 42, "toolCallId": null })).is_err());
+        assert!(request(json!({ "requestId": 42, "toolCallId": "call_1" })).is_err());
         assert!(request(json!({})).is_err());
         assert!(request(json!({ "sessionId": 42, "requestId": 42 })).is_err());
         assert!(request(json!({ "sessionId": 42 })).is_err());
@@ -2781,6 +2811,20 @@ mod tests {
 
     #[test]
     fn multi_select_items_unknown_does_not_hide_malformed_string_type() {
+        for tag in [json!("string"), json!(null), json!(42)] {
+            let items = json!({
+                "type": tag, "enum": 7,
+                "anyOf": [{"const": "red", "title": "Red"}]
+            });
+            assert!(serde_json::from_value::<MultiSelectItems>(items.clone()).is_err());
+            let form = json!({
+                "mode": "form", "sessionId": "s", "message": "Choose",
+                "requestedSchema": {"type": "object", "properties": {
+                    "colors": {"type": "array", "items": items}
+                }}
+            });
+            assert!(serde_json::from_value::<CreateElicitationRequest>(form).is_err());
+        }
         assert!(
             serde_json::from_value::<MultiSelectItems>(json!({
                 "type": "string"

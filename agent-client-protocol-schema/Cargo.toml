@@ -1,7 +1,7 @@
 [package]
 name = "agent-client-protocol-schema"
 authors = ["Zed <hi@zed.dev>"]
-version = "1.19.0"
+version = "1.20.0"
 edition = "2024"
 license = "Apache-2.0"
 description = "A protocol for standardizing communication between code editors and AI coding agents"
@@ -31,7 +31,6 @@ unstable = [
     "unstable_auth_status",
     "unstable_llm_providers",
     "unstable_mcp_over_acp",
-    "unstable_plan_operations",
     "unstable_prompt_suggestions",
     "unstable_proxy_chains",
     "unstable_session_archive",
@@ -41,7 +40,6 @@ unstable = [
     "unstable_session_options",
     "unstable_session_set_title",
     "unstable_speed_config_category",
-    "unstable_subagents",
     "unstable_end_turn_token_usage",
 ]
 # Protocol v2 is intentionally NOT part of the `unstable` umbrella.
@@ -52,7 +50,6 @@ unstable_agent_skills = []
 unstable_auth_status = []
 unstable_llm_providers = []
 unstable_mcp_over_acp = []
-unstable_plan_operations = []
 unstable_prompt_suggestions = []
 unstable_proxy_chains = []
 unstable_session_archive = []
@@ -62,7 +59,6 @@ unstable_session_status = []
 unstable_session_options = []
 unstable_session_set_title = []
 unstable_speed_config_category = []
-unstable_subagents = []
 unstable_end_turn_token_usage = []
 
 # Backwards-compatible no-op: malformed list entries are silently skipped

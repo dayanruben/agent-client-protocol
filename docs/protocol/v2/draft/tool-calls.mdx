@@ -106,7 +106,7 @@ unchanged when omitted, reset the field to its default when `null`, and
 replace the previous value when concrete values are sent. A new `toolCallId`
 starts with every field at its default: `status` is `pending`, `kind` is
 `other`, `content` and `locations` are empty, and `title`, `name`, `rawInput`,
-and `rawOutput` are unset. Clients can show a generic title when `title` is
+`rawOutput`, and `capabilities` are unset. Clients can show a generic title when `title` is
 unset. `content` and `locations` are
 replaced as whole arrays. Send `[]` or `null` to clear them. For `_meta`, omit
 the field to leave it unchanged or set it to `null` to clear it. An object
@@ -203,7 +203,7 @@ a `toolCallId` the Client hasn't seen creates the tool call with its
 An Agent can stream a tool's text output the way it streams message text, by
 sending each piece as a text content item in its own
 `tool_call_content_chunk`. As in a message,
-[adjacent text items](/protocol/v2/content#text-content) form one continuous
+[adjacent text items](/protocol/v2/draft/content#text-content) form one continuous
 text.
 
 ## Requesting permission
@@ -308,7 +308,7 @@ provided. The IDs only associate the permission with displayed state and may be
 unavailable before execution starts. Selecting an allow option authorizes the
 Agent to execute the command. It does not ask the Client to execute anything.
 
-The Client responds with the user's decision:
+The Client returns `selected` when the user chooses an offered option, including a rejection. For example, if the user chooses "Reject" for the file edit above, the Client responds:
 
 ```json
 {
@@ -317,7 +317,7 @@ The Client responds with the user's decision:
   "result": {
     "outcome": {
       "outcome": "selected",
-      "optionId": "allow-once"
+      "optionId": "reject-once"
     }
   }
 }
@@ -344,13 +344,12 @@ Clients also send `cancelled` when the user dismisses the prompt or the Client d
 The Agent **MUST NOT** treat an error response as approval. The same holds when the connection ends before the Client answers. The Agent can then [reestablish the request](/protocol/v2/draft/session-setup#current-state-synchronization) once the Client resumes the session.
 
 <ResponseField name="outcome" type="RequestPermissionOutcome" required>
-  The user's decision. Known outcomes are `cancelled` when the [active work was
-  cancelled](/protocol/v2/draft/prompt-lifecycle#cancellation), the user
-  dismissed the prompt, or the Client declined it, and `selected` with an
-  `optionId` for the selected permission option. If `optionId` doesn't match an
-  offered option, the Agent **MUST** treat the request as not approved. Custom
-  or future outcomes may appear. Agents that do not understand the outcome
-  **MUST NOT** treat it as approval.
+  `selected` identifies a choice. It is not approval by itself. The Agent
+  **MUST** match `optionId` against the options it offered in this request. If
+  the selected option's `kind` is `reject_once` or `reject_always`, the Agent
+  **MUST NOT** perform the requested operation. If no option matches, or the
+  Agent does not understand the selected kind or the outcome, it **MUST NOT**
+  treat the response as approval. `cancelled` means no option was selected.
 </ResponseField>
 
 ### Permission options
@@ -366,17 +365,18 @@ Each permission option provided to the Client contains:
 </ParamField>
 
 <ParamField path="kind" type="PermissionOptionKind" required>
-  A hint to help Clients choose appropriate icons and UI treatment for each option.
+  What selecting this option means. Clients can also use it to choose an icon or other UI treatment.
 
 - `allow_once` - Allow this operation only this time
 - `allow_always` - Allow this operation and remember the choice
 - `reject_once` - Reject this operation only this time
 - `reject_always` - Reject this operation and remember the choice
 
-Custom or future permission option kinds can be used as UI hints. Custom kinds **MUST** begin with `_`. Unknown non-underscore kinds are reserved for future ACP variants. Clients that do not understand a kind **SHOULD** preserve the value and use a generic permission option treatment.
+Custom kinds **MUST** begin with `_`. Unknown non-underscore kinds are reserved for future ACP variants. Clients that do not understand a kind **SHOULD** preserve the value and use a generic permission option treatment. A Client can return the selected ID without interpreting the kind. A custom or future kind grants permission only if the Agent understands it to authorize the operation.
 
 </ParamField>
 
+Both reject kinds deny the current operation. Remembering the choice affects later requests.
 The Agent owns remembered decisions. When the user selects an `allow_always` or
 `reject_always` option, the Agent stores the decision, decides its scope (for
 example a tool, a command, or a directory) and how long it lasts, and applies
@@ -386,7 +386,7 @@ option `name` describes it.
 ### Security
 
 - Clients **SHOULD** describe the operation from `subject`, present `title` as Agent-authored text, and show commands and paths in full.
-- Agents **SHOULD NOT** give an option a `name` that contradicts its `kind`, and **SHOULD** act on a selected option according to its known `kind`.
+- Agents **SHOULD NOT** give an option a `name` that contradicts its `kind`. Neither the display name nor the spelling of `optionId` overrides a rejection.
 - Automatic approval **SHOULD NOT** rely only on `title`, `description`, or option `name`. Unless the user's policy allows all requests, it **SHOULD NOT** allow a request with an absent or unknown subject.
 - Agents **SHOULD** perform only the operation the approved request described, and **SHOULD** request again if the command or resolved target changes.
 - Agents **SHOULD** state the scope of a remembered decision (`allow_always`, `reject_always`) in the option `name` and **SHOULD NOT** apply it beyond that scope.
@@ -428,7 +428,7 @@ Clients **SHOULD** show `in_progress` as active, `pending` as waiting or schedul
 
 ### Cancelling tool calls
 
-A tool call can advertise that the Client may cancel it on its own, without cancelling the rest of the session's work. `tool_call_update` carries an optional `capabilities` field:
+A tool call can advertise that the Client can cancel it on its own, without cancelling the rest of the session's work. `tool_call_update` carries an optional `capabilities` field:
 
 ```json
 {
@@ -534,7 +534,7 @@ empty.
 - `cwd` is the command's working directory and **MUST** be absolute when
   supplied.
 - `size` is the terminal size the command runs with, in character cells, with
-  required `cols` and `rows`. It is optional. When present, Clients can render output at this size so that column layouts, progress bars, and
+  required `cols` and `rows`, each at least 1. It is optional. When present, Clients can render output at this size so that column layouts, progress bars, and
   cursor-positioned output display as the program wrote them. Without it,
   Clients choose a size.
 - `output` is an authoritative replacement snapshot. Its required `data` is
@@ -547,8 +547,8 @@ empty.
 - A concrete `exitStatus` marks the terminal as exited. Its optional nullable
   `exitCode` and `signal` report known exit information. Its optional nullable
   `_meta` is scoped to that exit information. For all three fields, omission
-  and `null` both mean the value was not provided. Conventional POSIX signal
-  names include `SIGTERM`, `SIGKILL`, and `SIGINT`. Other platforms may use
+  and `null` both mean the value was not provided. Agents **SHOULD** use the
+  conventional platform signal name. POSIX examples include `SIGTERM`, `SIGKILL`, and `SIGINT`. Other platforms may use
   platform-specific names. Terminal exit and tool call status are independent.
 - The top-level `_meta` is terminal-scoped and follows the same patch semantics,
   except that an object patches the stored metadata by top-level key. See
@@ -577,10 +577,8 @@ sequences, so decoders retain parser state across chunks. Optional nullable
 provided. A chunk for a `terminalId` the Client hasn't seen creates the terminal
 with unknown fields and empty output, then appends to it.
 
-Clients **SHOULD** ignore a chunk, or the `output` snapshot of a `terminal_update`,
-whose `data` isn't valid base64, keeping the bytes they already have. The other
-fields of that `terminal_update` still apply. Agents **SHOULD** send all output before a
-concrete `exitStatus`, but Clients still append output that arrives after it.
+Agents **SHOULD** send all output before a concrete `exitStatus`, but Clients
+still append output that arrives after it.
 Clients **MAY** bound how much output they keep, for example by dropping the
 oldest bytes. A later `output` snapshot replaces whatever they kept.
 
@@ -685,10 +683,8 @@ repository root prepended, with Git's quoting applied to the full path. On Windo
 
 Many diff parsers strip one leading path component by default to remove Git's
 `a/` and `b/` prefixes. Don't strip anything from an absolute path, which has no
-such prefix. A Client can still strip a leading `a/` or `b/` from a relative
-path to tolerate Agents that send Git's default output, as long as `changes`
-decides which file a patch belongs to. Take paths from `changes`, or from the
-`---`, `+++`, rename, and copy lines, rather than by splitting the `diff --git`
+such prefix. Take paths from `changes`, or from the `---`, `+++`, rename, and
+copy lines, rather than by splitting the `diff --git`
 header, which is ambiguous when paths contain spaces.
 
 </ParamField>
@@ -794,7 +790,7 @@ can resolve the handle to a known session.
 
 ## Following the Agent
 
-Tool calls can report the file locations they're working with. Clients can use this to follow along, showing which files the Agent is reading or modifying as it works.
+Tool calls can report the file locations they're working with. Clients can use this to show which files the Agent is reading or modifying as it works.
 
 ```json
 {

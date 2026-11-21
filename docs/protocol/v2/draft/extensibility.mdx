@@ -34,7 +34,7 @@ For example:
 | [Elicitation](/protocol/v2/draft/elicitation#checking-support)                                                                          | The Client advertises each supported mode under `elicitation`. Agents **MUST NOT** request other modes.                                                                                                                                                    |
 | [Provider configuration](/protocol/v2/draft/initialization#agent-capabilities) (experimental)                                           | The Agent advertises `capabilities.providers`. Clients **MUST NOT** call provider configuration methods without it.                                                                                                                                        |
 | [Notices](/protocol/v2/draft/prompt-lifecycle#session-notices) and [compaction](/protocol/v2/draft/prompt-lifecycle#session-compaction) | No Client capability is required. Clients without feature-specific handling **MAY** preserve, ignore, or generically display the updates.                                                                                                                  |
-| [Markdown plans](/protocol/v2/draft/agent-plan#unstable-plan-operations) (experimental)                                                 | No Client capability is required. Clients without this plan representation use the unknown plan-content fallback. Sending one does not establish that it will be rendered.                                                                                 |
+| [Plans](/protocol/v2/draft/agent-plan)                                                                                                  | No Client capability is required. A `plan_update` replaces the whole plan with that ID, even if the new plan type is unknown.                                                                                                                              |
 | [End-turn token usage](/protocol/v2/draft/prompt-lifecycle#end-turn-token-usage-unstable) (experimental)                                | Optional `usage` on an idle `state_update`, not on the prompt response. No capability is required. Clients **MAY** ignore it.                                                                                                                              |
 | [Prompt suggestions](/protocol/v2/draft/prompt-lifecycle#prompt-suggestions-unstable) (experimental)                                    | The Client advertises `session.promptSuggestions`. Agents **MUST NOT** send `prompt_suggestions_update` without it.                                                                                                                                        |
 | [Skills](/protocol/v2/draft/slash-commands#skills-unstable) (experimental)                                                              | The Client advertises `session.commands.skill`. Agents **MUST NOT** send `skill` command entries without it. The Agent advertises `session.prompt.skill`. Clients **MUST NOT** send `skill` content blocks that it does not allow.                         |
@@ -96,7 +96,7 @@ Protocol object types that define a `_meta` field can use it to attach custom in
 }
 ```
 
-Clients **MAY** propagate fields to the agent for correlation purposes, using a namespaced key such as `com.example/requestId`. The following root-level keys in `_meta` are reserved, as in MCP, for interop with MCP implementations and OpenTelemetry tooling. When present, their values **MUST** use the corresponding W3C format:
+Clients **MAY** propagate fields to the Agent for correlation purposes, using a namespaced key such as `com.example/requestId`. The following root-level keys in `_meta` are reserved, as in MCP, for interop with MCP implementations and OpenTelemetry tooling. When present, their values **MUST** use the corresponding W3C format:
 
 - `traceparent` and `tracestate`: [W3C Trace Context](https://www.w3.org/TR/trace-context/)
 - `baggage`: [W3C Baggage](https://www.w3.org/TR/baggage/)
@@ -107,7 +107,7 @@ Implementations **MUST NOT** add any custom fields at the root of a type that's 
 
 ### Metadata patches
 
-Upsert updates carry a top-level `_meta` that the Client stores with the entity they create or update: `tool_call_update` (including the `toolCall` of a permission request's `tool_call` subject), `terminal_update`, `user_message`, `agent_message`, `agent_thought`, `session_info_update`, `compaction_update`, `subagent_update`, and `session_message`. Clients apply this `_meta` as a patch, one top-level key at a time, using the same rule as the update's other fields:
+Upsert updates carry a top-level `_meta` that the Client stores with the entity they create or update: `tool_call_update` (including the `toolCall` of a permission request's `tool_call` subject), `terminal_update`, `user_message`, `agent_message`, `agent_thought`, `session_info_update`, `usage_update`, `compaction_update`, `subagent_update`, `session_message`, and the experimental [`cursor_update`](/protocol/v2/draft/prompt-lifecycle#session-cursors-unstable). Clients apply this `_meta` as a patch, one top-level key at a time, using the same rule as the update's other fields:
 
 - Omit `_meta` to leave the stored metadata unchanged.
 - Set `_meta` to `null` to clear all stored metadata.

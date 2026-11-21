@@ -20,6 +20,7 @@ All paths in the protocol should be absolute
 - Add constants for the method names
 - Add variants to {Agent|Client}{Request|Response} enums
 - Add the method to the SideDocs functions in `schema-generator/src/main.rs`
+- In `v2`, add an `x-state` hint to every new `SessionUpdate` variant, and to any other message from the Agent that changes what a Client holds for a session or about the Agent as a whole. Add an `x-scope` hint to the params of every new Agent-to-Client method. The `state_and_scope` tests in `schema-generator/src/main.rs` describe the formats and fail when a required hint is missing.
 - Run `npm run generate` and fix any issues that appear
 - Run `npm run check`
 - Update the example agents and clients in tests and examples in both libraries
@@ -30,6 +31,7 @@ All paths in the protocol should be absolute
 - Use `DefaultOnError`/`VecSkipError` only when the fallback means less (no metadata, an unsupported capability, a missing display item). If the receiver acts on the value (runs, reads, connects, or applies something), keep it strict so a request fails with `-32602` instead of silently doing something else; use `DefaultOnNull` on such lists so `null` still means empty.
 - A malformed value for a known discriminator must not fall through to an untagged fallback variant.
 - `DefaultOnError`, `VecSkipError`, and the `x-deserialize-*` markers they add to the schema are SDK leniency toward non-conforming Clients and Agents. They are not protocol behavior and can change. Ignore them when you write or review the spec.
+- `x-state` and `x-scope` are hints for SDK generators and intermediaries. They restate what the spec pages say a message changes and what it belongs to. They add no protocol behavior. When you change one of those rules, update the hint with the prose.
 
 ## Updating existing methods, their params, or output
 
@@ -46,9 +48,24 @@ These apply to the `docs/protocol` pages and to Rust doc comments, which become 
 - Name concrete methods and capabilities instead of abstract nouns. Write "Agents that advertise `capabilities.session`" or "`auth/login` and `auth/logout`", not "the session method surface" or "the authentication surface".
 - Use periods instead of semicolons or em dashes to join clauses. Use straight quotes.
 - Prefer plain words: "use", not "leverage" or "utilize"; "to", not "in order to".
-- Use sentence case for headings. Keep Agent, Client, and acronyms capitalized.
+- Use sentence case for headings and for the titles of steps and tabs. Keep Agent, Client, and acronyms capitalized.
+- On the `docs/protocol` pages and in doc comments, capitalize Agent and Client wherever the protocol role is meant. Lowercase is for other things, such as "the underlying agent" that an adapter wraps or "API client libraries".
+- Use one term for one thing. Write "final status" for `completed`, `failed`, and `cancelled`, not "terminal status", which reads as the status of a terminal. On the v2 pages, write "foreground work", not "turn", which only v1 defines.
+- Write error names as the Errors page lists them, in sentence case: `-32800` (Request cancelled), `-32600` (Invalid request).
+- Keep shorthand such as `idle(cancelled)` to tables and diagrams. In prose, write "`idle` with `stopReason: "cancelled"`".
 - Don't say what a receiver does with a malformed value ("is treated as omitted", "is skipped", "falls back to"). Say what a conforming sender sends. Rules that reject a value, such as `-32602` for malformed params, are protocol behavior and stay.
 - Write a requirement with a capitalized keyword: MUST, MUST NOT, SHOULD, SHOULD NOT, or MAY. Use bold on the `docs/protocol` pages (`**MUST**`) and plain capitals in doc comments. A lowercase "must", "should", or "may" is not a requirement ([RFC 8174](https://datatracker.ietf.org/doc/html/rfc8174)). Use it only for advice, a possibility, or a description of data. Where a rule is stated in more than one place, use the same keyword in each.
+- A keyword needs an implementation as its subject: an Agent, a Client, a sender, a receiver, or a transport. "The language model **MAY** respond" and "Cancellation **MAY** be done" are plain statements. Write them with "can".
+- Don't write "may not". It reads as both "might not" and "is not allowed to". Write "might not" for a possibility and MUST NOT for a rule. Where a lowercase "may" grants a permission, write "can" or use the keyword.
+- Bold only the keywords. Other all-caps words, such as MAJOR, are not requirements.
+- A sentence that introduces a list of rules carries no keyword when the items have their own. "**MUST** follow these requirements:" turns every SHOULD below it into a MUST.
+- Before you change a keyword, find every place that states the rule: the other pages, the `draft/` copy, the migration guide, the schema description, the accepted RFD, and the same page of the other protocol version. Change them together, or link to the rule instead of restating it.
+- Don't describe how an SDK serializes a value ("empty lists are omitted when serializing"). Like receiver leniency, it is not protocol behavior.
+- A doc comment is often repeated: on a field and its builder method, and on a type and the trait method that uses it. When you change one, search for the other copies.
+- The "See protocol docs" link in a doc comment points at the page that owns the topic.
+- A page under `draft/` links to other pages under `draft/`. A stable page never links to a draft page.
+- In `<ParamField>` and `<ResponseField>` tags, name the element type of an array (`string[]`), as the sibling fields do.
+- The section intros in `schema-generator/src/main.rs` are shared by the v1 and v2 schema pages unless they are behind a `cfg`. A change there changes both.
 - Don't name the protocol version ("v1", "v2") in prose. State the rule on its own: "No Client capability is required", not "No Client capability is required in v2". The exceptions are the migration guide, which compares versions, and text about `protocolVersion` negotiation. Link targets, file paths, and examples are not prose.
 - v1 is stable: rewording must not add, remove, or change a requirement. Keep every **MUST**/**SHOULD**/**MAY** and its scope as it was, and don't state behavior the v1 spec doesn't already define. Draft v2 pages can change freely.
 

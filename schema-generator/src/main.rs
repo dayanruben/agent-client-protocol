@@ -34,6 +34,9 @@ use std::{
 
 use markdown_generator::MarkdownGenerator;
 
+#[cfg(feature = "unstable_protocol_v2")]
+mod wire;
+
 const PROTOCOL_DOC_BASE: &str = "https://agentclientprotocol.com/protocol";
 
 /// Protocol version directory the schema's doc links point into.
@@ -256,6 +259,8 @@ fn write_schema(schema_value: &serde_json::Value, schema_dir: &Path, docs_protoc
 
 fn schema_value_for_publication(schema_value: &serde_json::Value) -> serde_json::Value {
     let mut schema_value = schema_value.clone();
+    #[cfg(feature = "unstable_protocol_v2")]
+    wire::add_contract(&mut schema_value);
     replace_string_values(&mut schema_value);
     schema_value
 }
@@ -279,6 +284,66 @@ mod schema_annotation_tests {
     const DEFAULT_ON_ERROR_EXTENSION: &str = "x-deserialize-default-on-error";
     const SKIP_INVALID_ITEMS_EXTENSION: &str = "x-deserialize-skip-invalid-items";
     const DEFAULT_ON_NULL_EXTENSION: &str = "x-deserialize-default-on-null";
+
+    #[test]
+    fn generated_plan_schema_keeps_version_specific_negotiation() {
+        let schema = root_schema_value();
+        let updates = def_schema(&schema, "SessionUpdate");
+        let content = def_schema(&schema, "PlanUpdateContent");
+        for (union, target) in [
+            (updates, "PlanUpdate"),
+            (updates, "PlanRemoved"),
+            (content, "PlanItems"),
+            (content, "PlanMarkdown"),
+        ] {
+            assert!(schema_contains_ref(union, &format!("#/$defs/{target}")));
+        }
+        let v1 = !cfg!(feature = "unstable_protocol_v2");
+        assert_eq!(schema_contains_ref(updates, "#/$defs/Plan"), v1);
+        let capabilities = def_schema(&schema, "ClientCapabilities");
+        assert_eq!(capabilities["properties"].get("plan").is_some(), v1);
+        assert_eq!(
+            def_schema(&schema, "PlanMarkdown")["required"],
+            serde_json::json!(["planId", "content"])
+        );
+    }
+
+    #[test]
+    fn generated_subagent_schema_keeps_version_specific_negotiation() {
+        let schema = root_schema_value();
+        let updates = def_schema(&schema, "SessionUpdate");
+        for target in ["SubagentUpdate", "SessionMessage", "SessionMessageChunk"] {
+            assert!(schema_contains_ref(updates, &format!("#/$defs/{target}")));
+        }
+        assert!(schema_contains_ref(
+            def_schema(&schema, "ToolCallContent"),
+            "#/$defs/SessionReference"
+        ));
+        assert!(schema_contains_ref(
+            def_schema(&schema, "SubagentUpdate"),
+            "#/$defs/StateUpdate"
+        ));
+        assert_eq!(
+            def_schema(&schema, "SubagentUpdate")["required"],
+            serde_json::json!(["sessionId"])
+        );
+        for name in [
+            "SubagentUpdate",
+            "SubagentSessionCapabilities",
+            "SessionMessage",
+            "SessionMessageChunk",
+            "SessionReference",
+        ] {
+            let description = def_schema(&schema, name)["description"]
+                .as_str()
+                .unwrap_or_else(|| panic!("`{name}` has no description"));
+            assert!(!description.contains("UNSTABLE"), "{name}");
+        }
+        // v1 Clients opt in. v2 Clients handle subagents without a capability.
+        let v1 = !cfg!(feature = "unstable_protocol_v2");
+        let capabilities = def_schema(&schema, "ClientCapabilities");
+        assert_eq!(capabilities["properties"].get("subagents").is_some(), v1);
+    }
 
     #[test]
     fn generated_notice_schema_is_available_without_unstable_features() {
@@ -1038,8 +1103,7 @@ mod schema_annotation_tests {
         assert_bool_extension(auth_methods, SKIP_INVALID_ITEMS_EXTENSION);
     }
 
-    /// v1 has the idle snapshot only for unstable subagents; it matches v2's shape.
-    #[cfg(any(feature = "unstable_protocol_v2", feature = "unstable"))]
+    /// v1 has the idle snapshot for subagents. It matches v2's shape.
     #[test]
     fn generated_idle_state_update_ties_error_to_error_stop_reason() {
         let schema = root_schema_value();
@@ -1538,6 +1602,431 @@ mod schema_annotation_tests {
             _ => false,
         }
     }
+
+    /// Checks the `x-state` and `x-scope` hints.
+    ///
+    /// `x-state` lists how a message changes what a Client holds. It maps an
+    /// owner to a list of rules. The `session` rules write to the session of
+    /// the message. The `agent` rules write to what the Client holds about the
+    /// Agent as a whole. An empty map means no change. Each rule has an
+    /// `action` (`upsert`, `append`, `replace`, or `remove`) and names what it
+    /// writes:
+    ///
+    /// - `target` is the part of the session, or of the Agent's state.
+    /// - `id` is the field holding the ID of the target. A target there is only
+    ///   one of has no `id`.
+    /// - `field` is the field of the target to write. Without it the rule writes
+    ///   the whole target.
+    /// - `value` is the field of the message to write. Without it the rule
+    ///   writes the whole update, params, or result.
+    ///
+    /// A field is a dotted path into the schema that has the hint.
+    ///
+    /// No `session` rule names the session, because it is always in
+    /// `sessionId`. A rule on a `session/update` variant writes to the session
+    /// of its notification. A rule on a request writes to the session in its
+    /// `sessionId`. A rule on a response writes to the session in the
+    /// `sessionId` of the result, or of the request's params when the result
+    /// has none.
+    ///
+    /// `x-scope` is on the params of every Agent-to-Client method. It maps each
+    /// kind of thing the message can belong to, such as `session` or
+    /// `elicitation`, to the fields that can hold its ID. The first field the
+    /// message has is used. An empty map means the Agent as a whole.
+    ///
+    /// The ID types cannot replace `x-scope`. `elicitationId` belongs to an
+    /// existing elicitation on `elicitation/complete`, and creates one on
+    /// `elicitation/create`, where no Client holds it yet.
+    #[cfg(feature = "unstable_protocol_v2")]
+    mod state_and_scope {
+        use super::{def_schema, root_schema_value};
+        use serde_json::{Map, Value};
+        use std::collections::{BTreeMap, BTreeSet};
+
+        const STATE: &str = "x-state";
+        const SCOPE: &str = "x-scope";
+        /// Whose state a rule can write.
+        const OWNERS: [&str; 2] = ["session", "agent"];
+        const RULE_KEYS: [&str; 5] = ["action", "target", "id", "field", "value"];
+        /// The unions of what an Agent sends, apart from `session/update`
+        /// variants. Only these can change what a Client holds.
+        const AGENT_MESSAGES: [&str; 3] = ["AgentRequest", "AgentNotification", "AgentResponse"];
+        /// Each kind of thing a message can belong to, with its ID type.
+        const SCOPE_KINDS: [(&str, &str); 5] = [
+            ("session", "SessionId"),
+            ("toolCall", "ToolCallId"),
+            ("request", "RequestId"),
+            ("elicitation", "ElicitationId"),
+            ("mcpServer", "McpServerAcpId"),
+        ];
+
+        #[test]
+        fn every_session_update_has_state_rules() {
+            let schema = root_schema_value();
+            let targets = session_targets(&schema);
+            let mut checked = 0;
+            for variant in update_variants(&schema) {
+                let Some(name) = variant
+                    .pointer("/properties/sessionUpdate/const")
+                    .and_then(Value::as_str)
+                else {
+                    // The custom or future variant has no known effect.
+                    assert!(variant.get(STATE).is_none());
+                    continue;
+                };
+                let state = state(name, variant).unwrap_or_else(|| panic!("{name} has no {STATE}"));
+                assert!(
+                    state.keys().all(|owner| owner == "session"),
+                    "{name}: a session update only changes its session"
+                );
+                assert_state_rules(&schema, "session", &targets, name, variant);
+                checked += 1;
+            }
+            assert!(checked > 0, "expected at least one session update variant");
+        }
+
+        #[test]
+        fn request_and_response_session_rules_match_the_session_updates() {
+            let schema = root_schema_value();
+            let targets = session_targets(&schema);
+            let has_rules = |name: &str, def: &Value| {
+                assert_state_rules(&schema, "session", &targets, name, def)
+            };
+            let session = |name: &str, holder: &Value| {
+                assert_eq!(id_type(&schema, name, holder, "sessionId"), "SessionId");
+            };
+            for (name, def) in method_defs(&schema, &["AgentRequest", "AgentNotification"]) {
+                if has_rules(name, def) {
+                    session(name, def);
+                }
+            }
+            let requests = method_defs(&schema, &["ClientRequest"]);
+            for (name, def) in method_defs(&schema, &["AgentResponse"]) {
+                if !has_rules(name, def) {
+                    continue;
+                }
+                // The session is in the result, or else in the params of the request.
+                let (_, request) = requests
+                    .iter()
+                    .find(|(_, request)| request["x-method"] == def["x-method"])
+                    .unwrap_or_else(|| panic!("{name} has no request"));
+                if field_schemas(&schema, def, "sessionId").is_empty() {
+                    session(name, request);
+                } else {
+                    session(name, def);
+                }
+            }
+        }
+
+        #[test]
+        fn agent_state_rules_match_the_notifications() {
+            let schema = root_schema_value();
+            let notifications = method_defs(&schema, &["AgentNotification"]);
+            let writers: Vec<&Value> = notifications.iter().map(|(_, def)| *def).collect();
+            let targets = targets(&schema, "agent", &writers);
+            for (name, def) in method_defs(&schema, &AGENT_MESSAGES) {
+                assert_state_rules(&schema, "agent", &targets, name, def);
+            }
+        }
+
+        #[test]
+        fn state_is_only_on_session_updates_and_agent_messages() {
+            let schema = root_schema_value();
+            let mut checked = update_variants(&schema)
+                .iter()
+                .filter(|variant| variant.get(STATE).is_some())
+                .count();
+            for (name, def) in method_defs(&schema, &AGENT_MESSAGES) {
+                if let Some(state) = state(name, def) {
+                    // Only a session update has to say that it changes nothing.
+                    assert!(!state.is_empty(), "{name}: {STATE} has no rules");
+                    checked += 1;
+                }
+            }
+            assert_eq!(
+                checked,
+                count_key(&schema, STATE),
+                "{STATE} on a schema these tests do not check"
+            );
+        }
+
+        #[test]
+        fn every_agent_to_client_method_has_a_scope() {
+            let schema = root_schema_value();
+            let params = method_defs(&schema, &["AgentRequest", "AgentNotification"]);
+            assert!(!params.is_empty(), "expected Agent-to-Client methods");
+            for (name, def) in &params {
+                let scope = def[SCOPE]
+                    .as_object()
+                    .unwrap_or_else(|| panic!("{name} has no {SCOPE}"));
+                for (kind, fields) in scope {
+                    let (_, expected) = SCOPE_KINDS
+                        .iter()
+                        .find(|(known, _)| known == kind)
+                        .unwrap_or_else(|| panic!("{name}: unknown kind {kind}"));
+                    let fields = fields.as_array().unwrap();
+                    assert!(!fields.is_empty(), "{name}: {kind} names no field");
+                    for field in fields {
+                        let field = field.as_str().unwrap();
+                        assert_eq!(id_type(&schema, name, def, field), *expected, "{name}");
+                    }
+                }
+            }
+            assert_eq!(
+                params.len(),
+                count_key(&schema, SCOPE),
+                "{SCOPE} on a schema that is not an Agent-to-Client method"
+            );
+        }
+
+        /// What a target looks like, from the message that writes it whole.
+        struct Target<'a> {
+            action: &'a str,
+            id_type: Option<&'a str>,
+            shape: &'a Value,
+        }
+
+        /// The session targets, from the `session/update` variants.
+        fn session_targets(schema: &Value) -> BTreeMap<&str, Target<'_>> {
+            let variants: Vec<&Value> = update_variants(schema).iter().collect();
+            targets(schema, "session", &variants)
+        }
+
+        /// The targets that the `owner` rules on `writers` write whole.
+        fn targets<'a>(
+            schema: &'a Value,
+            owner: &str,
+            writers: &[&'a Value],
+        ) -> BTreeMap<&'a str, Target<'a>> {
+            let mut targets = BTreeMap::new();
+            for &writer in writers {
+                let rules = writer
+                    .get(STATE)
+                    .and_then(|state| state.get(owner))
+                    .and_then(Value::as_array);
+                for rule in rules.into_iter().flatten() {
+                    let get = |key: &str| rule.get(key).and_then(Value::as_str);
+                    let (Some(name), Some(action)) = (get("target"), get("action")) else {
+                        panic!("a rule needs an action and a target: {rule}");
+                    };
+                    if action == "remove" || get("field").is_some() {
+                        continue;
+                    }
+                    let target = Target {
+                        action,
+                        id_type: get("id").map(|id| id_type(schema, name, writer, id)),
+                        shape: get("value")
+                            .map_or(writer, |value| one_field(schema, name, writer, value)),
+                    };
+                    let known = targets.insert(name, target);
+                    assert!(known.is_none(), "two messages write {name} whole");
+                }
+            }
+            targets
+        }
+
+        /// The `x-state` rules of `message` by owner, or `None` when it has no
+        /// hint.
+        fn state<'a>(name: &str, message: &'a Value) -> Option<&'a Map<String, Value>> {
+            let state = message
+                .get(STATE)?
+                .as_object()
+                .unwrap_or_else(|| panic!("{name}: {STATE} must map an owner to its rules"));
+            for (owner, rules) in state {
+                assert!(
+                    OWNERS.contains(&owner.as_str()),
+                    "{name}: unknown {STATE} owner {owner}"
+                );
+                assert!(
+                    rules.as_array().is_some_and(|rules| !rules.is_empty()),
+                    "{name}: {owner} must have a list of rules"
+                );
+            }
+            Some(state)
+        }
+
+        /// Checks the `owner` rules on `message`, the schema their fields are
+        /// read from. Returns whether it has any.
+        fn assert_state_rules(
+            schema: &Value,
+            owner: &str,
+            targets: &BTreeMap<&str, Target<'_>>,
+            name: &str,
+            message: &Value,
+        ) -> bool {
+            let Some(rules) = state(name, message).and_then(|state| state.get(owner)) else {
+                return false;
+            };
+            for rule in rules.as_array().unwrap() {
+                let rule = rule.as_object().unwrap();
+                let get = |key: &str| rule.get(key).map(|value| value.as_str().unwrap());
+                let (Some(action), Some(written)) = (get("action"), get("target")) else {
+                    panic!("{name}: a rule needs an action and a target");
+                };
+                let (field, value) = (get("field"), get("value"));
+                assert!(
+                    rule.keys().all(|key| RULE_KEYS.contains(&key.as_str())),
+                    "{name}: unknown key in a {STATE} rule"
+                );
+                let complete = match action {
+                    "upsert" | "replace" => true,
+                    "append" => field.is_some() && value.is_some(),
+                    "remove" => field.is_none() && value.is_none(),
+                    _ => panic!("{name}: unknown {STATE} action {action}"),
+                };
+                assert!(complete, "{name}: {action} has the wrong keys");
+
+                let target = targets
+                    .get(written)
+                    .unwrap_or_else(|| panic!("{name}: no message writes {owner} {written} whole"));
+                let id = get("id").map(|field| id_type(schema, name, message, field));
+                assert_eq!(id, target.id_type, "{name}: {written} id");
+
+                let value = value.map(|value| one_field(schema, name, message, value));
+                match field.map(|field| one_field(schema, name, target.shape, field)) {
+                    Some(field) if action == "append" => assert!(
+                        appends_to(field, value.unwrap()),
+                        "{name}: the value cannot be appended to the field"
+                    ),
+                    None if action != "remove" => assert_eq!(
+                        action, target.action,
+                        "{name}: {written} is written whole with another action elsewhere"
+                    ),
+                    _ => {}
+                }
+            }
+            true
+        }
+
+        /// Whether a `chunk` can be added to `target`: as one item of a list of
+        /// its type, or as a string in the same encoding.
+        fn appends_to(target: &Value, chunk: &Value) -> bool {
+            match target.get("items") {
+                Some(items) => {
+                    let (items, chunk) = (type_refs(items), type_refs(chunk));
+                    !chunk.is_empty() && items == chunk
+                }
+                None => {
+                    target["type"] == "string"
+                        && chunk["type"] == "string"
+                        && target.get("contentEncoding") == chunk.get("contentEncoding")
+                }
+            }
+        }
+
+        /// The one ID type, such as `ToolCallId`, of the dotted `field` of
+        /// `message`.
+        fn id_type<'a>(schema: &'a Value, name: &str, message: &'a Value, field: &str) -> &'a str {
+            let fields = field_schemas(schema, message, field);
+            assert!(!fields.is_empty(), "{name}: no field {field}");
+            let types: BTreeSet<&str> = fields.into_iter().flat_map(type_refs).collect();
+            match types.into_iter().collect::<Vec<_>>()[..] {
+                [id_type] if id_type.ends_with("Id") => id_type,
+                ref types => panic!("{name}: {field} must have one ID type, not {types:?}"),
+            }
+        }
+
+        /// The definitions `node` refers to directly, apart from `null`.
+        fn type_refs(node: &Value) -> BTreeSet<&str> {
+            let members = ["allOf", "anyOf", "oneOf"]
+                .into_iter()
+                .filter_map(|key| node.get(key).and_then(Value::as_array))
+                .flatten();
+            std::iter::once(node)
+                .chain(members)
+                .filter_map(|node| node.get("$ref").and_then(Value::as_str))
+                .map(|target| target.trim_start_matches("#/$defs/"))
+                .collect()
+        }
+
+        /// The schema of the dotted `field` of `message`, which must have it on
+        /// exactly one branch.
+        fn one_field<'a>(
+            schema: &'a Value,
+            name: &str,
+            message: &'a Value,
+            field: &str,
+        ) -> &'a Value {
+            match field_schemas(schema, message, field)[..] {
+                [field] => field,
+                ref fields => panic!("{name}: {} fields named {field}", fields.len()),
+            }
+        }
+
+        /// The schemas of the dotted `field` on `message`. A field can exist on
+        /// several branches of a union, such as `plan.planId` on `plan_update`.
+        fn field_schemas<'a>(schema: &'a Value, message: &'a Value, field: &str) -> Vec<&'a Value> {
+            field.split('.').fold(vec![message], |nodes, name| {
+                nodes
+                    .into_iter()
+                    .flat_map(|node| property_schemas(schema, node, name))
+                    .collect()
+            })
+        }
+
+        fn property_schemas<'a>(schema: &'a Value, node: &'a Value, name: &str) -> Vec<&'a Value> {
+            let mut found: Vec<&Value> = node
+                .get("properties")
+                .and_then(|properties| properties.get(name))
+                .into_iter()
+                .collect();
+            let target = node
+                .get("$ref")
+                .and_then(Value::as_str)
+                .map(|target| schema.pointer(target.trim_start_matches('#')).unwrap());
+            let members = ["allOf", "anyOf", "oneOf"]
+                .into_iter()
+                .filter_map(|key| node.get(key).and_then(Value::as_array))
+                .flatten();
+            for branch in target.into_iter().chain(members) {
+                found.extend(property_schemas(schema, branch, name));
+            }
+            found
+        }
+
+        fn update_variants(schema: &Value) -> &Vec<Value> {
+            def_schema(schema, "SessionUpdate")["anyOf"]
+                .as_array()
+                .unwrap()
+        }
+
+        /// The definitions with an `x-method` that the `unions` reference, by
+        /// name.
+        fn method_defs<'a>(schema: &'a Value, unions: &[&str]) -> Vec<(&'a str, &'a Value)> {
+            fn collect<'a>(node: &'a Value, refs: &mut BTreeSet<&'a str>) {
+                match node {
+                    Value::Object(object) => {
+                        if let Some(target) = object.get("$ref").and_then(Value::as_str) {
+                            refs.insert(target.trim_start_matches("#/$defs/"));
+                        }
+                        object.values().for_each(|value| collect(value, refs));
+                    }
+                    Value::Array(array) => array.iter().for_each(|value| collect(value, refs)),
+                    _ => {}
+                }
+            }
+            let mut refs = BTreeSet::new();
+            for union in unions {
+                collect(def_schema(schema, union), &mut refs);
+            }
+            refs.into_iter()
+                .map(|name| (name, def_schema(schema, name)))
+                .filter(|(_, def)| def.get("x-method").is_some())
+                .collect()
+        }
+
+        /// How many times `key` appears anywhere in `node`.
+        fn count_key(node: &Value, key: &str) -> usize {
+            match node {
+                Value::Object(object) => object
+                    .iter()
+                    .map(|(name, value)| usize::from(name == key) + count_key(value, key))
+                    .sum(),
+                Value::Array(array) => array.iter().map(|value| count_key(value, key)).sum(),
+                _ => 0,
+            }
+        }
+    }
 }
 
 mod markdown_generator {
@@ -1662,10 +2151,10 @@ mod markdown_generator {
             writeln!(&mut self.output).unwrap();
             writeln!(
                 &mut self.output,
-                "Defines the interface that all ACP-compliant agents must implement.
+                "Defines the requests and notifications that Clients send to Agents. Some are optional.
 
 Agents are programs that use generative AI to autonomously modify code. They handle
-requests from clients and execute tasks using language models and tools."
+requests from Clients and execute tasks using language models and tools."
             )
             .unwrap();
             writeln!(&mut self.output).unwrap();
@@ -1684,7 +2173,7 @@ requests from clients and execute tasks using language models and tools."
             writeln!(&mut self.output).unwrap();
             writeln!(
                 &mut self.output,
-                "Defines the interface that ACP-compliant clients must implement.
+                "Defines the requests and notifications that Agents send to Clients. Some are optional.
 
 Clients are typically code editors (IDEs, text editors) that provide the interface
 between users and AI agents. They manage the environment, handle user interactions,
@@ -1721,12 +2210,12 @@ Ordinary clients and agents never send or receive these messages. A conductor se
                 }
             }
             {
-                writeln!(&mut self.output, "## Protocol Level").unwrap();
+                writeln!(&mut self.output, "## Protocol level").unwrap();
                 writeln!(&mut self.output).unwrap();
                 #[cfg(not(feature = "unstable_protocol_v2"))]
                 writeln!(
-            &mut self.output,
-            "Defines the interface that ACP-compliant agents and clients must both implement.
+                    &mut self.output,
+                    "Defines the notifications that both agents and clients can send.
 
 Notifications whose methods start with '$/' are messages which are protocol
 implementation dependent and might not be implementable in all clients or
@@ -1734,7 +2223,7 @@ agents. For example if the implementation uses a single threaded synchronous
 programming language then there is little it can do to react to a
 `$/cancel_request` notification. If an agent or client receives notifications
 starting with '$/' it is free to ignore the notification."
-        )
+                )
                 .unwrap();
                 #[cfg(feature = "unstable_protocol_v2")]
                 writeln!(

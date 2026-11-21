@@ -1,11 +1,11 @@
-//! Agent Client Protocol version 2 draft types.
+//! Agent Client Protocol version 2 types.
 //!
-//! **EXPERIMENTAL.** This module is gated behind the `unstable_protocol_v2`
+//! **PREVIEW.** This module is gated behind the `unstable_protocol_v2`
 //! feature, is not part of the [`unstable`] umbrella, and must be selected
 //! explicitly with [`crate::ProtocolVersion::V2`]. The types here evolve v2
 //! without disturbing the stable v1 API, and the wire format intentionally
-//! diverges from v1 as draft v2 RFDs land. The type definitions may change at
-//! any time.
+//! diverges from v1 as the v2 RFDs describe. Version 2 is in Preview, and the
+//! type definitions can still change.
 //!
 //! [`unstable`]: https://docs.rs/crate/agent-client-protocol-schema/latest/features
 
@@ -133,10 +133,10 @@ impl<T: ?Sized + AsRef<OsStr>> crate::IntoMaybeUndefined<AbsolutePath> for &T {
         crate::MaybeUndefined::Value(self.into())
     }
 }
-/// A unique identifier for a conversation session between a client and agent.
+/// A unique identifier for a conversation session between a Client and Agent.
 ///
 /// Each session has its own context, conversation history, and state, so one
-/// agent can run several independent sessions.
+/// Agent can run several independent sessions.
 ///
 /// See protocol docs: [Session ID](https://agentclientprotocol.com/protocol/v2/session-setup#session-id)
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]

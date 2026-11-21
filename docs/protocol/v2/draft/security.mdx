@@ -5,11 +5,11 @@ description: "Trust model and security guidance for Agents and Clients"
 
 This page describes ACP's trust model and security guidance that spans features. Guidance for a single feature is on that feature's page. See [Feature Guidance](#feature-guidance).
 
-## Trust Model
+## Trust model
 
 - The Agent runs with whatever permissions its process is given. ACP itself does not sandbox it.
 - Files, web pages, tool results, and MCP servers can influence Agent output. Treat every Agent-authored string, URI, and path as untrusted, including replayed content.
-- Permission requests are advisory: the Agent performs operations and is responsible for honoring the user's decision. A Client cannot prevent an operation the Agent performs without asking.
+- The Agent enforces [permission decisions](/protocol/v2/draft/tool-calls#requesting-permission). If the user selects a `reject_once` or `reject_always` option, the Agent **MUST NOT** perform the requested operation. A Client cannot prevent a malicious Agent from acting without permission.
 - `info` in `initialize` is self-reported. Implementations **SHOULD NOT** use it for security decisions, and Clients **SHOULD** identify the Agent from their own launch configuration.
 
 Out of scope: a malicious Agent binary, detecting prompt injection, and operating-system sandboxing.
@@ -37,6 +37,7 @@ This applies to `uri` on images, resource links, and embedded resources, to icon
 - Automatic fetches **SHOULD** use only `https:` or `data:` URIs, **SHOULD NOT** carry credentials, **SHOULD** refuse loopback and private-network targets, and **SHOULD** bound the response size.
 - Clients **SHOULD NOT** run scripts in SVG images from Agent content.
 - Apart from icons, which never use `file:`, Clients **SHOULD NOT** read a `file:` URI from Agent content outside the session's [root set](/protocol/v2/draft/session-setup#workspace-root-security) without user action.
+- Clients **SHOULD NOT** read a [Markdown plan's](/protocol/v2/draft/agent-plan#markdown-plans) `path` outside the session's root set without user action.
 - Agents **SHOULD** apply the root set and these fetch rules to URIs in prompts.
 
 ## Credentials
@@ -56,7 +57,7 @@ This applies to `uri` on images, resource links, and embedded resources, to icon
 
 - An intermediary between the Client and the Agent, such as a proxy, can read and change every message, and each side treats it as the other. Clients **SHOULD** only use intermediaries the user trusts.
 - Intermediaries **SHOULD NOT** answer permission requests or elicitations for the user except under user-configured policy, and **SHOULD** forward `subject` unchanged.
-- An Agent serving more than one user **SHOULD** scope `session/list`, every request that names a session (such as `session/resume`, `session/delete`, and `session/fork`), permission requests, and elicitations to the user that owns the session. It treats another user's session as one that does not exist, so it is not listed, resuming it fails with `-32002`, and deleting it does nothing. Such an Agent **SHOULD** also authorize `cwd`, `additionalDirectories`, and `mcpServers` against the requesting user, and **SHOULD NOT** launch stdio MCP servers that user isn't permitted to run.
+- An Agent serving more than one user **SHOULD** scope `session/list`, every request that names a session (such as `session/resume`, `session/delete`, and `session/fork`), and permission requests to the user that owns the session. Elicitations have a stricter rule: such an Agent **MUST** bind each one to the receiving connection and the verified user. See [Creating an elicitation](/protocol/v2/draft/elicitation#creating-an-elicitation). It treats another user's session as one that does not exist, so it is not listed, resuming it fails with `-32002`, and deleting it does nothing. Such an Agent **SHOULD** also authorize `cwd`, `additionalDirectories`, and `mcpServers` against the requesting user, and **SHOULD NOT** launch stdio MCP servers that user isn't permitted to run.
 
 ## Transports
 
@@ -77,5 +78,4 @@ A user can approve a harmful operation, prompt injection can steer operations th
 
 ## Unstable features
 
-- Clients **SHOULD NOT** read a markdown plan's `path` outside the session's [root set](/protocol/v2/draft/session-setup#workspace-root-security) without user action.
 - Provider `headers` are credentials. Agents **SHOULD NOT** return them from `providers/list`.

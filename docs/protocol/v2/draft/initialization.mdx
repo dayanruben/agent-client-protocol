@@ -87,7 +87,7 @@ The Agent **MUST** respond with the chosen [protocol version](#protocol-version)
 
 Initialization completes when the Agent responds successfully to `initialize`. Until then:
 
-- Clients **MUST NOT** send requests other than `initialize`. Agents reject them with `-32600` and ignore notifications. See [Requests Before Initialization](/protocol/v2/draft/error#requests-before-initialization).
+- Clients **MUST NOT** send requests other than `initialize`. Agents **MUST** reject them with `-32600` and ignore notifications. See [Requests Before Initialization](/protocol/v2/draft/error#requests-before-initialization).
 - Agents **MUST NOT** send requests or notifications.
 - If `initialize` fails, the connection is still uninitialized, and the Client **MAY** send `initialize` again, for example after correcting invalid params.
 
@@ -95,7 +95,7 @@ After initialization completes, the Client can repeat `initialize` only as descr
 
 ## Protocol version
 
-The protocol versions that appear in the `initialize` requests and responses are a single integer that identifies a **MAJOR** protocol version. This version is only incremented when breaking changes are introduced.
+The protocol versions that appear in the `initialize` requests and responses are a single integer that identifies a major protocol version. This version is only incremented when breaking changes are introduced.
 
 Clients and Agents **MUST** agree on a protocol version and act according to its specification.
 
@@ -103,9 +103,9 @@ See [Capabilities](#capabilities) to learn how non-breaking features are introdu
 
 ### Version negotiation
 
-The `initialize` request **MUST** include the latest protocol version the Client supports. After the Agent selects a lower version, the Client **MAY** send that version instead when it [repeats `initialize`](#repeating-initialization) or opens a new connection.
+The `initialize` request **MUST** include the latest protocol version the Client supports. After the Agent selects a lower version, the Client **MAY** send that version, or a lower version it supports, instead when it [repeats `initialize`](#repeating-initialization) or opens a new connection.
 
-The Agent **MUST** read `protocolVersion` before validating any other parameter. Missing, non-integer, or out-of-range values are malformed parameters and **MUST** receive `-32602` (`Invalid params`).
+The Agent **MUST** read `protocolVersion` before validating any other parameter. Missing, non-integer, or out-of-range values are malformed parameters and **MUST** receive `-32602` (`Invalid params`). The range is 0 to 65535.
 
 The Agent **MUST** select the highest protocol version it supports that is less than or equal to the requested version. If it supports the requested version, this selects that version. A successful `initialize` response **MUST NOT** select a version higher than the requested version and **MUST** use the selected version's initialization response shape.
 
@@ -130,15 +130,15 @@ A version-mismatch error does not initialize the connection. The Agent **MUST NO
 
 The Agent validates the remaining parameters against the selected version. If the requested version is newer than the selected one, the request was written for a version the Agent doesn't know, so the Agent **MUST** ignore parameters it can't parse under the selected version instead of rejecting the request.
 
-The Client **MUST** check that it supports the version in a successful response. Advertising a latest version does not imply support for every earlier version. If the Client does not support the selected version, it **SHOULD** close the connection and inform the user.
+The Client **MUST** check that it supports the version in a successful response. Advertising a latest version does not imply support for every earlier version. If the Client does not support the selected version, it **MAY** [repeat `initialize`](#repeating-initialization) with a lower version it supports. Otherwise it **SHOULD** close the connection and inform the user.
 
 #### Repeating initialization
 
-When the Agent selects a lower version than requested, it may have ignored parts of the Client's request, such as capabilities. The Client **MAY** then send `initialize` again with the selected version and that version's parameters.
+When the Agent selects a lower version than requested, it may have ignored parts of the Client's request, such as capabilities. The Client **MAY** then send `initialize` again with the selected version, or a lower version it supports, and that version's parameters.
 
 The Client **MAY** repeat `initialize` any number of times before its first other request, waiting for each response before sending the next. The Agent handles each one like the first and treats the latest successful `initialize` as authoritative. A repeat that fails leaves the previous successful initialization in effect. `initialize` **MUST NOT** be repeated after any other request.
 
-Agents that implement only an earlier protocol version may not accept a repeated `initialize`. To change its parameters with such an Agent, the Client opens a new connection.
+Agents that implement only an earlier protocol version might not accept a repeated `initialize`. To change its parameters with such an Agent, the Client opens a new connection.
 
 ## Capabilities
 
@@ -146,7 +146,7 @@ Capabilities describe features supported by the Client and the Agent.
 
 All capabilities included in the `initialize` request or response are **OPTIONAL**. Clients and Agents **SHOULD** support all possible combinations of their peer's capabilities.
 
-The introduction of new capabilities is not considered a breaking change. Therefore, Clients and Agents **MUST** treat all capabilities omitted in the `initialize` request or response as **UNSUPPORTED**.
+The introduction of new capabilities is not considered a breaking change. Therefore, Clients and Agents **MUST** treat all capabilities omitted in the `initialize` request or response as unsupported.
 
 A capability may advertise a group of methods, such as the `session/*` methods,
 or a nested feature that only applies when its parent capability is supported.
@@ -310,8 +310,9 @@ Optionally, Agents **MAY** support prompt extensions, MCP server transports, and
 additional session methods such as `session/delete` by specifying nested
 capabilities.
 
-Agents that advertise [config options](/protocol/v2/draft/session-config-options#setting-a-config-option) **MUST** also
-support `session/set_config_option`.
+Agents that advertise [config options](/protocol/v2/draft/session-config-options#setting-a-config-option) for a
+session the Client created or resumed **MUST** also support
+`session/set_config_option`.
 
 <ResponseField name="prompt" type="PromptCapabilities Object">
   Object indicating the different types of [content](/protocol/v2/draft/content)
@@ -388,7 +389,7 @@ support `session/set_config_option`.
 
 As a baseline, Agents that advertise `session` **MUST** support `text` and `resource_link` content blocks in `session/prompt` requests.
 
-Optionally, they **MAY** support richer types of [content](/protocol/v2/draft/content) by specifying the following capabilities:
+Optionally, they **MAY** support more types of [content](/protocol/v2/draft/content) by specifying the following capabilities:
 
 <ResponseField name="image" type="PromptImageCapabilities Object">
   The prompt may include `image` content blocks. Omitted or `null` means the

@@ -169,6 +169,22 @@ The Client **SHOULD** specify whether it supports the following capabilities:
   Learn more about Elicitation
 </Card>
 
+#### Plan operations
+
+<ParamField path="plan" type="PlanCapabilities Object">
+  Supplying `{}` advertises support for both `plan_update` and `plan_removed`.
+  Omitted or `null` means the Client does not advertise support. The Agent then
+  sends structured checklists with the `plan` update.
+</ParamField>
+
+<Card
+  icon="list-check"
+  horizontal
+  href="/protocol/v1/agent-plan#plan-operations"
+>
+  Learn more about plan operations
+</Card>
+
 #### Boolean config options
 
 <ParamField
@@ -214,6 +230,20 @@ The Client **SHOULD** specify whether it supports the following capabilities:
 
 <Card icon="message" horizontal href="/protocol/v1/prompt-turn#session-notices">
   Learn more about Session Notices
+</Card>
+
+#### Subagents
+
+<ParamField path="subagents" type="SubagentCapabilities Object">
+  The Client handles `subagent_update`, `session_message`, and
+  `session_message_chunk` session updates, and applies the restrictions on what
+  it sends for a child session. This field is optional and nullable. Omitted or
+  `null` means unsupported. Supplying `{}` means supported. Agents **MUST NOT**
+  send these updates without this capability.
+</ParamField>
+
+<Card icon="sitemap" horizontal href="/protocol/v1/subagents">
+  Learn more about Subagents
 </Card>
 
 ### Agent capabilities
@@ -305,7 +335,7 @@ Optionally, they **MAY** support other session methods and notifications by spec
 </ResponseField>
 
 <Note>
-  `session/load` is still handled by the top-level `load_session` capability.
+  `session/load` is still handled by the top-level `loadSession` capability.
   This will be unified in future versions of the protocol.
 </Note>
 

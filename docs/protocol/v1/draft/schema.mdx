@@ -10,10 +10,10 @@ description: "Schema definitions for the Agent Client Protocol"
 
 ## Agent
 
-Defines the interface that all ACP-compliant agents must implement.
+Defines the requests and notifications that Clients send to Agents. Some are optional.
 
 Agents are programs that use generative AI to autonomously modify code. They handle
-requests from clients and execute tasks using language models and tools.
+requests from Clients and execute tasks using language models and tools.
 
 <a id="auth-status"></a>
 ### <span class="font-mono">auth/status</span>
@@ -1786,7 +1786,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 
 ## Client
 
-Defines the interface that ACP-compliant clients must implement.
+Defines the requests and notifications that Agents send to Clients. Some are optional.
 
 Clients are typically code editors (IDEs, text editors) that provide the interface
 between users and AI agents. They manage the environment, handle user interactions,
@@ -2352,7 +2352,7 @@ Outer ACP errors are reserved for binding and runtime failures.
 Both branches require their carrier key. An error MUST be a non-null object.
 Unknown outer fields are ignored. Inner result and error fields are preserved.
 Carrier `_meta` is optional. Omitted and `null` are equivalent.
-Senders must include exactly one outcome. Receivers prefer `result` if both are present.
+Senders MUST include exactly one outcome.
 
 **Type:** Union
 
@@ -2956,9 +2956,9 @@ This capability is not part of the spec yet, and may be removed or changed at an
 
 Result of a `proxy/successor` request: the wrapped request's result, forwarded unchanged.
 
-## Protocol Level
+## Protocol level
 
-Defines the interface that ACP-compliant agents and clients must both implement.
+Defines the notifications that both agents and clients can send.
 
 Notifications whose methods start with '$/' are messages which are protocol
 implementation dependent and might not be implementable in all clients or
@@ -2983,13 +2983,13 @@ Upon receiving this notification, the receiver:
 - Valid response with appropriate data (partial results or cancellation marker)
 - Error response with code `-32800` (Cancelled)
 
-See protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v1/draft/cancellation)
+See protocol docs: [Request Cancellation](https://agentclientprotocol.com/protocol/v1/draft/cancellation)
 
 #### <span class="font-mono">CancelRequestNotification</span>
 
 Notification to cancel an ongoing request.
 
-See protocol docs: [Cancellation](https://agentclientprotocol.com/protocol/v1/draft/cancellation)
+See protocol docs: [Request Cancellation](https://agentclientprotocol.com/protocol/v1/draft/cancellation)
 
 **Type:** Object
 
@@ -3652,14 +3652,10 @@ Determines which file operations the agent can request.
 
 </ResponseField>
 <ResponseField name="plan" type={<><span><a href="#plancapabilities">PlanCapabilities</a></span><span> | null</span></>} >
-  **UNSTABLE**
+  Whether the Client supports `plan_update` and `plan_removed` session updates.
 
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
-Whether the client supports `plan_update` and `plan_removed` session updates.
-
-Optional. Omitted or `null` both mean the client does not advertise support.
-Supplying `\{\}` means the client can receive both update types.
+Optional. Omitted or `null` both mean the Client does not advertise support.
+Supplying `\{\}` means the Client can receive both update types.
 
 </ResponseField>
 <ResponseField name="session" type={<><span><a href="#clientsessioncapabilities">ClientSessionCapabilities</a></span><span> | null</span></>} >
@@ -3670,16 +3666,14 @@ session-related extensions.
 
 </ResponseField>
 <ResponseField name="subagents" type={<><span><a href="#subagentcapabilities">SubagentCapabilities</a></span><span> | null</span></>} >
-  **UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
-Whether the client understands exposed subagent sessions.
+  Whether the client understands exposed subagent sessions.
 
 Optional and nullable. Omitted or `null` both mean the client does not
 advertise support.
 Supplying `\{\}` means the client understands child associations, work-state
 snapshots, session-directed messages, and restricted-session semantics.
+
+See protocol docs: [Subagents](https://agentclientprotocol.com/protocol/v1/draft/subagents)
 
 </ResponseField>
 <ResponseField name="terminal" type={"boolean"} >
@@ -5475,10 +5469,6 @@ range LSP reserves (-32899 to -32800).
 
 ## <span class="font-mono">ErrorStopReason</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 Details of a failure that ended a child's foreground work.
 
 **Type:** Object
@@ -6601,11 +6591,7 @@ Helps clients choose appropriate icons and UI treatment.
 
 ## <span class="font-mono">Plan</span>
 
-An execution plan for accomplishing complex tasks.
-
-Plans consist of multiple entries representing individual tasks or goals.
-Agents report plans to clients to provide visibility into their execution strategy.
-Plans can evolve during execution as the agent discovers new requirements or completes tasks.
+A checklist sent with the `plan` session update.
 
 See protocol docs: [Agent Plan](https://agentclientprotocol.com/protocol/v1/draft/agent-plan)
 
@@ -6624,16 +6610,12 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 <ResponseField name="entries" type={<a href="#planentry">PlanEntry[]</a>} required>
   The list of tasks to be accomplished.
 
-When updating a plan, the agent MUST send a complete list of all entries
-with their current status. The client replaces the entire plan with each update.
+The Agent MUST send all entries with their current status.
+The Client MUST replace the entire checklist with each update.
 
 </ResponseField>
 
 ## <span class="font-mono">PlanCapabilities</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Capabilities for receiving `plan_update` and `plan_removed` session updates.
 
@@ -6726,19 +6708,11 @@ See protocol docs: [Plan Entries](https://agentclientprotocol.com/protocol/v1/dr
 
 ## <span class="font-mono">PlanId</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 Unique identifier for a plan within a session.
 
 **Type:** `string`
 
 ## <span class="font-mono">PlanItems</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 A plan represented as structured entries.
 
@@ -6757,8 +6731,8 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 <ResponseField name="entries" type={<a href="#planentry">PlanEntry[]</a>} required>
   The list of tasks to be accomplished.
 
-When updating an item-based plan, the agent MUST send a complete list of all entries
-with their current status. The client replaces that plan with each update.
+The Agent MUST send all entries with their current status.
+The Client MUST replace the checklist with this `planId` on each update.
 
 </ResponseField>
 <ResponseField name="planId" type={<a href="#planid">PlanId</a>} required>
@@ -6767,11 +6741,7 @@ with their current status. The client replaces that plan with each update.
 
 ## <span class="font-mono">PlanMarkdown</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
-A plan represented as raw markdown content.
+A plan represented as Markdown.
 
 **Type:** Object
 
@@ -6786,13 +6756,13 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 
 </ResponseField>
 <ResponseField name="content" type={"string"} required>
-  Markdown content for the plan.
+  The complete plan as Markdown, not just the text that changed.
 </ResponseField>
 <ResponseField name="path" type={"string | null"} >
   The absolute path of the file that holds this plan.
 
-This field is optional. Omitting it or sending `null` both mean that the plan
-has no file. `content` is the plan to display whether or not `path` is set.
+Omitted and `null` both mean the plan has no file. A supplied path MUST
+be absolute. `content` is the plan to display whether or not `path` is set.
 Clients can use `path` to open the file.
 
 </ResponseField>
@@ -6801,10 +6771,6 @@ Clients can use `path` to open the file.
 </ResponseField>
 
 ## <span class="font-mono">PlanRemoved</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Removal notice for a plan identified by ID.
 
@@ -6821,14 +6787,10 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 
 </ResponseField>
 <ResponseField name="planId" type={<a href="#planid">PlanId</a>} required>
-  The plan ID to remove.
+  The plan ID to remove. Clients MUST ignore a removal for an unknown ID.
 </ResponseField>
 
 ## <span class="font-mono">PlanUpdate</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 A content update for a plan identified by ID.
 
@@ -6845,14 +6807,10 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 
 </ResponseField>
 <ResponseField name="plan" type={<a href="#planupdatecontent">PlanUpdateContent</a>} required>
-  The updated plan content.
+  Replaces the whole plan with this `planId`, even if its `type` changes.
 </ResponseField>
 
 ## <span class="font-mono">PlanUpdateContent</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Updated content for a plan.
 
@@ -6874,8 +6832,8 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 <ResponseField name="entries" type={<a href="#planentry">PlanEntry[]</a>} required>
   The list of tasks to be accomplished.
 
-When updating an item-based plan, the agent MUST send a complete list of all entries
-with their current status. The client replaces that plan with each update.
+The Agent MUST send all entries with their current status.
+The Client MUST replace the checklist with this `planId` on each update.
 
 </ResponseField>
 <ResponseField name="planId" type={<a href="#planid">PlanId</a>} required>
@@ -6889,7 +6847,7 @@ with their current status. The client replaces that plan with each update.
 </ResponseField>
 
 <ResponseField name="markdown" type="object">
-Raw markdown content for the plan.
+The complete plan as Markdown.
 
 <Expandable title="Properties">
 
@@ -6902,13 +6860,13 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 
 </ResponseField>
 <ResponseField name="content" type={"string"} required>
-  Markdown content for the plan.
+  The complete plan as Markdown, not just the text that changed.
 </ResponseField>
 <ResponseField name="path" type={"string | null"} >
   The absolute path of the file that holds this plan.
 
-This field is optional. Omitting it or sending `null` both mean that the plan
-has no file. `content` is the plan to display whether or not `path` is set.
+Omitted and `null` both mean the plan has no file. A supplied path MUST
+be absolute. `content` is the plan to display whether or not `path` is set.
 Clients can use `path` to open the file.
 
 </ResponseField>
@@ -7527,10 +7485,6 @@ future ACP variants.
 
 ## <span class="font-mono">SessionCancelCapabilities</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 Capability to cancel work in a subagent session without ending that session.
 
 Supplying `\{\}` advertises support. An omitted or `null` `cancel` does not.
@@ -8119,10 +8073,6 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 
 ## <span class="font-mono">SessionMessage</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 An upsert for an inter-session message.
 
 **Type:** Object
@@ -8172,10 +8122,6 @@ Omitted leaves the stored value unchanged. `null` clears it. A value replaces it
 </ResponseField>
 
 ## <span class="font-mono">SessionMessageChunk</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 A streamed content block of an inter-session message.
 
@@ -8281,10 +8227,6 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 </ResponseField>
 
 ## <span class="font-mono">SessionReference</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 A display-only reference to another session that this tool call operates on,
 such as a subagent it created, delegated to, or is waiting on.
@@ -8708,8 +8650,8 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 <ResponseField name="entries" type={<a href="#planentry">PlanEntry[]</a>} required>
   The list of tasks to be accomplished.
 
-When updating a plan, the agent MUST send a complete list of all entries
-with their current status. The client replaces the entire plan with each update.
+The Agent MUST send all entries with their current status.
+The Client MUST replace the entire checklist with each update.
 
 </ResponseField>
 <ResponseField name="sessionUpdate" type={"string"} required>
@@ -8720,11 +8662,8 @@ with their current status. The client replaces the entire plan with each update.
 </ResponseField>
 
 <ResponseField name="plan_update" type="object">
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
-A content update for a plan identified by ID.
+Replaces the plan with this ID. Agents MUST NOT send this update unless
+the Client advertised `plan`.
 
 <Expandable title="Properties">
 
@@ -8737,7 +8676,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 
 </ResponseField>
 <ResponseField name="plan" type={<a href="#planupdatecontent">PlanUpdateContent</a>} required>
-  The updated plan content.
+  Replaces the whole plan with this `planId`, even if its `type` changes.
 </ResponseField>
 <ResponseField name="sessionUpdate" type={"string"} required>
   The discriminator value. Must be `"plan_update"`.
@@ -8747,11 +8686,8 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 </ResponseField>
 
 <ResponseField name="plan_removed" type="object">
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
-Removal notice for a plan identified by ID.
+Removes the plan with this ID. Agents MUST NOT send this update unless
+the Client advertised `plan`.
 
 <Expandable title="Properties">
 
@@ -8764,7 +8700,7 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 
 </ResponseField>
 <ResponseField name="planId" type={<a href="#planid">PlanId</a>} required>
-  The plan ID to remove.
+  The plan ID to remove. Clients MUST ignore a removal for an unknown ID.
 </ResponseField>
 <ResponseField name="sessionUpdate" type={"string"} required>
   The discriminator value. Must be `"plan_removed"`.
@@ -9096,12 +9032,13 @@ the whole previous value. A new cursor starts with none.
 </ResponseField>
 
 <ResponseField name="subagent_update" type="object">
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 Announces a child session created and owned by this session, or updates
 that ownership association's metadata.
+
+Agents MUST only send this update when the Client advertised
+the `subagents` Client capability.
+
+See protocol docs: [Subagents](https://agentclientprotocol.com/protocol/v1/draft/subagents)
 
 <Expandable title="Properties">
 
@@ -9177,12 +9114,13 @@ a fallback presentation.
 </ResponseField>
 
 <ResponseField name="session_message" type="object">
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 A message upsert observed in this session's transcript, sent to or
 received from another session.
+
+Agents MUST only send this update when the Client advertised
+the `subagents` Client capability.
+
+See protocol docs: [Session-directed messages](https://agentclientprotocol.com/protocol/v1/draft/prompt-turn#session-directed-messages)
 
 <Expandable title="Properties">
 
@@ -9235,11 +9173,12 @@ Omitted leaves the stored value unchanged. `null` clears it. A value replaces it
 </ResponseField>
 
 <ResponseField name="session_message_chunk" type="object">
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 One content block appended to a sent or received session message.
+
+Agents MUST only send this update when the Client advertised
+the `subagents` Client capability.
+
+See protocol docs: [Session-directed messages](https://agentclientprotocol.com/protocol/v1/draft/prompt-turn#session-directed-messages)
 
 <Expandable title="Properties">
 
@@ -9263,10 +9202,6 @@ Implementations MUST NOT make assumptions about values in `_meta`.
 </ResponseField>
 
 ## <span class="font-mono">StateUpdate</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Current foreground-work state of a reusable child session.
 
@@ -9644,10 +9579,6 @@ Optional. Omitted and `null` are equivalent and mean no title is provided.
 
 ## <span class="font-mono">SubagentCapabilities</span>
 
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 Capability marker for exposing reusable child sessions as restricted ACP sessions.
 
 Supplying `\{\}` advertises support for child association and state updates,
@@ -9666,10 +9597,6 @@ session-directed messages.
 </ResponseField>
 
 ## <span class="font-mono">SubagentSessionCapabilities</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Client-initiated session mutations permitted for a specific subagent session.
 
@@ -9692,10 +9619,6 @@ the session. Omitted or `null` means unsupported. An object (including
 </ResponseField>
 
 ## <span class="font-mono">SubagentUpdate</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 Notification that the enclosing parent session created and owns a child session.
 
@@ -10143,11 +10066,12 @@ See protocol docs: [Extensibility](https://agentclientprotocol.com/protocol/v1/d
 </ResponseField>
 
 <ResponseField name="session" type="object">
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
-
 A display-only reference to another session, such as a subagent.
+
+Agents send it only when the Client advertised the `subagents` Client
+capability.
+
+See protocol docs: [Sessions](https://agentclientprotocol.com/protocol/v1/draft/tool-calls#sessions)
 
 <Expandable title="Properties">
 
@@ -10338,10 +10262,6 @@ See protocol docs: [Creating](https://agentclientprotocol.com/protocol/v1/draft/
 </ResponseField>
 
 ## <span class="font-mono">UnknownStateUpdate</span>
-
-**UNSTABLE**
-
-This capability is not part of the spec yet, and may be removed or changed at any point.
 
 The Agent cannot currently determine foreground activity.
 
