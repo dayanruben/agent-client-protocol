@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [1.21.2](https://github.com/agentclientprotocol/agent-client-protocol/compare/v1.21.1...v1.21.2) - 2026-11-21
+
+### Other
+
+- *(unstable-v2)* say which description fields may contain Markdown ([#2974](https://github.com/agentclientprotocol/agent-client-protocol/pull/2974))
+
+## [1.21.1](https://github.com/agentclientprotocol/agent-client-protocol/compare/v1.21.0...v1.21.1) - 2026-11-21
+
+### Other
+
+- *(rust)* narrow Clippy exceptions and box large v2 payloads ([#2972](https://github.com/agentclientprotocol/agent-client-protocol/pull/2972))
+
+## [1.21.0](https://github.com/agentclientprotocol/agent-client-protocol/compare/v1.20.0...v1.21.0) - 2026-11-21
+
+### Added
+
+- *(rust)* re-export IndexMap from the schema crate ([#2970](https://github.com/agentclientprotocol/agent-client-protocol/pull/2970))
+
+### Other
+
+- *(schema)* reorder the protocol pages and rename Cancellation ([#2964](https://github.com/agentclientprotocol/agent-client-protocol/pull/2964))
+
 ## [1.20.0](https://github.com/agentclientprotocol/agent-client-protocol/compare/v1.19.0...v1.20.0) - 2026-11-20
 
 ### Added
