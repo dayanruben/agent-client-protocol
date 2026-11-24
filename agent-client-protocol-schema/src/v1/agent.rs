@@ -4021,11 +4021,40 @@ pub enum SessionConfigOptionValue {
     /// This is the default when `type` is absent on the wire. Unknown `type`
     /// values with string payloads also gracefully deserialize into this
     /// variant.
-    #[serde(untagged)]
+    #[serde(untagged, deserialize_with = "deserialize_config_value_id_fallback")]
+    // Without `required` inside `not`, the schema would also reject legacy IDs with no `type`.
+    #[cfg_attr(feature = "schemars", schemars(extend("not" = {
+        "properties": {"type": {"const": "boolean"}},
+        "required": ["type"]
+    })))]
     ValueId {
         /// The value ID.
         value: SessionConfigValueId,
     },
+}
+
+fn deserialize_config_value_id_fallback<'de, D>(
+    deserializer: D,
+) -> Result<SessionConfigValueId, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    // An untagged struct variant accepts objects, not positional arrays.
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Fallback {
+        Id {
+            #[serde(default, rename = "type")]
+            value_type: serde_json::Value,
+            value: SessionConfigValueId,
+        },
+    }
+
+    let Fallback::Id { value_type, value } = Fallback::deserialize(deserializer)?;
+    if value_type == "boolean" {
+        return Err(serde::de::Error::custom("expected a boolean config value"));
+    }
+    Ok(value)
 }
 
 impl SessionConfigOptionValue {
@@ -4221,8 +4250,30 @@ pub enum McpServer {
     /// Stdio transport configuration
     ///
     /// All Agents MUST support this transport.
-    #[serde(untagged)]
+    #[serde(untagged, deserialize_with = "deserialize_stdio_server")]
     Stdio(McpServerStdio),
+}
+
+fn deserialize_stdio_server<'de, D>(deserializer: D) -> Result<McpServerStdio, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    // Inspect the tag without collecting into a JSON object: flatten keeps
+    // duplicate fields visible to the stdio configuration's deserializer.
+    #[derive(Deserialize)]
+    struct Wire {
+        #[serde(default, rename = "type")]
+        transport: crate::MaybeUndefined<String>,
+        #[serde(flatten)]
+        server: McpServerStdio,
+    }
+
+    let wire = Wire::deserialize(deserializer)?;
+    if wire.transport.is_undefined() || wire.transport.contains_value(&"stdio") {
+        Ok(wire.server)
+    } else {
+        Err(serde::de::Error::custom("expected stdio transport"))
+    }
 }
 
 /// HTTP transport configuration for MCP.
@@ -7434,6 +7485,10 @@ mod test_serialization {
             })
         );
 
+        let mut tagged = json.clone();
+        tagged["type"] = json!("stdio");
+        assert_eq!(serde_json::from_value::<McpServer>(tagged).unwrap(), server);
+
         let deserialized: McpServer = serde_json::from_value(json).unwrap();
         match deserialized {
             McpServer::Stdio(McpServerStdio {
@@ -7451,6 +7506,45 @@ mod test_serialization {
                 assert_eq!(env[0].value, "secret123");
             }
             _ => panic!("Expected Stdio variant"),
+        }
+    }
+
+    #[test]
+    fn mcp_server_stdio_does_not_override_another_transport() {
+        for transport in [
+            json!("http"),
+            json!("sse"),
+            json!("acp"),
+            json!("future"),
+            json!(null),
+            json!(0),
+            json!({"stdio": null}),
+        ] {
+            let params = json!({
+                "cwd": "/repo",
+                "mcpServers": [{
+                    "type": transport, "name": "docs", "url": 42, "headers": [],
+                    "command": "/bin/docs-mcp", "args": [], "env": []
+                }]
+            });
+            assert!(
+                matches!(
+                    ClientRequest::from_method_and_params("session/new", &params),
+                    Err(crate::MethodDispatchError::InvalidPayload { .. })
+                ),
+                "unexpectedly accepted transport {transport}"
+            );
+        }
+    }
+
+    #[test]
+    fn mcp_server_stdio_rejects_duplicate_fields() {
+        // Parsing into serde_json::Value first would discard the duplicate.
+        for raw in [
+            r#"{"name":"a","name":"b","command":"/bin/docs-mcp","args":[],"env":[]}"#,
+            r#"{"type":"stdio","type":"stdio","name":"a","command":"/bin/docs-mcp","args":[],"env":[]}"#,
+        ] {
+            assert!(serde_json::from_str::<McpServer>(raw).is_err(), "{raw}");
         }
     }
 
@@ -7918,14 +8012,20 @@ mod test_serialization {
             serde_json::from_value::<NewSessionRequest>(value).unwrap(),
             request
         );
-        assert!(
-            serde_json::from_value::<NewSessionRequest>(json!({
-                "cwd": "/home/user/project",
-                "mcpServers": [],
-                "configOptions": [{"type": "boolean", "value": true}]
-            }))
-            .is_err()
-        );
+        for invalid in [
+            json!({"type": "boolean", "value": true}),
+            json!({"configId": "fast", "type": "boolean", "value": "false"}),
+        ] {
+            assert!(
+                serde_json::from_value::<NewSessionRequest>(json!({
+                    "cwd": "/home/user/project",
+                    "mcpServers": [],
+                    "configOptions": [invalid]
+                }))
+                .is_err(),
+                "{invalid}"
+            );
+        }
         assert_eq!(
             serde_json::to_value(SessionOptionsResponse::new()).unwrap(),
             json!({})
@@ -8526,16 +8626,14 @@ mod test_serialization {
     }
 
     #[test]
-    fn test_session_config_option_value_type_mismatch_boolean_with_string() {
-        // type says "boolean" but value is a string — falls to untagged ValueId
-        let json = json!({ "type": "boolean", "value": "not a bool" });
-        let result = serde_json::from_value::<SessionConfigOptionValue>(json);
-        // serde tries Boolean first (fails), then falls to untagged ValueId (succeeds)
-        assert!(result.is_ok());
-        assert_eq!(
-            result.unwrap().as_value_id().unwrap().to_string(),
-            "not a bool"
-        );
+    fn test_set_session_config_option_request_rejects_boolean_with_string() {
+        let params = json!({
+            "sessionId": "s",
+            "configId": "fast",
+            "type": "boolean",
+            "value": "false"
+        });
+        assert!(serde_json::from_value::<SetSessionConfigOptionRequest>(params).is_err());
     }
 
     #[test]
